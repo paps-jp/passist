@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../host/renderer/style.css" />
+    <title>UI preview</title>
+    <!-- このPCで取得した Windows システム色（ライト）を再現。実アプリは systemPreferences から動的取得。 -->
+    <style>
+      :root {
+        --bg: #ffffff; --surface: #ffffff; --fg: #000000; --muted: #5f5f5f;
+        --border: #e2e2e2; --btn-border: #e2e2e2; --field-bg: #ffffff;
+        --btn-bg: #f0f0f0; --btn-fg: #000000; --btn-hover: #e6e6e6;
+        --primary: #0078d4; --danger: #c0392b;
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <div class="warn">⚠ 入力注入が無効（閲覧のみ）。<code>npm run rebuild</code> で有効化できます。</div>
+      <section class="picker">
+        <div class="picker-head">
+          <h2>共有するウィンドウを 1 つ選択</h2>
+          <button class="ghost">更新</button>
+        </div>
+        <p class="hint">デスクトップ全体や画面は選択肢に出ません。選んだ 1 ウィンドウだけが相手に表示されます。</p>
+        <div class="grid">
+          <div class="card"><div class="thumb" style="height:130px;background:linear-gradient(135deg,#4a90d9,#2c6cb0)"></div><div class="cap"><span>メモ帳 — 無題</span></div></div>
+          <div class="card"><div class="thumb" style="height:130px;background:linear-gradient(135deg,#d98a4a,#c0603a)"></div><div class="cap"><span>Google Chrome — PAssist</span></div></div>
+          <div class="card"><div class="thumb" style="height:130px;background:linear-gradient(135deg,#5a5a5a,#222)"></div><div class="cap"><span>エクスプローラー</span></div></div>
+        </div>
+      </section>
+      <hr style="border:0;border-top:1px solid var(--border);margin:36px 0" />
+      <section class="session">
+        <div class="left">
+          <h2>このウィンドウを共有中</h2>
+          <div id="preview" style="height:200px"></div>
+          <button class="ghost">別のウィンドウを選ぶ</button>
+        </div>
+        <div class="right">
+          <label>共有URL（アカウント不要・このリンクだけで接続）</label>
+          <div class="urlrow"><input value="https://passist.paps.jp/s/ab12cd34" readonly /><button>コピー</button></div>
+          <div class="pin">PIN: 4 8 2 9 1 7</div>
+          <div class="request">
+            <p>接続リクエストがあります。許可しますか？</p>
+            <label class="chk"><input type="checkbox" checked /> この端末を信頼（次回から承認なしで接続）</label>
+            <div class="btnrow"><button class="primary">許可する</button><button class="ghost">拒否</button></div>
+          </div>
+          <div class="statusrow"><span class="status">接続済み</span><button class="danger">セッション終了</button></div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

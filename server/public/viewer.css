@@ -1,0 +1,186 @@
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #0b0d10;
+  color: #e7ecf2;
+  font-family: system-ui, "Segoe UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+}
+body { display: flex; flex-direction: column; }
+.hidden { display: none !important; }
+
+.status {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(20, 24, 30, 0.92);
+  border: 1px solid #2a313b;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 14px;
+  z-index: 10;
+}
+
+.pinbox {
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 28px;
+  background: #12161c;
+  border: 1px solid #2a313b;
+  border-radius: 14px;
+  width: 280px;
+  text-align: center;
+}
+.pinbox input {
+  font-size: 24px;
+  letter-spacing: 8px;
+  text-align: center;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid #2a313b;
+  background: #0b0d10;
+  color: #fff;
+}
+.pinbox button,
+.toolbar button {
+  background: #2b6cff;
+  color: #fff;
+  border: 0;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.stage {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+#video {
+  max-width: 100%;
+  max-height: 100vh;
+  outline: none;
+  background: #000;
+  cursor: crosshair;
+}
+.gate {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.toolbar {
+  position: fixed;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: rgba(20, 24, 30, 0.92);
+  border: 1px solid #2a313b;
+  padding: 8px 14px;
+  border-radius: 999px;
+  z-index: 10;
+}
+#badge { color: #3ddc84; font-size: 13px; }
+.toolbar button { background: #2a313b; padding: 6px 12px; font-size: 13px; }
+
+.ctxmenu {
+  position: fixed;
+  z-index: 20;
+  background: #1b2230;
+  border: 1px solid #2a313b;
+  border-radius: 8px;
+  padding: 4px;
+  min-width: 130px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+}
+.ctxmenu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  color: #e7ecf2;
+  border: 0;
+  padding: 7px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.ctxmenu button:hover { background: #2b6cff; }
+.ctxsep { height: 1px; background: #2a313b; margin: 4px 6px; }
+
+/* テキスト入力ダイアログ */
+.textdialog {
+  position: fixed;
+  z-index: 30;
+  left: 50%;
+  top: 16%;
+  transform: translateX(-50%);
+  width: min(440px, 92vw);
+  background: #1b2230;
+  border: 1px solid #2a313b;
+  border-radius: 12px;
+  padding: 14px;
+  box-shadow: 0 12px 44px rgba(0, 0, 0, 0.5);
+}
+.textdialog-row { font-size: 12.5px; color: #9fb0c6; margin-bottom: 8px; }
+#textInput {
+  width: 100%;
+  resize: vertical;
+  min-height: 64px;
+  background: #0b0d10;
+  color: #fff;
+  border: 1px solid #2a313b;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 14px;
+  font-family: inherit;
+}
+.textdialog-btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+.textdialog-btns button {
+  background: #2a313b;
+  color: #fff;
+  border: 0;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.textdialog-btns .primary { background: #2b6cff; }
+
+/* クライアント側ローカルカーソル（VNC風・即時描画） */
+#localCursor {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 24px;
+  height: 24px;
+  pointer-events: none; /* クリックを透過 */
+  z-index: 15;
+  display: none;
+  will-change: transform;
+}
+#localCursor svg {
+  display: block;
+  filter: drop-shadow(0 1px 1.5px rgba(0, 0, 0, 0.5));
+  transition: transform 0.08s ease-out;
+}
+#localCursor.click svg { transform: scale(0.7); } /* クリック時の押し込みフィードバック */
+/* ローカルカーソル表示中はブラウザ標準カーソルを隠す（カーソルが2つ見えないように） */
+.stage.local-cursor,
+.stage.local-cursor #video,
+.stage.local-cursor #gate { cursor: none; }

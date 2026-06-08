@@ -1,0 +1,160 @@
+/* PAssist ホストUI — Claude 風のやわらかい配色（ライト/ダーク対応のデザイン済みパレット）。
+   ※ 以前は生の CSS システムカラーで地味だったため、調整した配色に変更。 */
+:root {
+  --bg: #faf9f7;
+  --surface: #ffffff;
+  --fg: #232321;
+  --muted: #76746e;
+  --border: #e7e3da;
+  --field-bg: #ffffff;
+  --btn-bg: #ffffff;
+  --btn-fg: #2c2b28;
+  --btn-border: #ddd8ce;
+  --btn-hover: #f1efe9;
+  --primary: #2f6fed;
+  --primary-hover: #235fd6;
+  --danger: #c0392b;
+  --danger-border: #e6b9b3;
+  --danger-hover: #fae9e6;
+  --shadow: 0 6px 22px rgba(40, 35, 25, 0.1);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1d1d1b;
+    --surface: #262624;
+    --fg: #ededea;
+    --muted: #9c9a93;
+    --border: #3a3934;
+    --field-bg: #2a2a27;
+    --btn-bg: #2f2f2b;
+    --btn-fg: #ededea;
+    --btn-border: #43423d;
+    --btn-hover: #3a3934;
+    --primary: #4b82f0;
+    --primary-hover: #5d8ef2;
+    --danger: #ff8a80;
+    --danger-border: #5c3a37;
+    --danger-hover: #3a2724;
+    --shadow: 0 8px 26px rgba(0, 0, 0, 0.45);
+  }
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--fg);
+  accent-color: var(--primary);
+  font-family: system-ui, "Segoe UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+}
+.hidden { display: none !important; }
+
+/* 中央寄せ・余白広め */
+.app { max-width: 880px; margin: 0 auto; padding: 40px 24px 72px; }
+h2 { font-size: 20px; font-weight: 650; margin: 0 0 6px; letter-spacing: 0.2px; }
+.hint { color: var(--muted); font-size: 13px; margin: 6px 0 18px; }
+code { background: var(--btn-hover); color: var(--fg); padding: 1px 6px; border-radius: 6px; font-size: 0.92em; }
+
+.warn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid #e0a400;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 22px;
+  color: var(--fg);
+  font-size: 13px;
+}
+
+/* ボタン（しっかり塗り＋ホバー＝地味さ解消） */
+button {
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 9px 16px;
+  border-radius: 10px;
+  border: 1px solid var(--btn-border);
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  transition: background 0.12s, border-color 0.12s, box-shadow 0.12s, transform 0.04s;
+}
+button:hover { background: var(--btn-hover); }
+button:active { transform: translateY(1px); }
+button:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.primary {
+  background: var(--primary);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+.primary:hover { filter: brightness(1.08); } /* 任意の Windows アクセント色に対応 */
+.ghost { background: var(--btn-bg); color: var(--btn-fg); border-color: var(--btn-border); }
+.danger { background: transparent; color: var(--danger); border-color: var(--danger-border); }
+.danger:hover { background: var(--danger-hover); }
+
+/* picker */
+.picker-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 16px; margin-top: 10px; }
+.card {
+  padding: 0;
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.12s, transform 0.06s, box-shadow 0.12s;
+}
+.card:hover { border-color: var(--primary); transform: translateY(-2px); box-shadow: var(--shadow); }
+.card img.thumb { width: 100%; height: 130px; object-fit: cover; background: #000; display: block; }
+.card .cap {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px; font-size: 13px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.card .cap img.ico { width: 16px; height: 16px; flex: 0 0 auto; }
+.card .cap span { overflow: hidden; text-overflow: ellipsis; }
+
+/* session */
+.session { display: grid; grid-template-columns: 1.1fr 1fr; gap: 28px; align-items: start; }
+#preview { width: 100%; border: 1px solid var(--border); border-radius: 14px; background: #000; margin-bottom: 14px; }
+.right label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 8px; }
+.urlrow { display: flex; gap: 8px; margin-bottom: 16px; }
+.urlrow input {
+  flex: 1; padding: 11px 12px; border-radius: 10px;
+  border: 1px solid var(--btn-border); background: var(--field-bg); color: var(--fg);
+  font-size: 13px;
+}
+.urlrow input:focus { outline: none; border-color: var(--primary); }
+.adv { margin-bottom: 16px; }
+.adv summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+.pin {
+  background: var(--field-bg); color: var(--fg);
+  border: 1px dashed var(--btn-border);
+  padding: 12px 16px; border-radius: 12px;
+  font-size: 18px; letter-spacing: 3px; margin-bottom: 16px;
+}
+.request {
+  background: var(--surface);
+  border: 1px solid var(--primary);
+  border-radius: 14px; padding: 16px; margin-bottom: 16px;
+  box-shadow: var(--shadow);
+}
+.request p { margin: 0 0 10px; }
+.btnrow { display: flex; gap: 10px; }
+.statusrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 8px; }
+.status { color: var(--muted); font-size: 13px; }
+
+.chk { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--fg); margin-bottom: 14px; }
+.chk input { width: 16px; height: 16px; }
+.trust { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+#trustManage a { color: var(--primary); }
+
+@media (max-width: 720px) {
+  .session { grid-template-columns: 1fr; }
+}

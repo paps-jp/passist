@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <title>PAssist — リモート操作</title>
+    <link rel="stylesheet" href="/viewer.css?v=5" />
+  </head>
+  <body>
+    <div id="status" class="status">接続を準備しています…</div>
+
+    <div id="pinBox" class="pinbox hidden">
+      <label for="pinInput">PIN を入力してください</label>
+      <input id="pinInput" inputmode="numeric" maxlength="6" autocomplete="off" />
+      <button id="pinBtn">接続</button>
+    </div>
+
+    <div id="stage" class="stage hidden">
+      <video id="video" autoplay playsinline muted></video>
+      <div id="gate" class="gate">クリックして操作を開始</div>
+    </div>
+
+    <div id="toolbar" class="toolbar hidden">
+      <span id="badge">● 操作中</span>
+      <button id="fsBtn">全画面</button>
+    </div>
+
+    <div id="localCursor" aria-hidden="true">
+      <svg width="24" height="24" viewBox="0 0 24 24">
+        <path d="M1 1 L1 17 L5.5 12.7 L8.7 19.6 L11.8 18.1 L8.6 11.5 L15 11.5 Z" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.4" stroke-linejoin="round" />
+      </svg>
+    </div>
+
+    <div id="ctxMenu" class="ctxmenu hidden">
+      <button data-act="copy">コピー</button>
+      <button data-act="cut">切り取り</button>
+      <button data-act="paste">貼り付け</button>
+      <div class="ctxsep"></div>
+      <button data-act="text">テキスト入力…</button>
+    </div>
+
+    <div id="textDialog" class="textdialog hidden">
+      <div class="textdialog-row">テキスト入力（日本語可・Enter で挿入 / Shift+Enter で改行）</div>
+      <textarea id="textInput" rows="3" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
+      <div class="textdialog-btns">
+        <button id="textCancel">閉じる</button>
+        <button id="textInsert" class="primary">挿入</button>
+      </div>
+    </div>
+
+    <script src="/viewer.js?v=5"></script>
+  </body>
+</html>
