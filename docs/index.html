@@ -101,6 +101,12 @@
       .more h3 .ic{color:var(--acc)}
       .more p{margin:0;color:var(--mut);font-size:13.5px}
 
+      /* 開発の背景 / ぱっぷす */
+      .prose{max-width:760px;margin:0 auto;color:#3a4658;font-size:14.5px;line-height:1.95}
+      .prose p{margin:0 0 15px}
+      .prose p:last-child{margin-bottom:0}
+      .paps-link{text-align:center;margin:22px 0 0;font-weight:700}
+
       footer{border-top:1px solid var(--line);color:var(--mut);font-size:13px;text-align:center;padding:28px 24px 48px}
       footer a{color:var(--mut)}
 
@@ -213,6 +219,22 @@
           <a href="docs.html#public"><h3><svg class="ic"><use href="#i-earth"/></svg>インターネット公開</h3><p>UPnP 自動公開／Cloudflare トンネルでの https 公開。</p></a>
           <a href="https://github.com/paps-jp/passist"><h3><svg class="ic"><use href="#i-git-branch"/></svg>GitHub リポジトリ</h3><p>ソースコード・Issue・最新の開発状況。</p></a>
         </div>
+      </div>
+    </section>
+
+    <section class="block" id="background" style="background:#f1f5fb">
+      <div class="wrap">
+        <h2 class="title">開発の背景</h2>
+        <p class="lead">PAssist は、NPO「ぱっぷす」の支援活動の中から生まれたツールです。</p>
+        <div class="prose">
+          <p>特定非営利活動法人ぱっぷす（PAPS）は、性的な画像や動画の拡散、セクストーション（性的脅迫）、リベンジポルノなどのデジタル性暴力被害を受けた方々への相談支援を行うNPO法人です（<a href="https://paps.jp" target="_blank" rel="noopener">https://paps.jp</a>）。</p>
+          <p>ぱっぷすの支援活動では、相談者への遠隔サポートや、スタッフ同士の技術支援、セキュリティの確保のために、画面共有やリモート操作が必要になる場面があります。しかし、市販のツールでは、支援現場で求められる要件やセキュリティ上の要請に十分対応できないことも多く、ぱっぷすでは必要な機能を備えたツールを独自に開発してきました。</p>
+          <p>また、ぱっぷすは、ライブチャットやSNS、動画配信サービスなどのオンラインプラットフォーム上で発生するデジタル性暴力の相談支援を数多く行っており、インターネット上での情報流通やネットワーク技術、オンラインサービスの仕組みに関する知見を蓄積してきました。こうした支援現場で培われた経験と技術的知見も、PAssistの開発に活かされています。</p>
+          <p>PAssistは、そのような支援活動の中から生まれたツールの一つです。Windows上の特定のウィンドウを共有し、遠隔から閲覧・操作できるようにすることで、相談支援やチーム内での協働を円滑に行うことを目的としています。</p>
+          <p>また、ぱっぷすではオープンソースの理念を重視しています。支援活動のために開発したツールのうち、他の団体や個人、さまざまな業務・教育・支援の現場でも活用できるものについては、今後も積極的に公開していきたいと考えています。</p>
+          <p>PAssistが、さまざまな支援活動や日々の業務を支えるツールとして活用されることを願っています。</p>
+        </div>
+        <p class="paps-link"><a href="https://paps.jp" target="_blank" rel="noopener">特定非営利活動法人ぱっぷす（PAPS）— paps.jp →</a></p>
       </div>
     </section>
 
