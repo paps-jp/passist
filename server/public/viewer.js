@@ -236,7 +236,7 @@
   function attachTouch() {
     const LONG_MS = 500, THRESH = 12;
     let lpTimer = null, sx = 0, sy = 0, moved = false, longFired = false, lastP = null;
-    let pinch = null;
+    let pinch = null, gmode = null, scrollAccum = 0; // gmode: 'zoom'(ピンチ) | 'scroll'(2本指ドラッグ)
     const clearLP = () => { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } };
     const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
     const startPinch = (e) => {
@@ -244,7 +244,9 @@
       const r = video.getBoundingClientRect();
       const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
       const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      pinch = { d: dist(e.touches[0], e.touches[1]), mx, my, baseX: r.left - zTx, baseY: r.top - zTy };
+      const d = dist(e.touches[0], e.touches[1]);
+      pinch = { d, mx, my, startD: d, startMx: mx, startMy: my, baseX: r.left - zTx, baseY: r.top - zTy };
+      gmode = null; scrollAccum = 0;
     };
 
     video.addEventListener('touchstart', (e) => {
@@ -261,18 +263,32 @@
     }, { passive: false });
 
     video.addEventListener('touchmove', (e) => {
-      if (e.touches.length >= 2) { // ピンチ拡大＋パン
+      if (e.touches.length >= 2) { // 2本指: ピンチ拡大 or スクロール（最初の動きで判別）
         if (!pinch) startPinch(e);
         const a = e.touches[0], b = e.touches[1];
         const d = dist(a, b);
         const mx = (a.clientX + b.clientX) / 2, my = (a.clientY + b.clientY) / 2;
-        const ns = Math.min(5, Math.max(1, zScale * (d / pinch.d)));
-        const f = ns / zScale; // クランプ後の実倍率
-        zTx = zTx - (mx - pinch.baseX - zTx) * (f - 1) + (mx - pinch.mx); // 2指中央を固定して拡大＋パン
-        zTy = zTy - (my - pinch.baseY - zTy) * (f - 1) + (my - pinch.my);
-        zScale = ns;
-        if (zScale <= 1.005) { zScale = 1; zTx = 0; zTy = 0; } // 等倍に戻ったら中央へスナップ
-        applyZoom();
+        if (!gmode) {
+          if (Math.abs(d - pinch.startD) > 24) gmode = 'zoom'; // 指の距離が変化→拡大
+          else if (Math.abs(my - pinch.startMy) > 14 || Math.abs(mx - pinch.startMx) > 14) gmode = 'scroll'; // 平行移動→スクロール
+        }
+        if (gmode === 'scroll') { // 2本指ドラッグ＝リモートを縦スクロール（指を下げる=上へ＝自然方向）
+          scrollAccum += my - pinch.my;
+          const STEP = 12;
+          while (Math.abs(scrollAccum) >= STEP) {
+            const up = scrollAccum > 0;
+            send({ t: 'w', dx: 0, dy: up ? -40 : 40 });
+            scrollAccum += up ? -STEP : STEP;
+          }
+        } else if (gmode === 'zoom') { // ピンチ拡大＋パン（2指中央を固定）
+          const ns = Math.min(5, Math.max(1, zScale * (d / pinch.d)));
+          const f = ns / zScale;
+          zTx = zTx - (mx - pinch.baseX - zTx) * (f - 1) + (mx - pinch.mx);
+          zTy = zTy - (my - pinch.baseY - zTy) * (f - 1) + (my - pinch.my);
+          zScale = ns;
+          if (zScale <= 1.005) { zScale = 1; zTx = 0; zTy = 0; } // 等倍復帰で中央スナップ
+          applyZoom();
+        }
         pinch.d = d; pinch.mx = mx; pinch.my = my;
         e.preventDefault();
         return;
@@ -301,7 +317,7 @@
       e.preventDefault();
     };
     video.addEventListener('touchend', end, { passive: false });
-    video.addEventListener('touchcancel', () => { clearLP(); longFired = false; moved = false; pinch = null; });
+    video.addEventListener('touchcancel', () => { clearLP(); longFired = false; moved = false; pinch = null; gmode = null; });
   }
 
   // テキスト入力ダイアログ：右クリック→「テキスト入力…」で開く。日本語はローカルIMEで確定し
