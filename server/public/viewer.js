@@ -270,8 +270,8 @@
     };
     // 蓄積分を STEP ごとにホイール送信（縦/横）。指と逆向き=自然なスクロール方向。
     const flushScroll = () => {
-      while (Math.abs(accY) >= STEP) { const up = accY > 0; send({ t: 'w', dx: 0, dy: up ? -120 : 120 }); accY += up ? -STEP : STEP; }
-      while (Math.abs(accX) >= STEP) { const right = accX > 0; send({ t: 'w', dx: right ? -120 : 120, dy: 0 }); accX += right ? -STEP : STEP; }
+      while (Math.abs(accY) >= STEP) { const up = accY > 0; send({ t: 'w', dx: 0, dy: up ? -360 : 360 }); accY += up ? -STEP : STEP; }
+      while (Math.abs(accX) >= STEP) { const right = accX > 0; send({ t: 'w', dx: right ? -360 : 360, dy: 0 }); accX += right ? -STEP : STEP; }
     };
 
     video.addEventListener('touchstart', (e) => {
@@ -280,6 +280,7 @@
       const t = e.touches[0];
       sx = t.clientX; sy = t.clientY; lastX = t.clientX; lastY = t.clientY;
       moved = false; longFired = false; accX = 0; accY = 0;
+      if (controlEnabled) { const p = norm(sx, sy); if (p) send({ t: 'm', x: p.x, y: p.y }); } // 触れた場所へカーソル＝スクロール/操作の対象を共有窓に確定（ホスト側で前面化）
       clearLP();
       if (controlEnabled) lpTimer = setTimeout(() => { longFired = true; showCtxMenu(sx, sy); }, LONG_MS); // 長押し=メニュー
       e.preventDefault();
