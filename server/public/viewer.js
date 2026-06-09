@@ -274,10 +274,10 @@
         }
         if (gmode === 'scroll') { // 2本指ドラッグ＝リモートを縦スクロール（指を下げる=上へ＝自然方向）
           scrollAccum += my - pinch.my;
-          const STEP = 12;
+          const STEP = 8; // 8px ごとに 1 ホイール（≒3ノッチ）。速いフリックは蓄積で比例して速くなる
           while (Math.abs(scrollAccum) >= STEP) {
             const up = scrollAccum > 0;
-            send({ t: 'w', dx: 0, dy: up ? -40 : 40 });
+            send({ t: 'w', dx: 0, dy: up ? -120 : 120 });
             scrollAccum += up ? -STEP : STEP;
           }
         } else if (gmode === 'zoom') { // ピンチ拡大＋パン（2指中央を固定）
