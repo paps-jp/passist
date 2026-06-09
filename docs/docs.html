@@ -145,9 +145,9 @@
 # ログに「[host] インターネット公開: http://&lt;公開IP&gt;:8443 …」が出れば成功
 # 同一LAN内のみにしたい場合: $env:PASSIST_PUBLIC="0"; npm start</pre>
           <h3>方法B：Cloudflare トンネル（https・ポート開け不要・推奨）</h3>
-          <p>独自ドメイン（例 <code>passist.paps.jp</code>）で正規の https URL になります。Cloudflare 側の公開ホスト名設定は <strong>タイプ=HTTP / URL=localhost:8443 / パス=空</strong>。</p>
-          <pre>$env:PASSIST_PUBLIC="0"; $env:PUBLIC_BASE_URL="https://passist.paps.jp"; npm start
-# 共有URL = https://passist.paps.jp/s/…（ブラウザで開くだけ）</pre>
+          <p>独自ドメイン（例 <code>passist.example.com</code>）で正規の https URL になります。Cloudflare 側の公開ホスト名設定は <strong>タイプ=HTTP / URL=localhost:8443 / パス=空</strong>。</p>
+          <pre>$env:PASSIST_PUBLIC="0"; $env:PUBLIC_BASE_URL="https://passist.example.com"; npm start
+# 共有URL = https://passist.example.com/s/…（ブラウザで開くだけ）</pre>
           <div class="note">
             映像/操作は WebRTC の P2P（STUN）で流れ、トンネルは通りません。厳しい NAT の相手とは TURN サーバが必要になることがあります（多人数運用なら中継集約型を推奨）。
           </div>
@@ -211,7 +211,7 @@ npm --prefix host run dist  # 配布用 dist\PAssist.exe（portable）を生成<
           <h2>10. iframe 埋め込み</h2>
           <p>ビューアは普通の Web ページなので iframe に埋め込めます。</p>
           <pre>&lt;iframe
-  src="https://passist.paps.jp/s/&lt;token&gt;"
+  src="https://passist.example.com/s/&lt;token&gt;"
   allow="fullscreen; autoplay"
   style="width:100%;height:600px;border:0"
   title="PAssist"&gt;&lt;/iframe&gt;</pre>
