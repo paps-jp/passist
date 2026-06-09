@@ -62,6 +62,12 @@
       .step p{margin:0;color:var(--mut);font-size:14px}
       .guest-note{margin:20px auto 0;max-width:760px;text-align:center;background:#eef6f6;border:1px solid #cfe9e8;border-radius:12px;padding:14px 18px;color:#27514f;font-size:14.5px}
 
+      /* screenshots */
+      .shots{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;align-items:start}
+      .shot{margin:0;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 10px 30px rgba(20,40,80,.07)}
+      .shot img{display:block;width:100%;height:auto;border-bottom:1px solid var(--line)}
+      .shot figcaption{padding:12px 15px;font-size:13.5px;color:var(--ink);font-weight:600}
+
       /* download */
       .dl{background:#fff;border:1px solid var(--line);border-radius:18px;max-width:720px;margin:0 auto;padding:34px 30px;text-align:center;box-shadow:0 12px 36px rgba(20,40,80,.08)}
       .dl .big{font-size:18px}
@@ -126,6 +132,18 @@
           <div class="step"><div class="n">3</div><h3>許可する</h3><p>接続リクエストを「許可」。これで相手がそのウィンドウを操作できます。</p></div>
         </div>
         <p class="guest-note">操作する人（ゲスト）は、送られた URL を<strong>ブラウザで開くだけ</strong>。インストールもログインも要りません。</p>
+      </div>
+    </section>
+
+    <section class="block" id="screens">
+      <div class="wrap">
+        <h2 class="title">画面イメージ</h2>
+        <p class="lead">実際のアプリ画面です（デモ表示・IP や実URLは含みません）。</p>
+        <div class="shots">
+          <figure class="shot"><img src="screenshots/pick.png" alt="共有する画面を1つ選ぶ" loading="lazy" /><figcaption>① 共有する画面を 1 つ選ぶ</figcaption></figure>
+          <figure class="shot"><img src="screenshots/share.png" alt="リンクとQRコードを送って承認" loading="lazy" /><figcaption>② リンク／QR を送って承認</figcaption></figure>
+          <figure class="shot"><img src="screenshots/operate.png" alt="相手はブラウザで操作" loading="lazy" /><figcaption>③ 相手はブラウザで操作</figcaption></figure>
+        </div>
       </div>
     </section>
 
