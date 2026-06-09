@@ -444,9 +444,21 @@
   async function startPeerFor(viewerId) {
     closePeerFor(viewerId); // 再接続時の取りこぼし防止
     const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-    const entry = { pc, dc: null };
+    const entry = { pc, dc: null, makingOffer: false, ignoreOffer: false, srpPending: false, polite: false }; // host=impolite
     peers.set(viewerId, entry);
-    for (const track of stream.getTracks()) pc.addTrack(track, stream);
+    // 再ネゴ（Perfect Negotiation）。初回 offer もこれが発火する。track/datachannel 追加より前に設定。
+    pc.onnegotiationneeded = async () => {
+      try {
+        entry.makingOffer = true;
+        await pc.setLocalDescription(); // 暗黙 createOffer（stable時）
+        sendWs({ type: 'signal', to: viewerId, data: { sdp: pc.localDescription } });
+      } catch (err) {
+        console.warn('negotiationneeded', err);
+      } finally {
+        entry.makingOffer = false;
+      }
+    };
+    if (stream) for (const track of stream.getTracks()) pc.addTrack(track, stream);
     const dc = pc.createDataChannel('input');
     entry.dc = dc;
     dc.onopen = () => {
@@ -465,22 +477,34 @@
       const st = pc.connectionState;
       if (st === 'failed' || st === 'closed') closePeerFor(viewerId); // 死んだ接続を解放
     };
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    sendWs({ type: 'signal', to: viewerId, data: { sdp: pc.localDescription } });
+    // 初回オファーは上記 onnegotiationneeded が自動発火する（手動 createOffer は不要）
   }
 
+  // Perfect Negotiation（host=impolite）。offer/answer/glare/ICE を捌く。
   async function handleSignal(from, data) {
     const p = peers.get(from);
     if (!p || !p.pc) return;
-    if (data.sdp) {
-      await p.pc.setRemoteDescription(data.sdp); // ビューアからの answer
-    } else if (data.candidate) {
-      try {
-        await p.pc.addIceCandidate(data.candidate);
-      } catch (err) {
-        console.warn('addIceCandidate', err);
+    const pc = p.pc;
+    try {
+      if (data.sdp) {
+        const desc = data.sdp;
+        const ready = !p.makingOffer && (pc.signalingState === 'stable' || p.srpPending);
+        const collision = desc.type === 'offer' && !ready;
+        p.ignoreOffer = !p.polite && collision; // impolite は衝突した offer を無視
+        if (p.ignoreOffer) return;
+        p.srpPending = desc.type === 'answer';
+        await pc.setRemoteDescription(desc);
+        p.srpPending = false;
+        if (desc.type === 'offer') {
+          // viewer 起点の offer（自分のカメラ追加など）には answer を返す
+          await pc.setLocalDescription();
+          sendWs({ type: 'signal', to: from, data: { sdp: pc.localDescription } });
+        }
+      } else if (data.candidate) {
+        try { await pc.addIceCandidate(data.candidate); } catch (err) { if (!p.ignoreOffer) console.warn('addIceCandidate', err); }
       }
+    } catch (err) {
+      console.warn('handleSignal', err);
     }
   }
 

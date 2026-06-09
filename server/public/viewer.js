@@ -22,6 +22,7 @@
 
   let ws, pc, dc;
   let controlEnabled = true; // ホストが「閲覧のみ」を通知したら false（操作入力を一切送らない）
+  let makingOffer = false, srpPending = false; // Perfect Negotiation（viewer=polite）
   const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
   const wsUrl = `${wsProto}://${location.host}/ws`;
 
@@ -92,6 +93,19 @@
 
   function startPeer() {
     pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    makingOffer = false; ignoreOffer = false; srpPending = false;
+    // 自分のカメラ等を追加したら offer を出す（viewer=polite）。P0では発火しない（受け身）。
+    pc.onnegotiationneeded = async () => {
+      try {
+        makingOffer = true;
+        await pc.setLocalDescription();
+        ws.send(JSON.stringify({ type: 'signal', data: { sdp: pc.localDescription } }));
+      } catch (e) {
+        console.warn('negotiationneeded', e);
+      } finally {
+        makingOffer = false;
+      }
+    };
     pc.ontrack = (e) => {
       video.srcObject = e.streams[0];
       stage.classList.remove('hidden');
@@ -120,21 +134,24 @@
     };
   }
 
+  // Perfect Negotiation（viewer=polite）。ホストからの offer は衝突時も rollback して受ける。
   async function handleSignal(data) {
     if (!pc) return;
-    if (data.sdp) {
-      await pc.setRemoteDescription(data.sdp);
-      if (data.sdp.type === 'offer') {
-        const ans = await pc.createAnswer();
-        await pc.setLocalDescription(ans);
-        ws.send(JSON.stringify({ type: 'signal', data: { sdp: pc.localDescription } }));
+    try {
+      if (data.sdp) {
+        const desc = data.sdp;
+        srpPending = desc.type === 'answer';
+        await pc.setRemoteDescription(desc); // polite: 衝突 offer でも受ける（暗黙 rollback）
+        srpPending = false;
+        if (desc.type === 'offer') {
+          await pc.setLocalDescription(); // 暗黙 createAnswer
+          ws.send(JSON.stringify({ type: 'signal', data: { sdp: pc.localDescription } }));
+        }
+      } else if (data.candidate) {
+        try { await pc.addIceCandidate(data.candidate); } catch (err) { console.warn('addIceCandidate', err); }
       }
-    } else if (data.candidate) {
-      try {
-        await pc.addIceCandidate(data.candidate);
-      } catch (err) {
-        console.warn('addIceCandidate', err);
-      }
+    } catch (err) {
+      console.warn('handleSignal', err);
     }
   }
 
