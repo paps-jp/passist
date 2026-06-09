@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
     <title>PAssist — リモート操作</title>
-    <link rel="stylesheet" href="/viewer.css?v=6" />
+    <link rel="stylesheet" href="/viewer.css?v=9" />
   </head>
   <body>
     <div id="status" class="status">接続を準備しています…</div>
@@ -17,12 +17,41 @@
 
     <div id="stage" class="stage hidden">
       <video id="video" autoplay playsinline muted></video>
-      <div id="gate" class="gate">クリックして操作を開始</div>
+      <div id="gate" class="gate">タップ／クリックして操作を開始</div>
     </div>
 
     <div id="toolbar" class="toolbar hidden">
       <span id="badge">● 操作中</span>
+      <button id="kbBtn">⌨ キー</button>
       <button id="fsBtn">全画面</button>
+    </div>
+
+    <!-- 画面上キーバー（スマホ用。特殊キー/修飾キーをホストへ送る。文字入力はテキスト入力ダイアログ） -->
+    <div id="keybar" class="keybar hidden">
+      <div class="kbrow">
+        <button data-mod="ctrl">Ctrl</button>
+        <button data-mod="alt">Alt</button>
+        <button data-mod="shift">Shift</button>
+        <button data-act="text">Aa 文字入力</button>
+        <button data-act="close">✕ 閉じる</button>
+      </div>
+      <div class="kbrow">
+        <button data-code="Escape" data-key="Escape">Esc</button>
+        <button data-code="Tab" data-key="Tab">Tab</button>
+        <button data-code="Home" data-key="Home">Home</button>
+        <button data-code="End" data-key="End">End</button>
+        <button data-code="PageUp" data-key="PageUp">PgUp</button>
+        <button data-code="PageDown" data-key="PageDown">PgDn</button>
+        <button data-code="Delete" data-key="Delete">Del</button>
+      </div>
+      <div class="kbrow">
+        <button data-code="ArrowLeft" data-key="ArrowLeft">←</button>
+        <button data-code="ArrowUp" data-key="ArrowUp">↑</button>
+        <button data-code="ArrowDown" data-key="ArrowDown">↓</button>
+        <button data-code="ArrowRight" data-key="ArrowRight">→</button>
+        <button data-code="Backspace" data-key="Backspace">⌫ BS</button>
+        <button data-code="Enter" data-key="Enter">⏎ Enter</button>
+      </div>
     </div>
 
     <div id="localCursor" aria-hidden="true">
@@ -48,6 +77,6 @@
       </div>
     </div>
 
-    <script src="/viewer.js?v=6"></script>
+    <script src="/viewer.js?v=9"></script>
   </body>
 </html>

@@ -62,6 +62,7 @@ body { display: flex; flex-direction: column; }
   align-items: center;
   justify-content: center;
   min-height: 0;
+  overflow: hidden; /* ピンチ拡大した映像のはみ出しをクリップ */
 }
 #video {
   max-width: 100%;
@@ -70,6 +71,16 @@ body { display: flex; flex-direction: column; }
   background: #000;
   cursor: crosshair;
 }
+/* スマホ: 既定のスクロール/ズーム/長押しコールアウトを抑止し、タッチ操作を自前で扱う */
+.stage, #video {
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+/* タッチでも押しやすいメニュー/ダイアログのボタン */
+.ctxmenu button { padding: 11px 14px; font-size: 15px; }
+.textdialog-btns button { padding: 11px 18px; font-size: 15px; }
 .gate {
   position: absolute;
   inset: 0;
@@ -99,6 +110,21 @@ body { display: flex; flex-direction: column; }
 #badge.readonly { color: #8ab4ff; }
 body.view-only #video { cursor: default; }
 .toolbar button { background: #2a313b; padding: 6px 12px; font-size: 13px; }
+
+/* 画面上キーバー（スマホ用の特殊キー/修飾キー） */
+.keybar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 25;
+  background: rgba(18, 22, 28, 0.97); border-top: 1px solid #2a313b;
+  padding: 6px; display: flex; flex-direction: column; gap: 6px;
+}
+.kbrow { display: flex; gap: 6px; justify-content: center; }
+.keybar button {
+  flex: 1 1 0; min-width: 40px; min-height: 46px;
+  background: #2a313b; color: #e7ecf2; border: 1px solid #3a434f;
+  border-radius: 8px; font-size: 15px; cursor: pointer;
+}
+.keybar button:active { background: #3a434f; }
+.keybar button.active { background: #2b6cff; border-color: #2b6cff; } /* 修飾キー ON */
 
 .ctxmenu {
   position: fixed;

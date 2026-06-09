@@ -97,6 +97,7 @@
       stage.classList.remove('hidden');
       toolbar.classList.remove('hidden');
       setStatus('', false);
+      resetZoom(); // 新しい映像はズーム等倍から
     };
     pc.ondatachannel = (e) => {
       dc = e.channel; // ホストが作成した 'input' チャネル
@@ -157,7 +158,7 @@
   }
 
   // video 表示領域(レターボックス補正込み)での正規化座標 0..1。範囲外は null。
-  function norm(e) {
+  function norm(cx, cy) {
     const r = video.getBoundingClientRect();
     const vw = video.videoWidth;
     const vh = video.videoHeight;
@@ -167,25 +168,38 @@
     const dispH = vh * scale;
     const offX = (r.width - dispW) / 2;
     const offY = (r.height - dispH) / 2;
-    const x = (e.clientX - r.left - offX) / dispW;
-    const y = (e.clientY - r.top - offY) / dispH;
+    const x = (cx - r.left - offX) / dispW;
+    const y = (cy - r.top - offY) / dispH;
     if (x < 0 || x > 1 || y < 0 || y > 1) return null;
     return { x, y };
   }
 
+  // 最新座標のみ間引いて移動送信（マウス/タッチ共通）
+  function queueMove(p) {
+    pendingMove = p;
+    if (!moveScheduled) {
+      moveScheduled = true;
+      requestAnimationFrame(flushMove);
+    }
+  }
+
+  // 表示ズーム（スマホのピンチ用）。CSS transform で video を拡大/移動。
+  // norm() は getBoundingClientRect（=変換後の矩形）を読むので、拡大中でも操作座標は自動で整合する。
+  let zScale = 1, zTx = 0, zTy = 0;
+  function applyZoom() {
+    video.style.transformOrigin = '0 0';
+    video.style.transform = zScale === 1 && !zTx && !zTy ? '' : `translate(${zTx}px, ${zTy}px) scale(${zScale})`;
+  }
+  function resetZoom() { zScale = 1; zTx = 0; zTy = 0; applyZoom(); }
+
   function attachInput() {
     video.addEventListener('mousemove', (e) => {
-      const p = norm(e);
-      if (!p) return;
-      pendingMove = p;
-      if (!moveScheduled) {
-        moveScheduled = true;
-        requestAnimationFrame(flushMove);
-      }
+      const p = norm(e.clientX, e.clientY);
+      if (p) queueMove(p);
     });
     video.addEventListener('mousedown', (e) => {
       if (e.button === 2) return; // 右クリックはコピペのメニュー用（ホストへは送らない）
-      const p = norm(e);
+      const p = norm(e.clientX, e.clientY);
       if (p) {
         send({ t: 'm', x: p.x, y: p.y });
         send({ t: 'd', b: e.button });
@@ -215,6 +229,79 @@
     };
     window.addEventListener('keydown', onKey(true));
     window.addEventListener('keyup', onKey(false));
+    attachTouch(); // スマホ: タップ=クリック / 1本指ドラッグ=移動 / 長押し=メニュー
+  }
+
+  // スマホ向けタッチ操作。1本指=操作（タップ/ドラッグ/長押し）、2本指=ピンチ拡大＋パン（閲覧のみでも可）。
+  function attachTouch() {
+    const LONG_MS = 500, THRESH = 12;
+    let lpTimer = null, sx = 0, sy = 0, moved = false, longFired = false, lastP = null;
+    let pinch = null;
+    const clearLP = () => { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } };
+    const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+    const startPinch = (e) => {
+      clearLP(); moved = true; longFired = false; // 単指ジェスチャを無効化
+      const r = video.getBoundingClientRect();
+      const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      pinch = { d: dist(e.touches[0], e.touches[1]), mx, my, baseX: r.left - zTx, baseY: r.top - zTy };
+    };
+
+    video.addEventListener('touchstart', (e) => {
+      if (e.touches.length >= 2) { startPinch(e); e.preventDefault(); return; } // ピンチ（閲覧のみでも拡大可）
+      if (!controlEnabled) return; // ここから下は操作（閲覧のみ時は無効）
+      if (ctxMenu && !ctxMenu.classList.contains('hidden')) { hideCtxMenu(); e.preventDefault(); return; } // メニュー表示中は閉じるだけ
+      const t = e.touches[0];
+      sx = t.clientX; sy = t.clientY; moved = false; longFired = false;
+      lastP = norm(sx, sy);
+      if (lastP) send({ t: 'm', x: lastP.x, y: lastP.y }); // 指の位置へカーソル移動
+      clearLP();
+      lpTimer = setTimeout(() => { longFired = true; showCtxMenu(sx, sy); }, LONG_MS); // 長押し→コピー等メニュー
+      e.preventDefault();
+    }, { passive: false });
+
+    video.addEventListener('touchmove', (e) => {
+      if (e.touches.length >= 2) { // ピンチ拡大＋パン
+        if (!pinch) startPinch(e);
+        const a = e.touches[0], b = e.touches[1];
+        const d = dist(a, b);
+        const mx = (a.clientX + b.clientX) / 2, my = (a.clientY + b.clientY) / 2;
+        const ns = Math.min(5, Math.max(1, zScale * (d / pinch.d)));
+        const f = ns / zScale; // クランプ後の実倍率
+        zTx = zTx - (mx - pinch.baseX - zTx) * (f - 1) + (mx - pinch.mx); // 2指中央を固定して拡大＋パン
+        zTy = zTy - (my - pinch.baseY - zTy) * (f - 1) + (my - pinch.my);
+        zScale = ns;
+        if (zScale <= 1.005) { zScale = 1; zTx = 0; zTy = 0; } // 等倍に戻ったら中央へスナップ
+        applyZoom();
+        pinch.d = d; pinch.mx = mx; pinch.my = my;
+        e.preventDefault();
+        return;
+      }
+      if (!controlEnabled) return;
+      const t = e.touches[0];
+      if (!t) return;
+      if (!moved && (Math.abs(t.clientX - sx) > THRESH || Math.abs(t.clientY - sy) > THRESH)) {
+        moved = true; clearLP(); // ドラッグ開始→長押し取消
+      }
+      const p = norm(t.clientX, t.clientY);
+      if (p) { lastP = p; queueMove(p); } // カーソル追従（間引き送信）
+      e.preventDefault();
+    }, { passive: false });
+
+    const end = (e) => {
+      if (pinch) { if (e.touches.length < 2) pinch = null; clearLP(); e.preventDefault(); return; } // ピンチ終了（タップ扱いしない）
+      clearLP();
+      if (!controlEnabled) return;
+      if (longFired) { longFired = false; e.preventDefault(); return; } // メニュー表示済み→クリックしない
+      if (!moved && lastP) { // タップ→左クリック
+        send({ t: 'm', x: lastP.x, y: lastP.y });
+        send({ t: 'd', b: 0 });
+        send({ t: 'u', b: 0 });
+      }
+      e.preventDefault();
+    };
+    video.addEventListener('touchend', end, { passive: false });
+    video.addEventListener('touchcancel', () => { clearLP(); longFired = false; moved = false; pinch = null; });
   }
 
   // テキスト入力ダイアログ：右クリック→「テキスト入力…」で開く。日本語はローカルIMEで確定し
@@ -269,8 +356,8 @@
     // 全画面中はフルスクリーン要素の中に入れないと前面に出ない（top layer 対策）
     const host = document.fullscreenElement || document.body;
     if (ctxMenu.parentNode !== host) host.appendChild(ctxMenu);
-    ctxMenu.style.left = Math.min(x, window.innerWidth - 150) + 'px';
-    ctxMenu.style.top = Math.min(y, window.innerHeight - 130) + 'px';
+    ctxMenu.style.left = Math.max(8, Math.min(x, window.innerWidth - 170)) + 'px';
+    ctxMenu.style.top = Math.max(8, Math.min(y, window.innerHeight - 230)) + 'px';
     ctxMenu.classList.remove('hidden');
   }
   function hideCtxMenu() {
@@ -303,6 +390,51 @@
     });
     document.addEventListener('click', (e) => { if (!ctxMenu.contains(e.target)) hideCtxMenu(); });
     window.addEventListener('blur', hideCtxMenu);
+  }
+
+  /* ---------- 画面上キーバー（スマホ用の特殊キー/修飾キー） ---------- */
+  const keybar = document.getElementById('keybar');
+  const kbBtn = document.getElementById('kbBtn');
+  const sticky = { ctrl: false, alt: false, shift: false };
+  const MOD = {
+    ctrl: { code: 'ControlLeft', key: 'Control' },
+    alt: { code: 'AltLeft', key: 'Alt' },
+    shift: { code: 'ShiftLeft', key: 'Shift' },
+  };
+  function clearSticky() {
+    sticky.ctrl = sticky.alt = sticky.shift = false;
+    if (keybar) keybar.querySelectorAll('button.active').forEach((b) => b.classList.remove('active'));
+  }
+  // 修飾キー（あれば）で挟んで1キーを押下→離す。修飾はワンショット。
+  function sendKey(code, key) {
+    if (!controlEnabled) return;
+    const mods = { ctrl: sticky.ctrl, alt: sticky.alt, shift: sticky.shift, meta: false };
+    const held = ['ctrl', 'alt', 'shift'].filter((m) => sticky[m]);
+    for (const m of held) send({ t: 'k', down: true, code: MOD[m].code, key: MOD[m].key, mods });
+    send({ t: 'k', down: true, code, key, mods });
+    send({ t: 'k', down: false, code, key, mods });
+    for (const m of held.reverse()) send({ t: 'k', down: false, code: MOD[m].code, key: MOD[m].key, mods });
+    clearSticky();
+  }
+  function attachKeybar() {
+    if (!keybar || !kbBtn) return;
+    kbBtn.onclick = () => {
+      const host = document.fullscreenElement || document.body; // 全画面でも前面に出す
+      if (keybar.parentNode !== host) host.appendChild(keybar);
+      keybar.classList.toggle('hidden');
+    };
+    keybar.addEventListener('click', (e) => {
+      const b = e.target.closest && e.target.closest('button');
+      if (!b) return;
+      if (b.dataset.mod) { sticky[b.dataset.mod] = !sticky[b.dataset.mod]; b.classList.toggle('active', sticky[b.dataset.mod]); return; }
+      if (b.dataset.act === 'text') { openTextDialog(); return; }
+      if (b.dataset.act === 'close') { keybar.classList.add('hidden'); return; }
+      if (b.dataset.code) sendKey(b.dataset.code, b.dataset.key || b.dataset.code);
+    });
+    document.addEventListener('fullscreenchange', () => {
+      const host = document.fullscreenElement || document.body;
+      if (keybar.parentNode !== host) host.appendChild(keybar);
+    });
   }
 
   // クライアント側ローカルカーソル（VNC風）：マウス位置に自前カーソルを即時描画して操作感を滑らかに。
@@ -353,11 +485,12 @@
   }
 
   let hasFocus = false;
+  const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
   gate.onclick = () => {
     gate.classList.add('hidden');
     hasFocus = true;
     video.focus();
-    setLocalCursor(true); // 操作開始でローカルカーソルを有効化
+    if (!isTouch) setLocalCursor(true); // PCのみVNC風ローカルカーソル（スマホは指がポインタなので不要）
   };
   video.tabIndex = 0;
   video.addEventListener('focus', () => (hasFocus = true));
@@ -374,6 +507,7 @@
     stage.classList.add('hidden');
     toolbar.classList.add('hidden');
     setLocalCursor(false);
+    resetZoom();
   }
 
   // ホストからの操作可否通知。閲覧のみ時は入力送信を止め、バッジ表示と見た目を切り替える。
@@ -390,12 +524,15 @@
       hasFocus = false;
       setLocalCursor(false); // 操作用ローカルカーソルを消す
       hideCtxMenu();
+      if (keybar) keybar.classList.add('hidden'); // 閲覧のみ：キーバーも隠す
+      clearSticky();
     }
   }
 
   attachInput();
   attachTextDialog();
   attachClipboardMenu();
+  attachKeybar();
   attachLocalCursor();
   connect();
 })();

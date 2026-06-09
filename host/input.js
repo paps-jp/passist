@@ -9,6 +9,7 @@
 
 const nut = require('@nut-tree-fork/nut-js');
 const { mouse, keyboard, Button, Key, Point, getWindows } = nut;
+const winenum = require('./winenum'); // 対象ウィンドウの前面化（koffi）
 
 let targetTitle = null;
 let targetHandle = null; // 対象ウィンドウの HWND（厳密一致用）
@@ -98,6 +99,7 @@ async function refreshRegion() {
 // 操作開始時に対象ウィンドウを前面化（他ウィンドウに隠れていると入力が別窓に当たるため）
 async function focusTarget() {
   try {
+    if (targetHandle != null) winenum.bringToFront(targetHandle); // 確実に最前面へ（koffi、前面化制限を回避）
     if (!targetWindow) await refreshRegion();
     if (targetWindow) await targetWindow.focus();
   } catch {
@@ -185,6 +187,7 @@ async function handle(ev) {
         break;
       }
       case 'd':
+        if (targetHandle != null) winenum.bringToFront(targetHandle); // クリック先が常に対象ウィンドウになるよう最前面化（既に最前面ならskip）
         await mouse.pressButton(btn(ev.b));
         break;
       case 'u':
@@ -197,9 +200,10 @@ async function handle(ev) {
         break;
       }
       case 'text': {
-        // 確定済みテキスト（日本語含む）を Unicode 直接入力。ホストのIMEは不要。
+        // 確定済みテキスト（日本語含む）を Unicode 直接入力（SendInput）。ホストのIME/キーボード配列に依存しない。
         if (typeof ev.s === 'string' && ev.s.length > 0 && ev.s.length <= 2000) {
-          await keyboard.type(ev.s);
+          if (targetHandle != null) winenum.bringToFront(targetHandle); // 入力先を対象ウィンドウに
+          if (!winenum.typeUnicode(ev.s)) await keyboard.type(ev.s); // 失敗時のみ nut フォールバック
         }
         break;
       }
@@ -222,8 +226,8 @@ async function handle(ev) {
           if (ev.down) await keyboard.pressKey(key);
           else await keyboard.releaseKey(key);
         } else if (ev.down && typeof ev.key === 'string' && ev.key.length === 1) {
-          // マップ外の印字可能文字はフォールバックで入力
-          await keyboard.type(ev.key);
+          // マップ外の印字可能文字は Unicode 直接入力（失敗時のみ nut）
+          if (!winenum.typeUnicode(ev.key)) await keyboard.type(ev.key);
         }
         break;
       }
