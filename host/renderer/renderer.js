@@ -13,6 +13,7 @@
   let cursorStarted = false; // ホストのカーソル形状追跡を一度だけ開始するためのフラグ
   const reqQueue = []; // 承認待ちリクエストのキュー [{ viewerId, auth }]
   let activeReq = null; // 現在ダイアログ表示中のリクエスト
+  let sessionStarted = false; // セッション確立済みか（別画面選択で「新規発行」か「映像差し替え」かを分岐）
 
   init();
 
@@ -98,8 +99,10 @@
     window.host.onCursorShape((shape) => broadcast({ t: 'cursor', s: shape }));
     $('reload').onclick = loadWindows;
     $('back').onclick = () => {
-      sessionStorage.setItem('passist_skip', '1'); // 手動で戻る時は自動再開しない
-      location.reload();
+      // セッション（URL・接続・承認）は維持したまま、別の画面を選び直す（映像トラックを差し替える方式）
+      $('session').classList.add('hidden');
+      $('picker').classList.remove('hidden');
+      loadWindows();
     };
     $('copy').onclick = copyUrl;
     $('reissue').onclick = reissue;
@@ -119,6 +122,7 @@
       window.host.settingsSet({ activeShareName: '' }); // 終了＝次回からの自動再開を解除
       stopWatch();
       closeAllPeers();
+      sessionStarted = false; // 次に画面を選ぶと新しいURLで開始
       setStatus('✓ 共有を終了しました（このリンクはもう使えません）');
       endShareUi(); // 終了ボタンを無効化して「終了済み」を明示
     };
@@ -177,8 +181,9 @@
     stopWatch();
     await window.host.selectSource(w.id, w.name);
     window.host.settingsSet({ activeShareName: w.name }); // 共有対象を保存（終了ボタンまで保持＝再起動で自動再開）
+    let newStream;
     try {
-      stream = await capture();
+      newStream = await capture();
     } catch (e) {
       if (opts.auto) {
         showResume(w); // 自動再開でキャプチャ不可（ユーザー操作要求等）→ 再開ボタンを提示
@@ -188,14 +193,34 @@
       return;
     }
     hideWatch();
-    $('preview').srcObject = stream;
-    $('picker').classList.add('hidden');
-    $('session').classList.remove('hidden');
-    $('back').classList.remove('hidden'); // トップバーの「別の画面」「終了」を表示
-    $('end').classList.remove('hidden');
-    resetShareUi(); // 終了ボタン等を「共有中」状態へ戻す
-    renderChips();
-    startSignaling();
+    if (sessionStarted) {
+      // 既存セッションを維持: 全ピアの映像トラックを差し替え（URL・接続・承認はそのまま継続）
+      const track = newStream.getVideoTracks()[0];
+      for (const { pc } of peers.values()) {
+        const sender = pc.getSenders().find((s) => s.track && s.track.kind === 'video') || pc.getSenders()[0];
+        if (sender && track) {
+          try { await sender.replaceTrack(track); } catch (err) { console.warn('replaceTrack', err); }
+        }
+      }
+      if (stream) stream.getTracks().forEach((t) => t.stop()); // 旧キャプチャを停止
+      stream = newStream;
+      $('preview').srcObject = stream;
+      $('picker').classList.add('hidden');
+      $('session').classList.remove('hidden');
+      setStatus(statusText());
+    } else {
+      // 初回: セッション開始
+      stream = newStream;
+      $('preview').srcObject = stream;
+      $('picker').classList.add('hidden');
+      $('session').classList.remove('hidden');
+      $('back').classList.remove('hidden'); // トップバーの「別の画面」「終了」を表示
+      $('end').classList.remove('hidden');
+      resetShareUi(); // 終了ボタン等を「共有中」状態へ戻す
+      renderChips();
+      startSignaling();
+      sessionStarted = true;
+    }
   }
 
   // --- セッション自動再開 / ウィンドウ監視 ---
@@ -263,6 +288,7 @@
   }
 
   function startSignaling() {
+    if (ws) { try { ws.onclose = null; ws.onerror = null; ws.close(); } catch {} } // 旧接続を確実に閉じてから張り直す
     ws = new WebSocket(cfg.signalWs);
     ws.onopen = () =>
       sendWs({
@@ -337,6 +363,7 @@
       case 'expired':
         setStatus('⏰ 有効期限が切れました。「← 別の画面を選ぶ」から共有し直してください');
         closeAllPeers();
+        sessionStarted = false; // 期限切れ＝次の画面選択で新規発行
         endShareUi();
         break;
     }
