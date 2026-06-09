@@ -16,7 +16,7 @@
     <meta name="twitter:card" content="summary_large_image" />
     <style>
       :root{
-        --acc:#2f6df0; --acc-d:#235fd6; --teal:#43c0bd; --pink:#ff8fa0;
+        --p:#78b3f7; --acc:#3776e6; --acc-d:#2f63cf; --teal:#43c0bd; --pink:#ff8fa0;
         --ink:#1f2733; --mut:#5b6b80; --bg:#f7f9fc; --card:#fff; --line:#e9eef5;
         --maxw:1000px;
       }
@@ -26,12 +26,16 @@
       a{color:var(--acc)}
       .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
 
+      /* インライン Lucide アイコン(currentColor で着色) */
+      .ic{width:1.1em;height:1.1em;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.18em}
+      a:focus-visible,.btn:focus-visible{outline:2px solid var(--p);outline-offset:3px}
+
       /* hero — やわらかいブルー→ティールに、パステルの光をふわっと */
       .hero{position:relative;overflow:hidden;background:linear-gradient(150deg,#20305f 0%,#1b3a55 55%,#15454c 100%);color:#fff;text-align:center;padding:66px 24px 78px}
       .hero::after{content:"";position:absolute;inset:0;pointer-events:none;background:
         radial-gradient(440px 340px at 13% 16%, rgba(102,205,202,.42), transparent 60%),
         radial-gradient(400px 320px at 87% 20%, rgba(255,154,166,.34), transparent 60%),
-        radial-gradient(560px 420px at 72% 110%, rgba(112,173,245,.42), transparent 62%)}
+        radial-gradient(560px 420px at 72% 110%, rgba(120,179,247,.45), transparent 62%)}
       .hero>*{position:relative;z-index:1}
       .logo-chip{display:inline-grid;place-items:center;background:#fff;border-radius:30px;width:122px;height:122px;box-shadow:0 18px 44px rgba(102,205,202,.40),0 8px 20px rgba(255,154,166,.30)}
       .logo-chip img{height:86px;width:auto;display:block}
@@ -39,7 +43,8 @@
       .sub{margin:0 auto;color:#cdd9ee;font-size:15.5px;max-width:640px}
       .cta{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:30px}
       .btn{display:inline-flex;align-items:center;gap:9px;font-size:15.5px;font-weight:700;text-decoration:none;padding:14px 28px;border-radius:999px;transition:.15s;border:1px solid transparent;cursor:pointer}
-      .btn-primary{background:linear-gradient(135deg,#3b80f7,#48c4be);color:#fff;box-shadow:0 12px 28px rgba(56,140,225,.45)}
+      .btn .ic{width:19px;height:19px}
+      .btn-primary{background:linear-gradient(135deg,#3776e6,#46c2bd);color:#fff;box-shadow:0 12px 28px rgba(55,118,230,.42)}
       .btn-primary:hover{filter:brightness(1.06);transform:translateY(-1px)}
       .btn-ghost{background:rgba(255,255,255,.08);color:#fff;border-color:rgba(255,255,255,.34)}
       .btn-ghost:hover{background:rgba(255,255,255,.16)}
@@ -55,9 +60,10 @@
       .features{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
       .feat{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:22px 22px 20px;box-shadow:0 10px 26px rgba(30,50,90,.05);transition:.15s}
       .feat:hover{transform:translateY(-3px);box-shadow:0 16px 34px rgba(30,50,90,.10)}
-      .feat .ico{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;font-size:23px;background:#eaf1ff;margin-bottom:13px}
-      .ico.c-blue{background:#e3edff}.ico.c-teal{background:#d7f4f1}.ico.c-pink{background:#ffe4e8}
-      .ico.c-cream{background:#fff0d6}.ico.c-lav{background:#ebe6fb}.ico.c-mint{background:#dbf5e8}
+      .feat .ico{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;background:#eaf1ff;margin-bottom:13px}
+      .ico .ic{width:26px;height:26px}
+      .ico.c-blue{background:#e3edff;color:#3b80f7}.ico.c-teal{background:#d7f4f1;color:#2bb3ae}.ico.c-pink{background:#ffe4e8;color:#f0748a}
+      .ico.c-cream{background:#fff0d6;color:#cf982b}.ico.c-lav{background:#ebe6fb;color:#7c6ae0}.ico.c-mint{background:#dbf5e8;color:#2ba672}
       .feat h3{margin:0 0 6px;font-size:16.5px}
       .feat p{margin:0;color:var(--mut);font-size:14px}
 
@@ -90,8 +96,9 @@
       /* more */
       .more{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
       .more a{display:block;text-decoration:none;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px 20px;transition:.15s}
-      .more a:hover{border-color:var(--teal);transform:translateY(-2px);box-shadow:0 12px 26px rgba(67,192,189,.18)}
-      .more h3{margin:0 0 4px;font-size:15.5px}
+      .more a:hover{border-color:var(--p);transform:translateY(-2px);box-shadow:0 12px 26px rgba(120,179,247,.20)}
+      .more h3{display:flex;align-items:center;gap:8px;margin:0 0 4px;font-size:15.5px}
+      .more h3 .ic{color:var(--acc)}
       .more p{margin:0;color:var(--mut);font-size:13.5px}
 
       footer{border-top:1px solid var(--line);color:var(--mut);font-size:13px;text-align:center;padding:28px 24px 48px}
@@ -101,15 +108,30 @@
     </style>
   </head>
   <body>
+    <!-- Lucide アイコン(lucide.dev / ISC)をインライン化したスプライト。外部CDN不要 -->
+    <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></symbol>
+      <symbol id="i-book-open" viewBox="0 0 24 24"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></symbol>
+      <symbol id="i-app-window" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M10 4v4"/><path d="M2 8h20"/><path d="M6 4v4"/></symbol>
+      <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+      <symbol id="i-circle-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></symbol>
+      <symbol id="i-ban" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M4.929 4.929 19.07 19.071"/></symbol>
+      <symbol id="i-timer" viewBox="0 0 24 24"><line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="15" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/></symbol>
+      <symbol id="i-rocket" viewBox="0 0 24 24"><path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09"/><path d="M9 12a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.4 22.4 0 0 1-4 2z"/><path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 .05 5 .05"/></symbol>
+      <symbol id="i-earth" viewBox="0 0 24 24"><path d="M21.54 15H17a2 2 0 0 0-2 2v4.54"/><path d="M7 3.34V5a3 3 0 0 0 3 3a2 2 0 0 1 2 2c0 1.1.9 2 2 2a2 2 0 0 0 2-2c0-1.1.9-2 2-2h3.17"/><path d="M11 21.95V18a2 2 0 0 0-2-2a2 2 0 0 1-2-2v-1a2 2 0 0 0-2-2H2.05"/><circle cx="12" cy="12" r="10"/></symbol>
+      <symbol id="i-git-branch" viewBox="0 0 24 24"><path d="M15 6a9 9 0 0 0-9 9V3"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/></symbol>
+    </svg>
+
     <header class="hero">
       <h1 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">PAssist — ブラウザだけで1ウィンドウを共有・遠隔操作</h1>
       <div class="logo-chip"><img src="passist.svg" alt="PAssist ロゴ" /></div>
       <p class="tagline">ブラウザだけで、1つのウィンドウを共有・遠隔操作。</p>
       <p class="sub">アカウント不要。相手は<strong>QRコードを読み取るだけ</strong>（またはURLを開くだけ）で、すぐに操作を開始。デスクトップ全体は決して映りません。</p>
       <div class="cta">
-        <a class="btn btn-primary" href="https://github.com/paps-jp/passist/releases/latest/download/PAssist.exe">⬇ Windows版をダウンロード</a>
-        <a class="btn btn-ghost" href="docs.html">📖 ドキュメント</a>
-        <a class="btn btn-ghost" href="https://github.com/paps-jp/passist">⟨/⟩ GitHub</a>
+        <a class="btn btn-primary" href="https://github.com/paps-jp/passist/releases/latest/download/PAssist.exe"><svg class="ic"><use href="#i-download"/></svg>Windows版をダウンロード</a>
+        <a class="btn btn-ghost" href="docs.html"><svg class="ic"><use href="#i-book-open"/></svg>ドキュメント</a>
+        <a class="btn btn-ghost" href="https://github.com/paps-jp/passist"><svg class="ic"><use href="#i-git-branch"/></svg>GitHub</a>
       </div>
       <p class="meta">無料・オープンソース ／ <b>Windows 10 / 11（64bit）</b> ／ インストール不要のポータブル版</p>
     </header>
@@ -122,12 +144,12 @@
           操作する相手は<strong>ブラウザを開くだけ</strong>（インストール・アカウント不要）で、映像と操作は WebRTC で暗号化されて流れます。
         </p>
         <div class="features">
-          <div class="feat"><div class="ico c-blue">🪟</div><h3>1ウィンドウだけ共有</h3><p>選んだ1つのウィンドウのみ。デスクトップや他の画面は構造的に映りません。</p></div>
-          <div class="feat"><div class="ico c-teal">🌐</div><h3>相手はブラウザだけ</h3><p>インストールもアカウントも不要。送られたURLを開くだけで操作を開始できます。</p></div>
-          <div class="feat"><div class="ico c-lav">🔒</div><h3>暗号化通信（WebRTC）</h3><p>映像も操作も DTLS-SRTP で常に暗号化。シグナリングも https/wss 化できます。</p></div>
-          <div class="feat"><div class="ico c-mint">✅</div><h3>ホスト承認制</h3><p>あなたが許可するまで何も映りません。信頼した端末は次回から自動接続も可能。</p></div>
-          <div class="feat"><div class="ico c-pink">⛔</div><h3>脱出キーをブロック</h3><p>Win / Alt+Tab / Alt+F4 などを遮断。操作は対象ウィンドウの中だけに限定。</p></div>
-          <div class="feat"><div class="ico c-cream">⏱️</div><h3>一時利用</h3><p>セッションは期限付き（既定30分）。期限切れで自動的に失効します。無期限にも設定できます。</p></div>
+          <div class="feat"><div class="ico c-blue"><svg class="ic"><use href="#i-app-window"/></svg></div><h3>1ウィンドウだけ共有</h3><p>選んだ1つのウィンドウのみ。デスクトップや他の画面は構造的に映りません。</p></div>
+          <div class="feat"><div class="ico c-teal"><svg class="ic"><use href="#i-globe"/></svg></div><h3>相手はブラウザだけ</h3><p>インストールもアカウントも不要。送られたURLを開くだけで操作を開始できます。</p></div>
+          <div class="feat"><div class="ico c-lav"><svg class="ic"><use href="#i-lock"/></svg></div><h3>暗号化通信（WebRTC）</h3><p>映像も操作も DTLS-SRTP で常に暗号化。シグナリングも https/wss 化できます。</p></div>
+          <div class="feat"><div class="ico c-mint"><svg class="ic"><use href="#i-circle-check"/></svg></div><h3>ホスト承認制</h3><p>あなたが許可するまで何も映りません。信頼した端末は次回から自動接続も可能。</p></div>
+          <div class="feat"><div class="ico c-pink"><svg class="ic"><use href="#i-ban"/></svg></div><h3>脱出キーをブロック</h3><p>Win / Alt+Tab / Alt+F4 などを遮断。操作は対象ウィンドウの中だけに限定。</p></div>
+          <div class="feat"><div class="ico c-cream"><svg class="ic"><use href="#i-timer"/></svg></div><h3>一時利用</h3><p>セッションは期限付き（既定30分）。期限切れで自動的に失効します。無期限にも設定できます。</p></div>
         </div>
       </div>
     </section>
@@ -162,7 +184,7 @@
         <h2 class="title">ダウンロード</h2>
         <p class="lead">下のボタンから最新版の実行ファイルを入手できます。</p>
         <div class="dl">
-          <a class="btn btn-primary big" href="https://github.com/paps-jp/passist/releases/latest/download/PAssist.exe">⬇ PAssist.exe をダウンロード</a>
+          <a class="btn btn-primary big" href="https://github.com/paps-jp/passist/releases/latest/download/PAssist.exe"><svg class="ic"><use href="#i-download"/></svg>PAssist.exe をダウンロード</a>
           <div class="specs">
             <span>最新版 <b>v0.1.0</b></span>
             <span><b>Windows 10 / 11</b>（64bit）</span>
@@ -186,10 +208,10 @@
         <h2 class="title">もっと詳しく</h2>
         <p class="lead">仕組み・セキュリティ・インターネット公開・設定など。</p>
         <div class="more">
-          <a href="docs.html"><h3>📖 ドキュメント</h3><p>概要・アーキテクチャ・セキュリティ・環境変数・ビルドまで網羅。</p></a>
-          <a href="docs.html#usage"><h3>🚀 使い方ガイド</h3><p>ホスト／ゲストの手順、タスクトレイ常駐の使い方。</p></a>
-          <a href="docs.html#public"><h3>🌍 インターネット公開</h3><p>UPnP 自動公開／Cloudflare トンネルでの https 公開。</p></a>
-          <a href="https://github.com/paps-jp/passist"><h3>⟨/⟩ GitHub リポジトリ</h3><p>ソースコード・Issue・最新の開発状況。</p></a>
+          <a href="docs.html"><h3><svg class="ic"><use href="#i-book-open"/></svg>ドキュメント</h3><p>概要・アーキテクチャ・セキュリティ・環境変数・ビルドまで網羅。</p></a>
+          <a href="docs.html#usage"><h3><svg class="ic"><use href="#i-rocket"/></svg>使い方ガイド</h3><p>ホスト／ゲストの手順、タスクトレイ常駐の使い方。</p></a>
+          <a href="docs.html#public"><h3><svg class="ic"><use href="#i-earth"/></svg>インターネット公開</h3><p>UPnP 自動公開／Cloudflare トンネルでの https 公開。</p></a>
+          <a href="https://github.com/paps-jp/passist"><h3><svg class="ic"><use href="#i-git-branch"/></svg>GitHub リポジトリ</h3><p>ソースコード・Issue・最新の開発状況。</p></a>
         </div>
       </div>
     </section>
