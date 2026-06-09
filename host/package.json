@@ -1,6 +1,6 @@
 {
   "name": "passist-host",
-  "version": "0.2.0",
+  "version": "0.1.0",
   "private": true,
   "description": "PAssist host (Electron): pick one window, capture it, stream over WebRTC, inject remote input.",
   "main": "main.js",
