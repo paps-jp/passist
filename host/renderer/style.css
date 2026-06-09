@@ -232,6 +232,15 @@ h2 .step {
 .adv > *:not(summary) { margin-top: 10px; }
 .adv label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 8px; }
 
+/* ビデオ通話: 操作バーとタイル */
+.callbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 12px 0 6px; }
+.callbar .hint { margin: 0; }
+button.small.on { background: var(--primary); color: #fff; border-color: transparent; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+.tile { position: relative; background: #000; border-radius: 12px; overflow: hidden; border: 1px solid var(--border); aspect-ratio: 4 / 3; }
+.tile video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tile .tname { position: absolute; left: 6px; bottom: 6px; font-size: 11px; color: #fff; background: rgba(0,0,0,0.5); padding: 1px 6px; border-radius: 6px; }
+
 /* QRコード */
 .qrpanel { margin: 10px 0 4px; text-align: center; }
 .qrpanel img { width: 200px; height: 200px; background: #fff; padding: 10px; border-radius: 12px; border: 1px solid var(--border); }

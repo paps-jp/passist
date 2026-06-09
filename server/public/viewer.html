@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
     <title>PAssist — リモート操作</title>
-    <link rel="stylesheet" href="/viewer.css?v=15" />
+    <link rel="stylesheet" href="/viewer.css?v=16" />
   </head>
   <body>
     <div id="status" class="status">接続を準備しています…</div>
@@ -22,10 +22,15 @@
 
     <div id="toolbar" class="toolbar hidden">
       <span id="badge">● 操作中</span>
+      <button id="vCamBtn" title="カメラ ON/OFF">📷</button>
+      <button id="vMicBtn" title="マイク ON/OFF">🔇</button>
       <button id="modeBtn">スクロール</button>
       <button id="kbBtn">⌨ キー</button>
       <button id="fsBtn">全画面</button>
     </div>
+
+    <!-- ビデオ通話のカメラタイル（自分＋相手） -->
+    <div id="tiles" class="tiles"></div>
 
     <!-- 画面上キーバー（スマホ用。特殊キー/修飾キーをホストへ送る。文字入力はテキスト入力ダイアログ） -->
     <div id="keybar" class="keybar hidden">
@@ -78,6 +83,6 @@
       </div>
     </div>
 
-    <script src="/viewer.js?v=15"></script>
+    <script src="/viewer.js?v=16"></script>
   </body>
 </html>

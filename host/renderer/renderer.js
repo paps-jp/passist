@@ -14,6 +14,8 @@
   const reqQueue = []; // 承認待ちリクエストのキュー [{ viewerId, auth }]
   let activeReq = null; // 現在ダイアログ表示中のリクエスト
   let sessionStarted = false; // セッション確立済みか（別画面選択で「新規発行」か「映像差し替え」かを分岐）
+  let localMedia = null; // 自分のカメラ+マイク MediaStream（ビデオ通話）
+  let camOn = false, micOn = false;
 
   init();
 
@@ -92,6 +94,8 @@
       $('qrToggle').classList.toggle('open', shown);
       if (shown) showQr();
     };
+    if ($('camBtn')) $('camBtn').onclick = () => setCam(!camOn); // ビデオ通話: カメラ
+    if ($('micBtn')) $('micBtn').onclick = () => setMic(!micOn); // ビデオ通話: マイク
     renderChips();
     // ホストのクリップボード変更を全ビューアへ転送（接続中のみ）
     window.host.onClipHost((text) => broadcast({ t: 'clip', s: text }));
@@ -440,7 +444,72 @@
     el.appendChild(a);
   }
 
-  // ビューアごとに peer 接続を張る（同じキャプチャ stream を各接続へ送る＝メッシュ）
+  // --- ビデオ通話: 自分のカメラ/マイク ---
+  async function ensureLocalMedia() {
+    if (localMedia) return localMedia;
+    localMedia = await navigator.mediaDevices.getUserMedia({
+      video: { width: { max: 640 }, height: { max: 360 }, frameRate: { max: 24 } },
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    });
+    localMedia.getVideoTracks().forEach((t) => (t.enabled = camOn));
+    localMedia.getAudioTracks().forEach((t) => (t.enabled = micOn));
+    for (const { pc } of peers.values()) for (const tr of localMedia.getTracks()) pc.addTrack(tr, localMedia); // 既存ピアへ（再ネゴはP0）
+    return localMedia;
+  }
+  async function setCam(on) {
+    try { if (on) await ensureLocalMedia(); camOn = on; if (localMedia) localMedia.getVideoTracks().forEach((t) => (t.enabled = on)); updateMediaUi(); sendRoster(); }
+    catch (e) { alert('カメラを開始できません: ' + e.message); }
+  }
+  async function setMic(on) {
+    try { if (on) await ensureLocalMedia(); micOn = on; if (localMedia) localMedia.getAudioTracks().forEach((t) => (t.enabled = on)); updateMediaUi(); sendRoster(); }
+    catch (e) { alert('マイクを開始できません: ' + e.message); }
+  }
+  function updateMediaUi() {
+    const c = $('camBtn'), m = $('micBtn');
+    if (c) { c.classList.toggle('on', camOn); c.textContent = camOn ? '📹 カメラ ON' : '📷 カメラ'; }
+    if (m) { m.classList.toggle('on', micOn); m.textContent = micOn ? '🎤 マイク ON' : '🔇 マイク'; }
+    renderSelfTile();
+  }
+  // roster: 各 viewer に「どの streamId が誰の何か」を知らせる（screen/camera の区別）
+  function sendRoster() {
+    const streams = [];
+    if (stream) streams.push({ streamId: stream.id, pid: 'host', kind: 'screen' });
+    if (localMedia && (camOn || micOn)) streams.push({ streamId: localMedia.id, pid: 'host', kind: 'camera' }); // 音声のみでも届くよう
+    broadcast({ t: 'roster', streams });
+  }
+
+  // --- タイル表示 ---
+  function makeTile(pid, label, self) {
+    const d = document.createElement('div');
+    d.className = 'tile'; d.dataset.pid = pid;
+    const v = document.createElement('video');
+    v.autoplay = true; v.playsInline = true; v.muted = !!self;
+    if (self) v.style.transform = 'scaleX(-1)';
+    const n = document.createElement('span'); n.className = 'tname'; n.textContent = label;
+    d.append(v, n);
+    return d;
+  }
+  function renderSelfTile() {
+    const el = $('tiles'); if (!el) return;
+    let t = el.querySelector('[data-pid="self"]');
+    if (camOn && localMedia) {
+      if (!t) { t = makeTile('self', 'あなた', true); el.prepend(t); }
+      t.querySelector('video').srcObject = localMedia;
+    } else if (t) t.remove();
+  }
+  function renderRemoteTile(pid, streamObj) {
+    const el = $('tiles'); if (!el) return;
+    let t = el.querySelector('[data-pid="' + CSS.escape(pid) + '"]');
+    if (!t) { t = makeTile(pid, '相手', false); el.appendChild(t); }
+    t.querySelector('video').srcObject = streamObj;
+  }
+  function removeRemoteTile(pid) {
+    const el = $('tiles'); if (!el) return;
+    const t = el.querySelector('[data-pid="' + CSS.escape(pid) + '"]');
+    if (t) t.remove();
+  }
+
+  // ビューアごとに peer 接続を張る（同じキャプチャ stream を各接続へ送る）
   async function startPeerFor(viewerId) {
     closePeerFor(viewerId); // 再接続時の取りこぼし防止
     const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
@@ -459,11 +528,14 @@
       }
     };
     if (stream) for (const track of stream.getTracks()) pc.addTrack(track, stream);
+    if (localMedia) for (const tr of localMedia.getTracks()) pc.addTrack(tr, localMedia); // 通話中なら自分のcam/micも送る
+    pc.ontrack = (e) => { renderRemoteTile(viewerId, e.streams[0]); }; // この viewer のカメラ/マイクを表示
     const dc = pc.createDataChannel('input');
     entry.dc = dc;
     dc.onopen = () => {
       if (!cursorStarted) { cursorStarted = true; window.host.cursorTrack(true); } // 一度だけ開始
       refreshModes(); // 操作権の決定＋mode 通知
+      sendRoster(); // どの stream が画面/カメラかを通知
     };
     dc.onmessage = (e) => {
       if (viewerId !== controllerId) return; // 操作権がないビューアの入力は無視（多重防壁）
@@ -524,6 +596,7 @@
       } catch {}
     }
     peers.delete(viewerId);
+    removeRemoteTile(viewerId); // 退出した相手のタイルを除去
     refreshModes(); // 操作者が抜けたら次の人へ委譲＋全体へ mode 再通知
   }
 
