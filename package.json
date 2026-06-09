@@ -1,6 +1,6 @@
 {
   "name": "passist",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "PAssist — share and remotely control a single window via a browser; no account required.",
   "scripts": {
