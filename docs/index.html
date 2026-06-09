@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#20305f" />
     <title>PAssist — ブラウザだけで1ウィンドウを共有・遠隔操作</title>
     <meta name="description" content="PAssist は、自分のPCの「1つのウィンドウだけ」を、ブラウザ・アカウント不要で相手に共有し遠隔操作してもらえる Windows ツール。デスクトップ全体は決して映りません。無料・ダウンロードはこちら。" />
     <link rel="icon" href="passist_min.svg" />
@@ -15,8 +16,8 @@
     <meta name="twitter:card" content="summary_large_image" />
     <style>
       :root{
-        --acc:#2b6cff; --acc-d:#1f54cf; --acc2:#66cdca;
-        --ink:#1b2330; --mut:#5b6b80; --bg:#f6f8fb; --card:#fff; --line:#e6ecf3;
+        --acc:#2f6df0; --acc-d:#235fd6; --teal:#43c0bd; --pink:#ff8fa0;
+        --ink:#1f2733; --mut:#5b6b80; --bg:#f7f9fc; --card:#fff; --line:#e9eef5;
         --maxw:1000px;
       }
       *{box-sizing:border-box}
@@ -25,62 +26,71 @@
       a{color:var(--acc)}
       .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
 
-      /* hero */
-      .hero{position:relative;overflow:hidden;background:linear-gradient(135deg,#0b0d10,#16263f);color:#fff;text-align:center;padding:64px 24px 72px}
-      .hero::after{content:"";position:absolute;inset:0;background:radial-gradient(1100px 360px at 50% -10%,rgba(43,108,255,.35),transparent 70%);pointer-events:none}
+      /* hero — やわらかいブルー→ティールに、パステルの光をふわっと */
+      .hero{position:relative;overflow:hidden;background:linear-gradient(150deg,#20305f 0%,#1b3a55 55%,#15454c 100%);color:#fff;text-align:center;padding:66px 24px 78px}
+      .hero::after{content:"";position:absolute;inset:0;pointer-events:none;background:
+        radial-gradient(440px 340px at 13% 16%, rgba(102,205,202,.42), transparent 60%),
+        radial-gradient(400px 320px at 87% 20%, rgba(255,154,166,.34), transparent 60%),
+        radial-gradient(560px 420px at 72% 110%, rgba(112,173,245,.42), transparent 62%)}
       .hero>*{position:relative;z-index:1}
-      .logo-chip{display:inline-grid;place-items:center;background:#fff;border-radius:18px;width:120px;height:120px;box-shadow:0 14px 40px rgba(0,0,0,.35)}
-      .logo-chip img{height:84px;width:auto;display:block}
-      .tagline{margin:26px auto 6px;font-size:clamp(22px,3.4vw,34px);font-weight:800;letter-spacing:.3px;max-width:760px}
-      .sub{margin:0 auto;color:#bcccea;font-size:15.5px;max-width:620px}
+      .logo-chip{display:inline-grid;place-items:center;background:#fff;border-radius:30px;width:122px;height:122px;box-shadow:0 18px 44px rgba(102,205,202,.40),0 8px 20px rgba(255,154,166,.30)}
+      .logo-chip img{height:86px;width:auto;display:block}
+      .tagline{margin:26px auto 8px;font-size:clamp(22px,3.4vw,34px);font-weight:800;letter-spacing:.3px;max-width:780px}
+      .sub{margin:0 auto;color:#cdd9ee;font-size:15.5px;max-width:640px}
       .cta{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:30px}
-      .btn{display:inline-flex;align-items:center;gap:9px;font-size:15.5px;font-weight:700;text-decoration:none;padding:14px 26px;border-radius:12px;transition:.15s;border:1px solid transparent;cursor:pointer}
-      .btn-primary{background:var(--acc);color:#fff;box-shadow:0 10px 26px rgba(43,108,255,.45)}
-      .btn-primary:hover{background:var(--acc-d);transform:translateY(-1px)}
-      .btn-ghost{background:rgba(255,255,255,.06);color:#fff;border-color:rgba(255,255,255,.32)}
-      .btn-ghost:hover{background:rgba(255,255,255,.14)}
-      .hero .meta{margin-top:18px;color:#9fb3d6;font-size:13px}
-      .hero .meta b{color:#dce6f8}
+      .btn{display:inline-flex;align-items:center;gap:9px;font-size:15.5px;font-weight:700;text-decoration:none;padding:14px 28px;border-radius:999px;transition:.15s;border:1px solid transparent;cursor:pointer}
+      .btn-primary{background:linear-gradient(135deg,#3b80f7,#48c4be);color:#fff;box-shadow:0 12px 28px rgba(56,140,225,.45)}
+      .btn-primary:hover{filter:brightness(1.06);transform:translateY(-1px)}
+      .btn-ghost{background:rgba(255,255,255,.08);color:#fff;border-color:rgba(255,255,255,.34)}
+      .btn-ghost:hover{background:rgba(255,255,255,.16)}
+      .hero .meta{margin-top:18px;color:#a9bcdd;font-size:13px}
+      .hero .meta b{color:#e4ecfa}
 
       /* sections */
-      section.block{padding:54px 0}
+      section.block{padding:56px 0}
       h2.title{font-size:25px;font-weight:800;text-align:center;margin:0 0 8px}
       .lead{text-align:center;color:var(--mut);max-width:680px;margin:0 auto 34px;font-size:15px}
 
-      /* features */
+      /* features — まるいパステルのアイコンチップ */
       .features{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
-      .feat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 20px 18px}
-      .feat .ico{width:42px;height:42px;border-radius:10px;display:grid;place-items:center;font-size:21px;background:#eaf1ff;margin-bottom:12px}
+      .feat{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:22px 22px 20px;box-shadow:0 10px 26px rgba(30,50,90,.05);transition:.15s}
+      .feat:hover{transform:translateY(-3px);box-shadow:0 16px 34px rgba(30,50,90,.10)}
+      .feat .ico{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;font-size:23px;background:#eaf1ff;margin-bottom:13px}
+      .ico.c-blue{background:#e3edff}.ico.c-teal{background:#d7f4f1}.ico.c-pink{background:#ffe4e8}
+      .ico.c-cream{background:#fff0d6}.ico.c-lav{background:#ebe6fb}.ico.c-mint{background:#dbf5e8}
       .feat h3{margin:0 0 6px;font-size:16.5px}
       .feat p{margin:0;color:var(--mut);font-size:14px}
 
-      /* steps */
+      /* steps — 番号バッジを3色に */
       .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
-      .step{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 20px;position:relative}
-      .step .n{width:34px;height:34px;border-radius:50%;background:var(--acc);color:#fff;font-weight:800;display:grid;place-items:center;margin-bottom:12px}
+      .step{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:24px 22px;box-shadow:0 10px 26px rgba(30,50,90,.05)}
+      .step .n{width:38px;height:38px;border-radius:50%;color:#fff;font-weight:800;display:grid;place-items:center;margin-bottom:13px;font-size:17px;box-shadow:0 6px 14px rgba(30,50,90,.18)}
+      .step:nth-child(1) .n{background:#3b80f7}
+      .step:nth-child(2) .n{background:#43c0bd}
+      .step:nth-child(3) .n{background:#ff8fa0}
       .step h3{margin:0 0 4px;font-size:16px}
       .step p{margin:0;color:var(--mut);font-size:14px}
-      .guest-note{margin:20px auto 0;max-width:760px;text-align:center;background:#eef6f6;border:1px solid #cfe9e8;border-radius:12px;padding:14px 18px;color:#27514f;font-size:14.5px}
+      .guest-note{margin:22px auto 0;max-width:760px;text-align:center;background:#eaf6f5;border:1px solid #cfe9e7;border-radius:16px;padding:14px 18px;color:#27514f;font-size:14.5px}
 
       /* screenshots */
       .shots{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;align-items:start}
-      .shot{margin:0;background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 10px 30px rgba(20,40,80,.07)}
+      .shot{margin:0;background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 12px 30px rgba(20,40,80,.08)}
       .shot img{display:block;width:100%;height:auto;border-bottom:1px solid var(--line)}
-      .shot figcaption{padding:12px 15px;font-size:13.5px;color:var(--ink);font-weight:600}
+      .shot figcaption{padding:13px 16px;font-size:13.5px;color:var(--ink);font-weight:600}
 
       /* download */
-      .dl{background:#fff;border:1px solid var(--line);border-radius:18px;max-width:720px;margin:0 auto;padding:34px 30px;text-align:center;box-shadow:0 12px 36px rgba(20,40,80,.08)}
+      .dl{background:#fff;border:1px solid var(--line);border-radius:24px;max-width:720px;margin:0 auto;padding:36px 30px;text-align:center;box-shadow:0 16px 40px rgba(20,40,80,.09)}
       .dl .big{font-size:18px}
-      .dl .specs{display:flex;gap:10px 22px;justify-content:center;flex-wrap:wrap;color:var(--mut);font-size:13.5px;margin:16px 0 4px}
+      .dl .specs{display:flex;gap:10px 22px;justify-content:center;flex-wrap:wrap;color:var(--mut);font-size:13.5px;margin:18px 0 4px}
       .dl .specs b{color:var(--ink)}
-      .warn{margin-top:20px;text-align:left;border-left:4px solid #e0a400;background:#fff8e6;padding:11px 15px;border-radius:0 8px 8px 0;font-size:13.5px;color:#5b4a12}
+      .warn{margin-top:20px;text-align:left;border-left:4px solid #f0b429;background:#fff7e6;padding:11px 15px;border-radius:0 10px 10px 0;font-size:13.5px;color:#5b4a12}
       .dl .links{margin-top:18px;font-size:14px}
       .dl .links a{margin:0 10px;white-space:nowrap}
 
       /* more */
       .more{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
-      .more a{display:block;text-decoration:none;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;transition:.15s}
-      .more a:hover{border-color:var(--acc);transform:translateY(-1px)}
+      .more a{display:block;text-decoration:none;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px 20px;transition:.15s}
+      .more a:hover{border-color:var(--teal);transform:translateY(-2px);box-shadow:0 12px 26px rgba(67,192,189,.18)}
       .more h3{margin:0 0 4px;font-size:15.5px}
       .more p{margin:0;color:var(--mut);font-size:13.5px}
 
@@ -112,17 +122,17 @@
           操作する相手は<strong>ブラウザを開くだけ</strong>（インストール・アカウント不要）で、映像と操作は WebRTC で暗号化されて流れます。
         </p>
         <div class="features">
-          <div class="feat"><div class="ico">🪟</div><h3>1ウィンドウだけ共有</h3><p>選んだ1つのウィンドウのみ。デスクトップや他の画面は構造的に映りません。</p></div>
-          <div class="feat"><div class="ico">🌐</div><h3>相手はブラウザだけ</h3><p>インストールもアカウントも不要。送られたURLを開くだけで操作を開始できます。</p></div>
-          <div class="feat"><div class="ico">🔒</div><h3>暗号化通信（WebRTC）</h3><p>映像も操作も DTLS-SRTP で常に暗号化。シグナリングも https/wss 化できます。</p></div>
-          <div class="feat"><div class="ico">✅</div><h3>ホスト承認制</h3><p>あなたが許可するまで何も映りません。信頼した端末は次回から自動接続も可能。</p></div>
-          <div class="feat"><div class="ico">⛔</div><h3>脱出キーをブロック</h3><p>Win / Alt+Tab / Alt+F4 などを遮断。操作は対象ウィンドウの中だけに限定。</p></div>
-          <div class="feat"><div class="ico">⏱️</div><h3>一時利用</h3><p>セッションは期限付き（既定30分）。期限切れで自動的に失効します。無期限にも設定できます。</p></div>
+          <div class="feat"><div class="ico c-blue">🪟</div><h3>1ウィンドウだけ共有</h3><p>選んだ1つのウィンドウのみ。デスクトップや他の画面は構造的に映りません。</p></div>
+          <div class="feat"><div class="ico c-teal">🌐</div><h3>相手はブラウザだけ</h3><p>インストールもアカウントも不要。送られたURLを開くだけで操作を開始できます。</p></div>
+          <div class="feat"><div class="ico c-lav">🔒</div><h3>暗号化通信（WebRTC）</h3><p>映像も操作も DTLS-SRTP で常に暗号化。シグナリングも https/wss 化できます。</p></div>
+          <div class="feat"><div class="ico c-mint">✅</div><h3>ホスト承認制</h3><p>あなたが許可するまで何も映りません。信頼した端末は次回から自動接続も可能。</p></div>
+          <div class="feat"><div class="ico c-pink">⛔</div><h3>脱出キーをブロック</h3><p>Win / Alt+Tab / Alt+F4 などを遮断。操作は対象ウィンドウの中だけに限定。</p></div>
+          <div class="feat"><div class="ico c-cream">⏱️</div><h3>一時利用</h3><p>セッションは期限付き（既定30分）。期限切れで自動的に失効します。無期限にも設定できます。</p></div>
         </div>
       </div>
     </section>
 
-    <section class="block" id="how" style="background:#eef3fb">
+    <section class="block" id="how" style="background:#eef4fb">
       <div class="wrap">
         <h2 class="title">使い方は 3 ステップ</h2>
         <p class="lead">共有する人（ホスト）の操作はこれだけ。</p>
@@ -147,7 +157,7 @@
       </div>
     </section>
 
-    <section class="block" id="download">
+    <section class="block" id="download" style="background:#fff4ea">
       <div class="wrap">
         <h2 class="title">ダウンロード</h2>
         <p class="lead">下のボタンから最新版の実行ファイルを入手できます。</p>
