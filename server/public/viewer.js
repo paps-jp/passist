@@ -232,92 +232,83 @@
     attachTouch(); // スマホ: タップ=クリック / 1本指ドラッグ=移動 / 長押し=メニュー
   }
 
-  // スマホ向けタッチ操作。1本指=操作（タップ/ドラッグ/長押し）、2本指=ピンチ拡大＋パン（閲覧のみでも可）。
+  // スマホ向けタッチ操作（タッチネイティブ方式）:
+  //  1本指: タップ=クリック / ドラッグ=スクロール(縦横) / 長押し=コピー等メニュー
+  //         （連続タップ=2クリック→ホスト側でOSがダブルクリック判定）
+  //  2本指: ピンチで拡大/縮小＋パン（閲覧のみでも可）
   function attachTouch() {
-    const LONG_MS = 500, THRESH = 12;
-    let lpTimer = null, sx = 0, sy = 0, moved = false, longFired = false, lastP = null;
-    let pinch = null, gmode = null, scrollAccum = 0; // gmode: 'zoom'(ピンチ) | 'scroll'(2本指ドラッグ)
+    const LONG_MS = 500, MOVE_THRESH = 10, STEP = 4; // STEP を小さくするほどスクロールが速い
+    let lpTimer = null, sx = 0, sy = 0, lastX = 0, lastY = 0, moved = false, longFired = false;
+    let accX = 0, accY = 0, pinch = null;
     const clearLP = () => { if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; } };
     const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
     const startPinch = (e) => {
-      clearLP(); moved = true; longFired = false; // 単指ジェスチャを無効化
+      clearLP(); moved = true; longFired = false;
       const r = video.getBoundingClientRect();
       const mx = (e.touches[0].clientX + e.touches[1].clientX) / 2;
       const my = (e.touches[0].clientY + e.touches[1].clientY) / 2;
-      const d = dist(e.touches[0], e.touches[1]);
-      pinch = { d, mx, my, startD: d, startMx: mx, startMy: my, baseX: r.left - zTx, baseY: r.top - zTy };
-      gmode = null; scrollAccum = 0;
+      pinch = { d: dist(e.touches[0], e.touches[1]), mx, my, baseX: r.left - zTx, baseY: r.top - zTy };
+    };
+    // 蓄積分を STEP ごとにホイール送信（縦/横）。指と逆向き=自然なスクロール方向。
+    const flushScroll = () => {
+      while (Math.abs(accY) >= STEP) { const up = accY > 0; send({ t: 'w', dx: 0, dy: up ? -120 : 120 }); accY += up ? -STEP : STEP; }
+      while (Math.abs(accX) >= STEP) { const right = accX > 0; send({ t: 'w', dx: right ? -120 : 120, dy: 0 }); accX += right ? -STEP : STEP; }
     };
 
     video.addEventListener('touchstart', (e) => {
       if (e.touches.length >= 2) { startPinch(e); e.preventDefault(); return; } // ピンチ（閲覧のみでも拡大可）
-      if (!controlEnabled) return; // ここから下は操作（閲覧のみ時は無効）
-      if (ctxMenu && !ctxMenu.classList.contains('hidden')) { hideCtxMenu(); e.preventDefault(); return; } // メニュー表示中は閉じるだけ
+      if (ctxMenu && !ctxMenu.classList.contains('hidden')) { hideCtxMenu(); e.preventDefault(); return; }
       const t = e.touches[0];
-      sx = t.clientX; sy = t.clientY; moved = false; longFired = false;
-      lastP = norm(sx, sy);
-      if (lastP) send({ t: 'm', x: lastP.x, y: lastP.y }); // 指の位置へカーソル移動
+      sx = t.clientX; sy = t.clientY; lastX = t.clientX; lastY = t.clientY;
+      moved = false; longFired = false; accX = 0; accY = 0;
       clearLP();
-      lpTimer = setTimeout(() => { longFired = true; showCtxMenu(sx, sy); }, LONG_MS); // 長押し→コピー等メニュー
+      if (controlEnabled) lpTimer = setTimeout(() => { longFired = true; showCtxMenu(sx, sy); }, LONG_MS); // 長押し=メニュー
       e.preventDefault();
     }, { passive: false });
 
     video.addEventListener('touchmove', (e) => {
-      if (e.touches.length >= 2) { // 2本指: ピンチ拡大 or スクロール（最初の動きで判別）
+      if (e.touches.length >= 2) { // ピンチ拡大＋パン
         if (!pinch) startPinch(e);
         const a = e.touches[0], b = e.touches[1];
         const d = dist(a, b);
         const mx = (a.clientX + b.clientX) / 2, my = (a.clientY + b.clientY) / 2;
-        if (!gmode) {
-          if (Math.abs(d - pinch.startD) > 24) gmode = 'zoom'; // 指の距離が変化→拡大
-          else if (Math.abs(my - pinch.startMy) > 14 || Math.abs(mx - pinch.startMx) > 14) gmode = 'scroll'; // 平行移動→スクロール
-        }
-        if (gmode === 'scroll') { // 2本指ドラッグ＝リモートを縦スクロール（指を下げる=上へ＝自然方向）
-          scrollAccum += my - pinch.my;
-          const STEP = 8; // 8px ごとに 1 ホイール（≒3ノッチ）。速いフリックは蓄積で比例して速くなる
-          while (Math.abs(scrollAccum) >= STEP) {
-            const up = scrollAccum > 0;
-            send({ t: 'w', dx: 0, dy: up ? -120 : 120 });
-            scrollAccum += up ? -STEP : STEP;
-          }
-        } else if (gmode === 'zoom') { // ピンチ拡大＋パン（2指中央を固定）
-          const ns = Math.min(5, Math.max(1, zScale * (d / pinch.d)));
-          const f = ns / zScale;
-          zTx = zTx - (mx - pinch.baseX - zTx) * (f - 1) + (mx - pinch.mx);
-          zTy = zTy - (my - pinch.baseY - zTy) * (f - 1) + (my - pinch.my);
-          zScale = ns;
-          if (zScale <= 1.005) { zScale = 1; zTx = 0; zTy = 0; } // 等倍復帰で中央スナップ
-          applyZoom();
-        }
+        const ns = Math.min(5, Math.max(1, zScale * (d / pinch.d)));
+        const f = ns / zScale;
+        zTx = zTx - (mx - pinch.baseX - zTx) * (f - 1) + (mx - pinch.mx);
+        zTy = zTy - (my - pinch.baseY - zTy) * (f - 1) + (my - pinch.my);
+        zScale = ns;
+        if (zScale <= 1.005) { zScale = 1; zTx = 0; zTy = 0; }
+        applyZoom();
         pinch.d = d; pinch.mx = mx; pinch.my = my;
         e.preventDefault();
         return;
       }
-      if (!controlEnabled) return;
       const t = e.touches[0];
       if (!t) return;
-      if (!moved && (Math.abs(t.clientX - sx) > THRESH || Math.abs(t.clientY - sy) > THRESH)) {
-        moved = true; clearLP(); // ドラッグ開始→長押し取消
+      if (!moved && (Math.abs(t.clientX - sx) > MOVE_THRESH || Math.abs(t.clientY - sy) > MOVE_THRESH)) {
+        moved = true; clearLP(); // ドラッグ開始→長押し取消（スクロールへ）
       }
-      const p = norm(t.clientX, t.clientY);
-      if (p) { lastP = p; queueMove(p); } // カーソル追従（間引き送信）
+      if (moved && controlEnabled) { // 1本指ドラッグ=縦横スクロール
+        accX += t.clientX - lastX;
+        accY += t.clientY - lastY;
+        flushScroll();
+      }
+      lastX = t.clientX; lastY = t.clientY;
       e.preventDefault();
     }, { passive: false });
 
     const end = (e) => {
-      if (pinch) { if (e.touches.length < 2) pinch = null; clearLP(); e.preventDefault(); return; } // ピンチ終了（タップ扱いしない）
+      if (pinch) { if (e.touches.length < 2) pinch = null; clearLP(); e.preventDefault(); return; }
       clearLP();
-      if (!controlEnabled) return;
-      if (longFired) { longFired = false; e.preventDefault(); return; } // メニュー表示済み→クリックしない
-      if (!moved && lastP) { // タップ→左クリック
-        send({ t: 'm', x: lastP.x, y: lastP.y });
-        send({ t: 'd', b: 0 });
-        send({ t: 'u', b: 0 });
+      if (longFired) { longFired = false; e.preventDefault(); return; } // メニュー表示済み
+      if (!moved && controlEnabled) { // タップ=その位置を左クリック（連続タップはOSがダブルクリック判定）
+        const p = norm(sx, sy);
+        if (p) { send({ t: 'm', x: p.x, y: p.y }); send({ t: 'd', b: 0 }); send({ t: 'u', b: 0 }); }
       }
       e.preventDefault();
     };
     video.addEventListener('touchend', end, { passive: false });
-    video.addEventListener('touchcancel', () => { clearLP(); longFired = false; moved = false; pinch = null; gmode = null; });
+    video.addEventListener('touchcancel', () => { clearLP(); longFired = false; moved = false; pinch = null; });
   }
 
   // テキスト入力ダイアログ：右クリック→「テキスト入力…」で開く。日本語はローカルIMEで確定し

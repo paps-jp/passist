@@ -195,9 +195,16 @@ async function handle(ev) {
         break;
       case 'w': {
         if (targetHandle != null) winenum.bringToFront(targetHandle); // スクロール先を対象ウィンドウに（既に最前面ならskip）
-        const amount = Math.max(1, Math.round(Math.abs(ev.dy) / 40));
-        if (ev.dy > 0) await mouse.scrollDown(amount);
-        else if (ev.dy < 0) await mouse.scrollUp(amount);
+        if (ev.dy) {
+          const a = Math.max(1, Math.round(Math.abs(ev.dy) / 40));
+          if (ev.dy > 0) await mouse.scrollDown(a);
+          else await mouse.scrollUp(a);
+        }
+        if (ev.dx) {
+          const a = Math.max(1, Math.round(Math.abs(ev.dx) / 40));
+          if (ev.dx > 0) await mouse.scrollRight(a);
+          else await mouse.scrollLeft(a);
+        }
         break;
       }
       case 'text': {
