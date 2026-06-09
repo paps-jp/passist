@@ -198,10 +198,17 @@
     const modeBtn = document.getElementById('modeBtn');
     if (!modeBtn) return;
     const MODES = ['scroll', 'mouse', 'pan'];
-    const LABEL = { scroll: '📜 スクロール', mouse: '🖱 マウス', pan: '🔍 画面移動' };
-    const set = (m) => { touchMode = m; modeBtn.textContent = LABEL[m]; };
+    const svg = (inner) =>
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
+    const ICON = {
+      scroll: svg('<polyline points="8 7 12 3 16 7"/><polyline points="8 17 12 21 16 17"/><line x1="12" y1="3" x2="12" y2="21"/>'),
+      mouse: svg('<path d="M4 3l6.5 16 2.3-6.8 6.8-2.3L4 3z"/><path d="M13.5 13.5L19 19"/>'),
+      pan: svg('<polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/>'),
+    };
+    const TEXT = { scroll: 'スクロール', mouse: 'マウス', pan: '画面移動' };
+    const set = (m) => { touchMode = m; modeBtn.innerHTML = ICON[m] + '<span>' + TEXT[m] + '</span>'; };
     set('scroll');
-    modeBtn.onclick = () => set(MODES[(MODES.indexOf(touchMode) + 1) % MODES.length]); // タップで切替
+    modeBtn.onclick = () => set(MODES[(MODES.indexOf(touchMode) + 1) % MODES.length]); // タップで順に切替
   }
 
   function attachInput() {

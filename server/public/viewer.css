@@ -114,6 +114,8 @@ body { display: flex; flex-direction: column; }
 #badge.readonly { color: #8ab4ff; }
 body.view-only #video { cursor: default; }
 .toolbar button { background: #2a313b; padding: 6px 10px; font-size: 13px; }
+#modeBtn { display: inline-flex; align-items: center; gap: 5px; }
+#modeBtn svg { flex: 0 0 auto; display: block; }
 
 /* 画面上キーバー（スマホ用の特殊キー/修飾キー） */
 .keybar {
