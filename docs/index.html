@@ -31,25 +31,27 @@
       a:focus-visible,.btn:focus-visible{outline:2px solid var(--p);outline-offset:3px}
 
       /* hero — やわらかいブルー→ティールに、パステルの光をふわっと */
-      .hero{position:relative;overflow:hidden;background:linear-gradient(150deg,#20305f 0%,#1b3a55 55%,#15454c 100%);color:#fff;text-align:center;padding:66px 24px 78px}
+      .hero{position:relative;overflow:hidden;background:linear-gradient(150deg,#5278e8 0%,#4a9de6 55%,#3599a8 100%);color:#fff;text-align:center;padding:66px 24px 78px}
       .hero::after{content:"";position:absolute;inset:0;pointer-events:none;background:
-        radial-gradient(440px 340px at 13% 16%, rgba(102,205,202,.42), transparent 60%),
-        radial-gradient(400px 320px at 87% 20%, rgba(255,154,166,.34), transparent 60%),
-        radial-gradient(560px 420px at 72% 110%, rgba(120,179,247,.45), transparent 62%)}
+        radial-gradient(620px 400px at 50% -12%, rgba(255,255,255,.34), transparent 62%),
+        radial-gradient(420px 320px at 86% 16%, rgba(255,255,255,.16), transparent 60%),
+        radial-gradient(560px 420px at 14% 42%, rgba(132,224,216,.32), transparent 62%)}
       .hero>*{position:relative;z-index:1}
       .logo-chip{display:inline-grid;place-items:center;background:#fff;border-radius:30px;width:122px;height:122px;box-shadow:0 18px 44px rgba(102,205,202,.40),0 8px 20px rgba(255,154,166,.30)}
       .logo-chip img{height:86px;width:auto;display:block}
       .tagline{margin:26px auto 8px;font-size:clamp(22px,3.4vw,34px);font-weight:800;letter-spacing:.3px;max-width:780px}
-      .sub{margin:0 auto;color:#cdd9ee;font-size:15.5px;max-width:640px}
+      .sub{margin:0 auto;color:rgba(255,255,255,.93);font-size:15.5px;max-width:640px}
       .cta{display:flex;gap:14px;justify-content:center;flex-wrap:wrap;margin-top:30px}
       .btn{display:inline-flex;align-items:center;gap:9px;font-size:15.5px;font-weight:700;text-decoration:none;padding:14px 28px;border-radius:999px;transition:.15s;border:1px solid transparent;cursor:pointer}
       .btn .ic{width:19px;height:19px}
-      .btn-primary{background:linear-gradient(135deg,#3776e6,#46c2bd);color:#fff;box-shadow:0 12px 28px rgba(55,118,230,.42)}
+      .btn-primary{background:linear-gradient(135deg,#2f6df0,#2f9fb0);color:#fff;box-shadow:0 12px 28px rgba(47,109,240,.40)}
       .btn-primary:hover{filter:brightness(1.06);transform:translateY(-1px)}
-      .btn-ghost{background:rgba(255,255,255,.08);color:#fff;border-color:rgba(255,255,255,.34)}
-      .btn-ghost:hover{background:rgba(255,255,255,.16)}
-      .hero .meta{margin-top:18px;color:#a9bcdd;font-size:13px}
-      .hero .meta b{color:#e4ecfa}
+      .hero .btn-primary{background:#fff;color:#2f6df0;box-shadow:0 12px 26px rgba(10,30,70,.22)}
+      .hero .btn-primary:hover{background:#eef3ff;filter:none;transform:translateY(-1px)}
+      .btn-ghost{background:rgba(255,255,255,.14);color:#fff;border-color:rgba(255,255,255,.6)}
+      .btn-ghost:hover{background:rgba(255,255,255,.24)}
+      .hero .meta{margin-top:18px;color:rgba(255,255,255,.82);font-size:13px}
+      .hero .meta b{color:#fff}
 
       /* sections */
       section.block{padding:56px 0}
