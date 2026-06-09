@@ -96,7 +96,7 @@
 
   function startPeer() {
     pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-    makingOffer = false; ignoreOffer = false; srpPending = false;
+    makingOffer = false; srpPending = false;
     // 自分のカメラ等を追加したら offer を出す（viewer=polite）。P0では発火しない（受け身）。
     pc.onnegotiationneeded = async () => {
       try {
