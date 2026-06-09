@@ -29,7 +29,7 @@
       .hero{position:relative;overflow:hidden;background:linear-gradient(135deg,#0b0d10,#16263f);color:#fff;text-align:center;padding:64px 24px 72px}
       .hero::after{content:"";position:absolute;inset:0;background:radial-gradient(1100px 360px at 50% -10%,rgba(43,108,255,.35),transparent 70%);pointer-events:none}
       .hero>*{position:relative;z-index:1}
-      .logo-chip{display:inline-flex;align-items:center;justify-content:center;background:#fff;border-radius:20px;padding:18px 26px;box-shadow:0 14px 40px rgba(0,0,0,.35)}
+      .logo-chip{display:inline-grid;place-items:center;background:#fff;border-radius:18px;width:120px;height:120px;box-shadow:0 14px 40px rgba(0,0,0,.35)}
       .logo-chip img{height:84px;width:auto;display:block}
       .tagline{margin:26px auto 6px;font-size:clamp(22px,3.4vw,34px);font-weight:800;letter-spacing:.3px;max-width:760px}
       .sub{margin:0 auto;color:#bcccea;font-size:15.5px;max-width:620px}
@@ -89,7 +89,7 @@
       <h1 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">PAssist — ブラウザだけで1ウィンドウを共有・遠隔操作</h1>
       <div class="logo-chip"><img src="passist.svg" alt="PAssist ロゴ" /></div>
       <p class="tagline">ブラウザだけで、1つのウィンドウを共有・遠隔操作。</p>
-      <p class="sub">アカウント不要。相手はインストール不要でブラウザを開くだけ。デスクトップ全体は決して映りません。</p>
+      <p class="sub">アカウント不要。相手は<strong>QRコードを読み取るだけ</strong>（またはURLを開くだけ）で、すぐに操作を開始。デスクトップ全体は決して映りません。</p>
       <div class="cta">
         <a class="btn btn-primary" href="https://github.com/paps-jp/passist/releases/latest/download/PAssist.exe">⬇ Windows版をダウンロード</a>
         <a class="btn btn-ghost" href="docs.html">📖 ドキュメント</a>
@@ -111,7 +111,7 @@
           <div class="feat"><div class="ico">🔒</div><h3>暗号化通信（WebRTC）</h3><p>映像も操作も DTLS-SRTP で常に暗号化。シグナリングも https/wss 化できます。</p></div>
           <div class="feat"><div class="ico">✅</div><h3>ホスト承認制</h3><p>あなたが許可するまで何も映りません。信頼した端末は次回から自動接続も可能。</p></div>
           <div class="feat"><div class="ico">⛔</div><h3>脱出キーをブロック</h3><p>Win / Alt+Tab / Alt+F4 などを遮断。操作は対象ウィンドウの中だけに限定。</p></div>
-          <div class="feat"><div class="ico">⏱️</div><h3>一時利用</h3><p>セッションは期限付き（既定30分）。期限切れで自動的に失効します。</p></div>
+          <div class="feat"><div class="ico">⏱️</div><h3>一時利用</h3><p>セッションは期限付き（既定30分）。期限切れで自動的に失効します。無期限にも設定できます。</p></div>
         </div>
       </div>
     </section>
