@@ -98,18 +98,22 @@ body { display: flex; flex-direction: column; }
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 12px;
+  flex-wrap: nowrap; /* 折り返さない */
+  gap: 8px;
   align-items: center;
+  max-width: 96vw; /* 画面幅に収め、はみ出す時は横スクロール */
+  overflow-x: auto;
   background: rgba(20, 24, 30, 0.92);
   border: 1px solid #2a313b;
-  padding: 8px 14px;
+  padding: 8px 12px;
   border-radius: 999px;
   z-index: 10;
 }
+.toolbar > * { flex: 0 0 auto; white-space: nowrap; } /* 各項目を縮めず改行させない */
 #badge { color: #3ddc84; font-size: 13px; }
 #badge.readonly { color: #8ab4ff; }
 body.view-only #video { cursor: default; }
-.toolbar button { background: #2a313b; padding: 6px 12px; font-size: 13px; }
+.toolbar button { background: #2a313b; padding: 6px 10px; font-size: 13px; }
 
 /* 画面上キーバー（スマホ用の特殊キー/修飾キー） */
 .keybar {

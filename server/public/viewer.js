@@ -192,6 +192,18 @@
   }
   function resetZoom() { zScale = 1; zTx = 0; zTy = 0; applyZoom(); }
 
+  // タッチ操作モード（1本指ドラッグの挙動）: scroll=共有窓の中身をスクロール / mouse=ポインタ操作 / pan=拡大画面の移動
+  let touchMode = 'scroll';
+  function attachModeBtn() {
+    const modeBtn = document.getElementById('modeBtn');
+    if (!modeBtn) return;
+    const MODES = ['scroll', 'mouse', 'pan'];
+    const LABEL = { scroll: '📜 スクロール', mouse: '🖱 マウス', pan: '🔍 画面移動' };
+    const set = (m) => { touchMode = m; modeBtn.textContent = LABEL[m]; };
+    set('scroll');
+    modeBtn.onclick = () => set(MODES[(MODES.indexOf(touchMode) + 1) % MODES.length]); // タップで切替
+  }
+
   function attachInput() {
     video.addEventListener('mousemove', (e) => {
       const p = norm(e.clientX, e.clientY);
@@ -288,10 +300,13 @@
       if (!moved && (Math.abs(t.clientX - sx) > MOVE_THRESH || Math.abs(t.clientY - sy) > MOVE_THRESH)) {
         moved = true; clearLP(); // ドラッグ開始→長押し取消（スクロールへ）
       }
-      if (moved && controlEnabled) { // 1本指ドラッグ=縦横スクロール
-        accX += t.clientX - lastX;
-        accY += t.clientY - lastY;
-        flushScroll();
+      if (moved) { // 1本指ドラッグ: モードで挙動が変わる
+        const dx = t.clientX - lastX, dy = t.clientY - lastY;
+        if (touchMode === 'pan') { zTx += dx; zTy += dy; applyZoom(); } // ①拡大画面の移動（閲覧のみでも可）
+        else if (controlEnabled) {
+          if (touchMode === 'mouse') { const p = norm(t.clientX, t.clientY); if (p) queueMove(p); } // ③ポインタを指の位置へ
+          else { accX += dx; accY += dy; flushScroll(); } // ②共有窓の中身スクロール（縦横）
+        }
       }
       lastX = t.clientX; lastY = t.clientY;
       e.preventDefault();
@@ -540,6 +555,7 @@
   attachTextDialog();
   attachClipboardMenu();
   attachKeybar();
+  attachModeBtn();
   attachLocalCursor();
   connect();
 })();
