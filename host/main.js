@@ -13,6 +13,8 @@ const trust = require('./trust');
 const portmap = require('./portmap');
 const settings = require('./settings');
 const cursorshape = require('./cursorshape');
+const winenum = require('./winenum'); // owned 窓（付随ウィンドウ）を精密に列挙して一覧へ補う
+const QRCode = require('qrcode'); // 共有URLのQRコード生成（スマホで読み取って接続）
 
 // クラッシュ理由を %TEMP%\passist-crash.log に記録（異常終了の原因切り分け用）
 function crashLog(msg) {
@@ -105,9 +107,16 @@ function setupDisplayMedia() {
         .getSources({ types: ['window'] }) // ★ 'screen' を含めない
         .then((sources) => {
           const chosen = sources.find((s) => s.id === selectedSourceId);
-          callback(chosen ? { video: chosen } : {});
+          if (chosen) return callback({ video: chosen });
+          // owned 窓など getSources に出ない対象は、選択済み ID から自作ソースで返す。
+          // 返すのは capture:select で固定された selectedSourceId のみ（任意ウィンドウは渡さない）。
+          if (selectedSourceId) return callback({ video: { id: selectedSourceId, name: selectedSourceName || 'PAssist' } });
+          callback({});
         })
-        .catch(() => callback({}));
+        .catch(() => {
+          if (selectedSourceId) callback({ video: { id: selectedSourceId, name: selectedSourceName || 'PAssist' } });
+          else callback({});
+        });
     },
     { useSystemPicker: false },
   );
@@ -119,14 +128,47 @@ ipcMain.handle('windows:list', async () => {
     fetchWindowIcons: true,
     thumbnailSize: { width: 320, height: 200 },
   });
-  return sources
-    .filter((s) => s.name && s.name.trim().length > 0)
-    .map((s) => ({
-      id: s.id,
-      name: s.name,
-      thumbnail: s.thumbnail && !s.thumbnail.isEmpty() ? s.thumbnail.toDataURL() : null,
-      appIcon: s.appIcon && !s.appIcon.isEmpty() ? s.appIcon.toDataURL() : null,
-    }));
+  const named = sources.filter((s) => s.name && s.name.trim().length > 0);
+  const list = named.map((s) => ({
+    id: s.id,
+    name: s.name,
+    thumbnail: s.thumbnail && !s.thumbnail.isEmpty() ? s.thumbnail.toDataURL() : null,
+    appIcon: s.appIcon && !s.appIcon.isEmpty() ? s.appIcon.toDataURL() : null,
+  }));
+
+  // owned 窓（付随ウィンドウ）の自動掲載。
+  // Chromium は「owned かつ非 WS_EX_APPWINDOW」をピッカーから除外するため、
+  // 映像を別の owned 最上位ウィンドウに描くアプリ（例: Qwatch Monitor の CameraViewWindow）が出ない。
+  // 所有者が「一覧に出ている共有可能ウィンドウ」である owned 窓だけを精密に補う（ゴミは出さない）。
+  try {
+    const hwndOf = (id) => { const m = /^window:(\d+):/.exec(id); return m ? Number(m[1]) : null; };
+    const listed = new Map(); // owner 判定用: hwnd -> source
+    for (const s of named) { const h = hwndOf(s.id); if (h != null) listed.set(h, s); }
+    const seen = new Set(listed.keys());
+    const WS_EX_TOOLWINDOW = 0x80;
+    for (const w of winenum.enumerate()) {
+      if (!w.visible || w.iconic) continue;
+      if (w.owner === 0) continue; // 独立窓は対象外（owned のみ）
+      if (!listed.has(w.owner)) continue; // 所有者が共有可能な掲載ウィンドウであること
+      if (seen.has(w.hwnd)) continue; // 既に一覧にある
+      if (w.exStyle & WS_EX_TOOLWINDOW) continue; // ツールチップ等
+      if (w.width < 200 || w.height < 150) continue;
+      if (!w.title || !w.title.trim()) continue;
+      seen.add(w.hwnd);
+      const ownerSrc = listed.get(w.owner);
+      list.push({
+        id: `window:${w.hwnd}:0`,
+        name: w.title,
+        thumbnail: null,
+        appIcon: ownerSrc && ownerSrc.appIcon && !ownerSrc.appIcon.isEmpty() ? ownerSrc.appIcon.toDataURL() : null,
+        owned: true,
+        ownerName: ownerSrc ? ownerSrc.name : '',
+      });
+    }
+  } catch (e) {
+    console.warn('[host] owned 窓の列挙に失敗:', e && e.message);
+  }
+  return list;
 });
 
 ipcMain.handle('capture:select', (_e, { id, name }) => {
@@ -137,10 +179,14 @@ ipcMain.handle('capture:select', (_e, { id, name }) => {
 });
 
 ipcMain.handle('input:focus', () => {
+  if (settings.get().readonly) return; // 閲覧のみ：前面化（操作系）はしない
   if (input) return input.focusTarget();
 });
 
 ipcMain.handle('config:get', () => ({ signalWs, inputEnabled: !!input && inputReady, settings: settings.get(), palette: getSystemPalette() }));
+ipcMain.handle('qr:make', async (_e, text) => {
+  try { return await QRCode.toDataURL(String(text || ''), { margin: 1, width: 240 }); } catch { return null; }
+});
 ipcMain.handle('settings:get', () => settings.get());
 ipcMain.handle('settings:set', (_e, patch) => settings.set(patch || {}));
 
@@ -150,6 +196,7 @@ nativeTheme.on('updated', () => {
 });
 
 ipcMain.on('input:event', (_e, ev) => {
+  if (settings.get().readonly) return; // 閲覧のみ：操作入力は無視（クライアントを信用しない最終防壁）
   if (input) input.handle(ev);
 });
 
@@ -208,6 +255,7 @@ function startClipboardSync() {
   }, 1000);
 }
 ipcMain.on('clip:set', (_e, text) => {
+  if (settings.get().readonly) return; // 閲覧のみ：クライアントからのクリップボード書込は無視
   try { if (typeof text === 'string') { clipboard.writeText(text); lastClip = text; } } catch {}
 });
 

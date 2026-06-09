@@ -96,6 +96,8 @@ body { display: flex; flex-direction: column; }
   z-index: 10;
 }
 #badge { color: #3ddc84; font-size: 13px; }
+#badge.readonly { color: #8ab4ff; }
+body.view-only #video { cursor: default; }
 .toolbar button { background: #2a313b; padding: 6px 12px; font-size: 13px; }
 
 .ctxmenu {

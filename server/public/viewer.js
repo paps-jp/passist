@@ -21,6 +21,7 @@
   };
 
   let ws, pc, dc;
+  let controlEnabled = true; // ホストが「閲覧のみ」を通知したら false（操作入力を一切送らない）
   const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
   const wsUrl = `${wsProto}://${location.host}/ws`;
 
@@ -104,6 +105,7 @@
           const m = JSON.parse(ev.data);
           if (m && m.t === 'clip' && typeof m.s === 'string') onHostClip(m.s); // ホストのクリップボードを同期
           else if (m && m.t === 'cursor' && typeof m.s === 'string') applyHostCursor(m.s); // カーソル形状を反映
+          else if (m && m.t === 'mode') applyMode(m); // 操作可否（閲覧のみ）の通知
         } catch {}
       };
     };
@@ -138,6 +140,7 @@
   /* ---------- 入力キャプチャ ---------- */
   const MAX_BUFFER = 256 * 1024; // DataChannel バッファ上限。超えたら mousemove は捨てる（バックプレッシャ対策）
   const send = (o) => {
+    if (!controlEnabled) return; // 閲覧のみ：操作系メッセージは送らない
     if (dc && dc.readyState === 'open') dc.send(JSON.stringify(o));
   };
 
@@ -295,6 +298,7 @@
     document.addEventListener('contextmenu', (e) => {
       if (e.target && e.target.id === 'textInput') return; // テキスト入力欄はブラウザ標準メニューに任せる
       e.preventDefault();
+      if (!controlEnabled) return; // 閲覧のみ：操作メニュー（コピー/貼り付け/テキスト入力）は出さない
       showCtxMenu(e.clientX, e.clientY);
     });
     document.addEventListener('click', (e) => { if (!ctxMenu.contains(e.target)) hideCtxMenu(); });
@@ -370,6 +374,23 @@
     stage.classList.add('hidden');
     toolbar.classList.add('hidden');
     setLocalCursor(false);
+  }
+
+  // ホストからの操作可否通知。閲覧のみ時は入力送信を止め、バッジ表示と見た目を切り替える。
+  function applyMode(m) {
+    controlEnabled = !(m && m.readonly);
+    const badge = document.getElementById('badge');
+    if (controlEnabled) {
+      if (badge) { badge.textContent = '● 操作中'; badge.classList.remove('readonly'); }
+      document.body.classList.remove('view-only');
+    } else {
+      if (badge) { badge.textContent = '● 閲覧のみ'; badge.classList.add('readonly'); }
+      document.body.classList.add('view-only');
+      gate.classList.add('hidden'); // 「クリックして操作を開始」ゲートは不要
+      hasFocus = false;
+      setLocalCursor(false); // 操作用ローカルカーソルを消す
+      hideCtxMenu();
+    }
   }
 
   attachInput();

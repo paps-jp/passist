@@ -7,6 +7,8 @@ const DEFAULTS = {
   publicMode: process.env.PASSIST_PUBLIC !== '0', // UPnP でインターネット公開するか
   publicBaseUrl: process.env.PUBLIC_BASE_URL || '', // トンネル等の公開URL（指定時は共有URLのベース）
   accessMode: process.env.ACCESS_MODE || 'approve', // approve | pin | token
+  readonly: false, // 閲覧のみ：接続相手の操作（マウス/キーボード/クリップボード書込）を禁止し画面共有だけにする
+  maxViewers: 1, // 同時接続できるビューア数（1〜4）。2以上で複数同時接続を許可（操作は1人のみ・他は閲覧）
   sessionTtlMinutes: Math.round(parseInt(process.env.SESSION_TTL_MS || String(30 * 60 * 1000), 10) / 60000),
   language: 'auto', // i18n 用（将来）
   activeShareName: '', // 共有中ウィンドウ名（再起動時の自動再開用。終了ボタンで空に）

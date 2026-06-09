@@ -27,6 +27,8 @@ const SCHEME = useTls ? 'https' : 'http';
 
 /** token -> session */
 const sessions = new Map();
+let viewerSeq = 0; // ビューアの一意ID採番（複数同時接続のルーティング用）
+const clampMaxViewers = (n) => { const v = parseInt(n, 10); return Number.isFinite(v) ? Math.min(8, Math.max(1, v)) : 1; };
 
 function lanIp() {
   const ifaces = os.networkInterfaces();
@@ -106,16 +108,23 @@ function route(ws, msg) {
 
 function hostCreate(ws, msg) {
   const token = newToken();
+  // 接続方法はセッションごと（host:create で指定）。未指定/不正なら環境変数の既定。
+  const accessMode = ['approve', 'pin', 'token'].includes(msg && msg.accessMode) ? msg.accessMode : ACCESS_MODE;
+  // 有効期限（分）。host:create の ttlMinutes 優先、未指定なら環境変数の既定。0 は「無期限」(expiresAt=null)。
+  const ttlMin = msg && Number.isFinite(msg.ttlMinutes) ? msg.ttlMinutes : SESSION_TTL_MS > 0 ? SESSION_TTL_MS / 60000 : 0;
+  const expiresAt = ttlMin > 0 ? Date.now() + ttlMin * 60000 : null;
   const s = {
     token,
     host: ws,
-    viewer: null,
-    pendingViewer: null,
+    viewers: new Map(), // viewerId -> ws（接続中。複数同時接続可）
+    pending: new Map(), // viewerId -> ws（approve 承認待ち）
+    maxViewers: clampMaxViewers(msg && msg.maxViewers),
+    accessMode, // 'approve'(承認制) | 'pin' | 'token'(だれでも)
     status: 'idle',
     base: baseUrl(msg && msg.publicBaseUrl),
-    pin: ACCESS_MODE === 'pin' ? newPin() : null,
+    pin: accessMode === 'pin' ? newPin() : null,
     createdAt: Date.now(),
-    expiresAt: Date.now() + SESSION_TTL_MS,
+    expiresAt, // null = 無期限
   };
   sessions.set(token, s);
   ws.role = 'host';
@@ -125,7 +134,7 @@ function hostCreate(ws, msg) {
     token,
     viewerUrl: `${s.base}/s/${token}`,
     pin: s.pin,
-    accessMode: ACCESS_MODE,
+    accessMode: s.accessMode,
     expiresAt: s.expiresAt,
   });
   console.log(`[server] session created: ${token} (${ACCESS_MODE})`);
@@ -134,24 +143,27 @@ function hostCreate(ws, msg) {
 function viewerJoin(ws, msg) {
   const s = sessions.get(msg.token);
   if (!s) return send(ws, { type: 'error', code: 'invalid', message: 'セッションが見つかりません' });
-  if (Date.now() > s.expiresAt) {
+  if (s.expiresAt && Date.now() > s.expiresAt) {
     sessions.delete(s.token);
     return send(ws, { type: 'error', code: 'expired', message: 'セッションの有効期限が切れています' });
   }
-  if (s.viewer) return send(ws, { type: 'error', code: 'busy', message: '別の利用者が接続中です' });
-  if (ACCESS_MODE === 'pin' && String(msg.pin || '') !== s.pin) {
+  if (s.viewers.size + s.pending.size >= s.maxViewers) {
+    return send(ws, { type: 'error', code: 'busy', message: '接続できる人数の上限に達しています' });
+  }
+  if (s.accessMode === 'pin' && String(msg.pin || '') !== s.pin) {
     return send(ws, { type: 'error', code: 'pin', message: 'PINが違います' });
   }
 
   ws.role = 'viewer';
   ws.token = s.token;
+  ws.viewerId = String(++viewerSeq);
 
-  if (ACCESS_MODE === 'approve') {
-    s.pendingViewer = ws;
+  if (s.accessMode === 'approve') {
+    s.pending.set(ws.viewerId, ws);
     s.status = 'pending';
     send(ws, { type: 'waiting', message: 'ホストの承認を待っています…' });
     // ビューア提示の信頼クレデンシャル(auth)はそのままホストへ中継（サーバは保存・検証しない）
-    send(s.host, { type: 'viewer:request', auth: msg.auth || null });
+    send(s.host, { type: 'viewer:request', viewerId: ws.viewerId, auth: msg.auth || null });
   } else {
     acceptViewer(s, ws);
   }
@@ -159,42 +171,47 @@ function viewerJoin(ws, msg) {
 
 function hostDecision(ws, approve, msg) {
   const s = sessions.get(ws.token);
-  if (!s || s.host !== ws || !s.pendingViewer) return;
-  const v = s.pendingViewer;
-  s.pendingViewer = null;
+  if (!s || s.host !== ws) return;
+  const viewerId = msg && msg.viewerId;
+  const v = viewerId != null ? s.pending.get(viewerId) : null;
+  if (!v) return;
+  s.pending.delete(viewerId);
   if (approve) {
     acceptViewer(s, v, msg && msg.issue);
   } else {
     send(v, { type: 'denied', message: 'ホストが接続を拒否しました' });
     v.close();
-    s.status = 'idle';
+    if (!s.viewers.size && !s.pending.size) s.status = 'idle';
   }
 }
 
 function acceptViewer(s, v, issue) {
-  s.viewer = v;
+  s.viewers.set(v.viewerId, v);
   s.status = 'connected';
   // issue があれば、ホストが新規発行した信頼クレデンシャルをビューアへ渡す（localStorage 保存用）
   send(v, { type: 'accepted', issue: issue || null });
-  send(s.host, { type: 'viewer:joined' }); // ホストがオファーを作成する合図
+  send(s.host, { type: 'viewer:joined', viewerId: v.viewerId }); // 当該ビューア向けにホストがオファー作成
 }
 
 function relaySignal(ws, msg) {
   const s = sessions.get(ws.token);
   if (!s) return;
-  const target = ws.role === 'host' ? s.viewer : s.host;
-  send(target, { type: 'signal', data: msg.data });
+  if (ws.role === 'host') {
+    send(s.viewers.get(msg && msg.to), { type: 'signal', data: msg.data }); // ホストは宛先ビューアを指定
+  } else if (ws.role === 'viewer') {
+    send(s.host, { type: 'signal', from: ws.viewerId, data: msg.data }); // 送信元ビューアIDを付与
+  }
 }
 
 function hostEnd(ws) {
   const s = sessions.get(ws.token);
   if (!s || s.host !== ws) return;
-  if (s.viewer) {
-    send(s.viewer, { type: 'ended', message: 'ホストがセッションを終了しました' });
-    s.viewer.close();
+  for (const v of [...s.viewers.values(), ...s.pending.values()]) {
+    send(v, { type: 'ended', message: 'ホストがセッションを終了しました' });
+    v.close();
   }
-  s.viewer = null;
-  s.pendingViewer = null;
+  s.viewers.clear();
+  s.pending.clear();
   s.status = 'idle';
 }
 
@@ -202,22 +219,19 @@ function onClose(ws) {
   const s = ws.token && sessions.get(ws.token);
   if (!s) return;
   if (ws.role === 'host') {
-    if (s.viewer) {
-      send(s.viewer, { type: 'ended', message: 'ホストが切断しました' });
-      s.viewer.close();
+    for (const v of [...s.viewers.values(), ...s.pending.values()]) {
+      send(v, { type: 'ended', message: 'ホストが切断しました' });
+      v.close();
     }
     sessions.delete(s.token);
     console.log(`[server] session closed: ${s.token}`);
   } else if (ws.role === 'viewer') {
-    if (s.viewer === ws) {
-      s.viewer = null;
-      s.status = 'idle';
-      send(s.host, { type: 'viewer:left' });
+    if (ws.viewerId != null && s.viewers.has(ws.viewerId)) {
+      s.viewers.delete(ws.viewerId);
+      send(s.host, { type: 'viewer:left', viewerId: ws.viewerId });
     }
-    if (s.pendingViewer === ws) {
-      s.pendingViewer = null;
-      s.status = 'idle';
-    }
+    if (ws.viewerId != null) s.pending.delete(ws.viewerId);
+    if (!s.viewers.size && !s.pending.size) s.status = 'idle';
   }
 }
 
@@ -225,10 +239,10 @@ function onClose(ws) {
 setInterval(() => {
   const now = Date.now();
   for (const [token, s] of sessions) {
-    if (now > s.expiresAt) {
-      if (s.viewer) {
-        send(s.viewer, { type: 'ended', message: '有効期限切れ' });
-        s.viewer.close();
+    if (s.expiresAt && now > s.expiresAt) {
+      for (const v of [...s.viewers.values(), ...s.pending.values()]) {
+        send(v, { type: 'ended', message: '有効期限切れ' });
+        v.close();
       }
       send(s.host, { type: 'expired' });
       sessions.delete(token);

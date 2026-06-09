@@ -1,12 +1,18 @@
 /* ホスト側レンダラ（Chromium）。WebRTC の offer 側。
  * - 開いているウィンドウ一覧を表示 → 1つ選択 → そのウィンドウだけをキャプチャ
  * - シグナリングサーバに接続して共有URLを発行
- * - ビューア接続を承認したら映像トラックを送出、入力は DataChannel で受信して注入へ転送 */
+ * - ビューア接続を承認したら映像トラックを送出、入力は DataChannel で受信して注入へ転送
+ * - 複数同時接続(最大 maxViewers)に対応。操作できるのは1人だけ（最初の接続者）、他は閲覧のみ。 */
 (() => {
   'use strict';
   const $ = (id) => document.getElementById(id);
 
-  let cfg, ws, pc, dc, stream;
+  let cfg, ws, stream;
+  const peers = new Map(); // viewerId -> { pc, dc }
+  let controllerId = null; // 操作権を持つビューアID（1人）。null=全員閲覧のみ
+  let cursorStarted = false; // ホストのカーソル形状追跡を一度だけ開始するためのフラグ
+  const reqQueue = []; // 承認待ちリクエストのキュー [{ viewerId, auth }]
+  let activeReq = null; // 現在ダイアログ表示中のリクエスト
 
   init();
 
@@ -39,14 +45,57 @@
     $('publicBase').addEventListener('change', () =>
       window.host.settingsSet({ publicBaseUrl: $('publicBase').value.trim() }),
     );
-    // ホストのクリップボード変更をクライアントへ転送（接続中のみ）
-    window.host.onClipHost((text) => {
-      if (dc && dc.readyState === 'open') dc.send(JSON.stringify({ t: 'clip', s: text }));
+    // 閲覧のみモード（グローバル設定）。ON の間は接続相手の操作をホスト側で全て無視する。
+    $('readonlyChk').checked = !!(cfg.settings && cfg.settings.readonly);
+    $('readonlyChk').addEventListener('change', () => {
+      const ro = $('readonlyChk').checked;
+      if (cfg.settings) cfg.settings.readonly = ro;
+      window.host.settingsSet({ readonly: ro });
+      refreshModes(); // 接続中なら操作権/相手表示へ即反映
+      renderChips();
     });
-    // ホストのカーソル形状をクライアントへ転送（接続中のみ）→ ローカルカーソルの形に反映
-    window.host.onCursorShape((shape) => {
-      if (dc && dc.readyState === 'open') dc.send(JSON.stringify({ t: 'cursor', s: shape }));
+    // 同時接続数（次の共有から有効）。操作は1人のみ・他は閲覧。
+    $('maxViewers').value = String((cfg.settings && cfg.settings.maxViewers) || 1);
+    $('maxViewers').addEventListener('change', () => {
+      const n = Math.max(1, Math.min(4, parseInt($('maxViewers').value, 10) || 1));
+      if (cfg.settings) cfg.settings.maxViewers = n;
+      window.host.settingsSet({ maxViewers: n });
+      renderChips();
     });
+    // 接続方法（承認制 / PIN / だれでも）。変更は次の共有から有効。
+    const accVal = (cfg.settings && cfg.settings.accessMode) || 'approve';
+    for (const r of document.querySelectorAll('input[name="access"]')) {
+      r.checked = r.value === accVal;
+      r.addEventListener('change', () => {
+        if (!r.checked) return;
+        if (cfg.settings) cfg.settings.accessMode = r.value;
+        window.host.settingsSet({ accessMode: r.value });
+        updateAccessHint();
+        renderChips();
+      });
+    }
+    updateAccessHint();
+    // 有効期限（次の共有から有効）。0 = 無期限。
+    $('ttlSel').value = String(cfg.settings && Number.isFinite(cfg.settings.sessionTtlMinutes) ? cfg.settings.sessionTtlMinutes : 30);
+    $('ttlSel').addEventListener('change', () => {
+      const m = parseInt($('ttlSel').value, 10);
+      const v = Number.isFinite(m) ? m : 30;
+      if (cfg.settings) cfg.settings.sessionTtlMinutes = v;
+      window.host.settingsSet({ sessionTtlMinutes: v });
+      renderChips();
+    });
+    $('settingsBtn').onclick = () => $('settingsPanel').classList.toggle('hidden'); // ⚙ 設定の開閉
+    // QRコードの開閉（既定は開）。相手はスマホのカメラで読み取って接続できる。
+    $('qrToggle').onclick = () => {
+      const shown = $('qrPanel').classList.toggle('hidden') === false;
+      $('qrToggle').classList.toggle('open', shown);
+      if (shown) showQr();
+    };
+    renderChips();
+    // ホストのクリップボード変更を全ビューアへ転送（接続中のみ）
+    window.host.onClipHost((text) => broadcast({ t: 'clip', s: text }));
+    // ホストのカーソル形状を全ビューアへ転送（接続中のみ）→ ローカルカーソルの形に反映
+    window.host.onCursorShape((shape) => broadcast({ t: 'cursor', s: shape }));
     $('reload').onclick = loadWindows;
     $('back').onclick = () => {
       sessionStorage.setItem('passist_skip', '1'); // 手動で戻る時は自動再開しない
@@ -56,9 +105,11 @@
     $('reissue').onclick = reissue;
     $('approve').onclick = onApprove;
     $('deny').onclick = () => {
-      sendWs({ type: 'host:deny' });
+      if (activeReq) sendWs({ type: 'host:deny', viewerId: activeReq.viewerId });
       $('request').classList.add('hidden');
       $('trustChk').checked = false;
+      activeReq = null;
+      processReqQueue();
     };
     $('trustLink').onclick = issueTrustLink;
     $('copyTrust').onclick = () => copyField('trustUrl', 'copyTrust');
@@ -67,8 +118,9 @@
       sendWs({ type: 'host:end' });
       window.host.settingsSet({ activeShareName: '' }); // 終了＝次回からの自動再開を解除
       stopWatch();
-      closePeer();
-      setStatus('セッションを終了しました');
+      closeAllPeers();
+      setStatus('✓ 共有を終了しました（このリンクはもう使えません）');
+      endShareUi(); // 終了ボタンを無効化して「終了済み」を明示
     };
     await loadWindows();
     maybeResume(); // 前回「終了」を押していなければ、同じウィンドウの共有を自動再開（無ければ起動を監視）
@@ -100,6 +152,14 @@
       const label = document.createElement('span');
       label.textContent = w.name;
       cap.appendChild(label);
+      if (w.owned) {
+        // owned 窓（アプリ本体に付随する別ウィンドウ）。どの本体のものか分かるよう注記。
+        const sub = document.createElement('span');
+        sub.className = 'subhint';
+        sub.textContent = w.ownerName ? '↳ ' + w.ownerName : '↳ サブ画面';
+        cap.appendChild(sub);
+        card.title = (w.ownerName ? w.ownerName + ' の' : '') + '付随ウィンドウ（通常は一覧に出ない別画面）';
+      }
       card.append(thumb, cap);
       card.onclick = () => choose(w);
       grid.appendChild(card);
@@ -131,6 +191,10 @@
     $('preview').srcObject = stream;
     $('picker').classList.add('hidden');
     $('session').classList.remove('hidden');
+    $('back').classList.remove('hidden'); // トップバーの「別の画面」「終了」を表示
+    $('end').classList.remove('hidden');
+    resetShareUi(); // 終了ボタン等を「共有中」状態へ戻す
+    renderChips();
     startSignaling();
   }
 
@@ -200,58 +264,106 @@
 
   function startSignaling() {
     ws = new WebSocket(cfg.signalWs);
-    ws.onopen = () => sendWs({ type: 'host:create', publicBaseUrl: $('publicBase').value.trim() || undefined });
+    ws.onopen = () =>
+      sendWs({
+        type: 'host:create',
+        publicBaseUrl: $('publicBase').value.trim() || undefined,
+        maxViewers: (cfg.settings && cfg.settings.maxViewers) || 1,
+        accessMode: (cfg.settings && cfg.settings.accessMode) || 'approve',
+        ttlMinutes: cfg.settings && Number.isFinite(cfg.settings.sessionTtlMinutes) ? cfg.settings.sessionTtlMinutes : 30,
+      });
     ws.onmessage = (e) => onMsg(JSON.parse(e.data));
     ws.onclose = () => setStatus('サーバとの接続が切断されました');
     ws.onerror = () => setStatus('サーバに接続できません: ' + cfg.signalWs);
   }
   const sendWs = (o) => ws && ws.readyState === WebSocket.OPEN && ws.send(JSON.stringify(o));
 
+  const isReadonlyGlobal = () => !!(cfg.settings && cfg.settings.readonly);
+
+  // 全ビューアの open な DataChannel へ同報（クリップボード/カーソル形状などの閲覧補助）
+  function broadcast(obj) {
+    const s = JSON.stringify(obj);
+    for (const { dc } of peers.values()) if (dc && dc.readyState === 'open') dc.send(s);
+  }
+
+  // 指定ビューアへ操作可否を通知（readonly = グローバル閲覧のみ or 操作者でない）
+  function sendModeTo(viewerId) {
+    const p = peers.get(viewerId);
+    if (!p || !p.dc || p.dc.readyState !== 'open') return;
+    p.dc.send(JSON.stringify({ t: 'mode', readonly: isReadonlyGlobal() || viewerId !== controllerId }));
+  }
+
+  // 操作権の再決定＋全ビューアへ mode 通知。操作者は「最初に接続した(最も古い)open なビューア」。
+  function refreshModes() {
+    const openIds = [...peers.entries()].filter(([, p]) => p.dc && p.dc.readyState === 'open').map(([id]) => id);
+    const prev = controllerId;
+    if (isReadonlyGlobal()) controllerId = null;
+    else if (!controllerId || !openIds.includes(controllerId)) controllerId = openIds[0] || null;
+    for (const id of peers.keys()) sendModeTo(id);
+    if (controllerId && controllerId !== prev) window.host.focusTarget(); // 操作者が変わった時だけ対象を前面へ
+    setStatus(statusText());
+  }
+
+  function statusText() {
+    const n = peers.size;
+    if (!n) return '待機中。相手がURLを開くと、ここに表示されます。';
+    return `接続中: ${n}人` + (controllerId && peers.has(controllerId) ? '（操作: 1人 / 他は閲覧）' : '（全員閲覧のみ）');
+  }
+
   function onMsg(msg) {
     switch (msg.type) {
       case 'session':
         $('url').value = msg.viewerUrl;
+        if (!$('qrPanel').classList.contains('hidden')) showQr(); // URL確定時にQRを更新
         if (msg.pin) {
           $('pin').textContent = 'PIN: ' + msg.pin;
           $('pin').classList.remove('hidden');
         }
-        setStatus('待機中。URLを共有してください（有効期限あり）。');
+        setStatus('待機中。相手がURLを開くと、ここに表示されます。');
         break;
       case 'viewer:request':
-        handleViewerRequest(msg.auth);
+        reqQueue.push({ viewerId: msg.viewerId, auth: msg.auth || null });
+        processReqQueue();
         break;
       case 'viewer:joined':
-        $('request').classList.add('hidden');
-        startPeer();
+        startPeerFor(msg.viewerId);
         break;
       case 'viewer:left':
-        setStatus('利用者が切断しました');
-        closePeer();
+        closePeerFor(msg.viewerId);
         break;
       case 'signal':
-        handleSignal(msg.data);
+        handleSignal(msg.from, msg.data);
         break;
       case 'expired':
-        setStatus('有効期限切れ。「別のウィンドウを選ぶ」から再発行してください');
-        closePeer();
+        setStatus('⏰ 有効期限が切れました。「← 別の画面を選ぶ」から共有し直してください');
+        closeAllPeers();
+        endShareUi();
         break;
     }
   }
 
   function reissue() {
     // 既存接続を畳んで新しいセッションURLを発行
-    closePeer();
+    closeAllPeers();
     try { ws && ws.close(); } catch {}
     startSignaling();
   }
 
-  // 信頼済みクレデンシャル提示時は自動承認（ダイアログを出さない）。それ以外は承認ダイアログ。
-  async function handleViewerRequest(auth) {
-    if (auth) {
-      const res = await window.host.trustCheck(auth);
+  // 承認キューを1件ずつ処理（信頼済みは自動承認、それ以外はダイアログ）
+  function processReqQueue() {
+    if (activeReq || !reqQueue.length) return;
+    activeReq = reqQueue.shift();
+    handleViewerRequest(activeReq);
+  }
+
+  async function handleViewerRequest(req) {
+    if (req.auth) {
+      const res = await window.host.trustCheck(req.auth);
       if (res && res.trusted) {
-        sendWs({ type: 'host:approve' });
+        sendWs({ type: 'host:approve', viewerId: req.viewerId });
         setStatus('信頼済み端末を自動承認しました' + (res.label ? '（' + res.label + '）' : ''));
+        activeReq = null;
+        processReqQueue();
         return;
       }
     }
@@ -260,13 +372,16 @@
   }
 
   async function onApprove() {
+    if (!activeReq) return;
     // 「この端末を信頼」がオンなら新しいクレデンシャルを発行してビューアへ渡す
     let issue = null;
     if ($('trustChk').checked) issue = await window.host.trustIssue('承認時に信頼');
-    sendWs({ type: 'host:approve', issue });
+    sendWs({ type: 'host:approve', viewerId: activeReq.viewerId, issue });
     $('request').classList.add('hidden');
     $('trustChk').checked = false;
+    activeReq = null;
     refreshTrustInfo();
+    processReqQueue();
   }
 
   // 相手に渡す“事前承認リンク”を発行（現在のセッションURL + 信頼クレデンシャル）
@@ -298,62 +413,92 @@
     el.appendChild(a);
   }
 
-  async function startPeer() {
-    closePeer(); // 再接続時の取りこぼし防止：既存接続を確実に解放してから作る
-    pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+  // ビューアごとに peer 接続を張る（同じキャプチャ stream を各接続へ送る＝メッシュ）
+  async function startPeerFor(viewerId) {
+    closePeerFor(viewerId); // 再接続時の取りこぼし防止
+    const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    const entry = { pc, dc: null };
+    peers.set(viewerId, entry);
     for (const track of stream.getTracks()) pc.addTrack(track, stream);
-    dc = pc.createDataChannel('input');
+    const dc = pc.createDataChannel('input');
+    entry.dc = dc;
     dc.onopen = () => {
-      window.host.focusTarget(); // 操作開始時に対象ウィンドウを前面へ
-      window.host.cursorTrack(true); // ホストのカーソル形状追跡を開始
+      if (!cursorStarted) { cursorStarted = true; window.host.cursorTrack(true); } // 一度だけ開始
+      refreshModes(); // 操作権の決定＋mode 通知
     };
     dc.onmessage = (e) => {
-      try {
-        window.host.sendInput(JSON.parse(e.data));
-      } catch {}
+      if (viewerId !== controllerId) return; // 操作権がないビューアの入力は無視（多重防壁）
+      if (isReadonlyGlobal()) return; // 閲覧のみ時は誰の入力も無視
+      try { window.host.sendInput(JSON.parse(e.data)); } catch {}
     };
     pc.onicecandidate = (e) => {
-      if (e.candidate) sendWs({ type: 'signal', data: { candidate: e.candidate } });
+      if (e.candidate) sendWs({ type: 'signal', to: viewerId, data: { candidate: e.candidate } });
     };
     pc.onconnectionstatechange = () => {
-      const st = pc && pc.connectionState;
-      setStatus('接続状態: ' + st);
-      if (st === 'failed' || st === 'closed') closePeer(); // 死んだ接続を確実に解放（リーク防止）
+      const st = pc.connectionState;
+      if (st === 'failed' || st === 'closed') closePeerFor(viewerId); // 死んだ接続を解放
     };
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
-    sendWs({ type: 'signal', data: { sdp: pc.localDescription } });
+    sendWs({ type: 'signal', to: viewerId, data: { sdp: pc.localDescription } });
   }
 
-  async function handleSignal(data) {
-    if (!pc) return;
+  async function handleSignal(from, data) {
+    const p = peers.get(from);
+    if (!p || !p.pc) return;
     if (data.sdp) {
-      await pc.setRemoteDescription(data.sdp); // ビューアからの answer
+      await p.pc.setRemoteDescription(data.sdp); // ビューアからの answer
     } else if (data.candidate) {
       try {
-        await pc.addIceCandidate(data.candidate);
+        await p.pc.addIceCandidate(data.candidate);
       } catch (err) {
         console.warn('addIceCandidate', err);
       }
     }
   }
 
-  function closePeer() {
-    // ハンドラを外してから閉じる（閉じた後のコールバックで古い参照を触らない＝リーク/誤動作防止）
-    if (dc) {
-      try { dc.onopen = null; dc.onmessage = null; dc.close(); } catch {}
-      dc = null;
+  function closePeerFor(viewerId) {
+    const p = peers.get(viewerId);
+    if (!p) return;
+    // ハンドラを外してから閉じる（閉じた後のコールバックで古い参照を触らない）
+    if (p.dc) {
+      try { p.dc.onopen = null; p.dc.onmessage = null; p.dc.close(); } catch {}
     }
-    if (pc) {
+    if (p.pc) {
       try {
-        pc.onicecandidate = null;
-        pc.onconnectionstatechange = null;
-        pc.ontrack = null;
-        pc.close();
+        p.pc.onicecandidate = null;
+        p.pc.onconnectionstatechange = null;
+        p.pc.ontrack = null;
+        p.pc.close();
       } catch {}
-      pc = null;
     }
+    peers.delete(viewerId);
+    refreshModes(); // 操作者が抜けたら次の人へ委譲＋全体へ mode 再通知
+  }
+
+  function closeAllPeers() {
+    for (const id of [...peers.keys()]) closePeerFor(id);
+    controllerId = null;
     $('request').classList.add('hidden');
+    activeReq = null;
+    reqQueue.length = 0;
+  }
+
+  // 共有終了：終了ボタンを無効化＋文言変更し、終わったことをひと目で分かるようにする
+  function endShareUi() {
+    const e = $('end');
+    e.disabled = true;
+    e.textContent = '■ 共有を終了しました';
+    $('copy').disabled = true; // 死んだURLをコピーさせない
+    $('qrToggle').disabled = true;
+  }
+  // 共有開始：上記を「共有中」状態へ戻す
+  function resetShareUi() {
+    const e = $('end');
+    e.disabled = false;
+    e.textContent = '■ 共有を終了';
+    $('copy').disabled = false;
+    $('qrToggle').disabled = false;
   }
 
   function copyUrl() {
@@ -368,4 +513,50 @@
   }
 
   const setStatus = (t) => ($('status').textContent = t);
+
+  // 「接続方法」ラジオの下に出す説明（だれでも は警告色）
+  function updateAccessHint() {
+    const el = $('accessHint');
+    if (!el) return;
+    const v = (cfg.settings && cfg.settings.accessMode) || 'approve';
+    el.textContent =
+      v === 'approve' ? 'つなぐたびに、あなたの「許可」が必要です（安全）。'
+      : v === 'pin' ? '相手は、表示されるPIN番号の入力が必要です。'
+      : '⚠ URLを知っていれば誰でも即接続できます。インターネット公開時はとくに注意してください。';
+    el.classList.toggle('danger-hint', v === 'token');
+  }
+
+  // 共有URLのQRコードを生成して表示（main 側で生成 → data URL）
+  async function showQr() {
+    const url = $('url').value;
+    if (!url) return;
+    try {
+      const data = await window.host.qrMake(url);
+      if (data) $('qrImg').src = data;
+    } catch {}
+  }
+
+  // 共有画面に「今の設定」をチップで表示（接続方法・同時接続・操作可否）
+  function renderChips() {
+    const el = $('modeChips');
+    if (!el) return;
+    const s = cfg.settings || {};
+    const access = s.accessMode === 'token' ? 'だれでも' : s.accessMode === 'pin' ? 'PIN番号' : '承認制';
+    const max = s.maxViewers || 1;
+    const op = s.readonly ? '全員 閲覧のみ' : max > 1 ? '操作は先着1人・他は閲覧' : '操作 可';
+    el.innerHTML = '';
+    for (const t of ['接続方法: ' + access, '同時接続: ' + max + '人', '操作: ' + op, '有効期限: ' + ttlLabel(s.sessionTtlMinutes)]) {
+      const c = document.createElement('span');
+      c.className = 'chip';
+      c.textContent = t;
+      el.appendChild(c);
+    }
+  }
+
+  function ttlLabel(m) {
+    const n = Number.isFinite(m) ? m : 30;
+    if (n <= 0) return '無期限';
+    if (n % 60 === 0) return n / 60 + '時間';
+    return n + '分';
+  }
 })();

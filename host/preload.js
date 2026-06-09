@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('host', {
   listWindows: () => ipcRenderer.invoke('windows:list'),
   selectSource: (id, name) => ipcRenderer.invoke('capture:select', { id, name }),
   getConfig: () => ipcRenderer.invoke('config:get'),
+  qrMake: (text) => ipcRenderer.invoke('qr:make', text),
   sendInput: (ev) => ipcRenderer.send('input:event', ev),
   focusTarget: () => ipcRenderer.invoke('input:focus'),
   trustCheck: (auth) => ipcRenderer.invoke('trust:check', auth),
