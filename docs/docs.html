@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PAssist ドキュメント</title>
+    <style>
+      :root { --acc: #2b6cff; --bg: #f6f8fb; --fg: #1b2330; --mut: #5b6b80; --card: #fff; --line: #e2e8f0; --code: #0b1020; }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body { margin: 0; font-family: system-ui, "Segoe UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif; color: var(--fg); background: var(--bg); line-height: 1.75; }
+      header.hero { background: linear-gradient(135deg, #0b0d10, #16263f); color: #fff; padding: 40px 24px; }
+      header.hero .wrap { max-width: 980px; margin: 0 auto; }
+      header.hero h1 { margin: 0 0 6px; font-size: 30px; letter-spacing: .5px; }
+      header.hero p { margin: 0; color: #b9c6dc; font-size: 15px; }
+      .badge { display:inline-block; background: var(--acc); color:#fff; font-size:12px; padding:2px 10px; border-radius:999px; margin-bottom:14px; }
+      .layout { max-width: 980px; margin: 0 auto; display: grid; grid-template-columns: 220px 1fr; gap: 32px; padding: 28px 24px 64px; }
+      nav.toc { position: sticky; top: 16px; align-self: start; font-size: 13.5px; }
+      nav.toc a { display:block; color: var(--mut); text-decoration: none; padding: 4px 0; border-left: 2px solid transparent; padding-left: 10px; }
+      nav.toc a:hover { color: var(--acc); border-left-color: var(--acc); }
+      main { min-width: 0; }
+      section { margin-bottom: 38px; }
+      h2 { font-size: 21px; margin: 0 0 12px; padding-bottom: 6px; border-bottom: 2px solid var(--line); }
+      h3 { font-size: 16px; margin: 20px 0 6px; }
+      p, li { font-size: 14.5px; }
+      code { background: #eef1f6; padding: 1px 6px; border-radius: 5px; font-size: 13px; }
+      pre { background: var(--code); color: #e8edf6; padding: 14px 16px; border-radius: 10px; overflow-x: auto; font-size: 12.5px; line-height: 1.6; }
+      pre.diagram { background: #0e1726; color: #cdd9ee; }
+      table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin: 8px 0; background: var(--card); }
+      th, td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
+      th { background: #eaf0fb; }
+      .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
+      .note { border-left: 4px solid var(--acc); background: #eef3ff; padding: 10px 14px; border-radius: 0 8px 8px 0; font-size: 13.5px; }
+      .warn { border-left: 4px solid #e0a400; background: #fff8e6; padding: 10px 14px; border-radius: 0 8px 8px 0; font-size: 13.5px; }
+      .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+      footer { max-width: 980px; margin: 0 auto; padding: 20px 24px 50px; color: var(--mut); font-size: 12.5px; border-top: 1px solid var(--line); }
+      @media (max-width: 780px) { .layout { grid-template-columns: 1fr; } nav.toc { position: static; } .grid2 { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <header class="hero">
+      <div class="wrap">
+        <span class="badge">PAssist</span>
+        <h1>PAssist ドキュメント</h1>
+        <p>このPCの「1つのウィンドウだけ」を、ブラウザだけ・アカウント不要で、離れた相手に一時的にリモート操作してもらうツール。デスクトップ全体は決して映りません。</p>
+        <p style="margin-top:16px;font-size:14px">
+          <a href="./" style="color:#9fc1ff;text-decoration:none">← ホーム</a>
+          &nbsp;・&nbsp;
+          <a href="./#download" style="color:#9fc1ff;text-decoration:none">⬇ ダウンロード</a>
+        </p>
+      </div>
+    </header>
+
+    <div class="layout">
+      <nav class="toc">
+        <a href="#overview">1. 概要</a>
+        <a href="#features">2. できること</a>
+        <a href="#arch">3. アーキテクチャ</a>
+        <a href="#usage">4. 使い方</a>
+        <a href="#public">5. インターネット公開</a>
+        <a href="#security">6. セキュリティ</a>
+        <a href="#reliability">7. 信頼性・堅牢化</a>
+        <a href="#config">8. 設定（環境変数）</a>
+        <a href="#build">9. ビルドと配布</a>
+        <a href="#iframe">10. iframe 埋め込み</a>
+        <a href="#limits">11. 制限と今後</a>
+      </nav>
+
+      <main>
+        <section id="overview">
+          <h2>1. 概要</h2>
+          <p>
+            PAssist は Windows 向けのリモート操作ツールです。共有するのは<strong>選んだ 1 つのウィンドウだけ</strong>。
+            操作する相手は<strong>ブラウザを開くだけ</strong>（インストール・アカウント不要）。映像と操作は WebRTC で暗号化されて流れます。
+          </p>
+          <div class="note">
+            ねらい：① 開いている任意のウィンドウを1つ選ぶ ② URLを発行 ③ 離れた第三者がブラウザだけで一時操作 ④ デスクトップ全体は絶対に見せない ⑤ アカウント作成なしで入れる。
+          </div>
+        </section>
+
+        <section id="features">
+          <h2>2. できること（要件と実装）</h2>
+          <table>
+            <tr><th>要件</th><th>実装</th></tr>
+            <tr><td>任意のウィンドウを1つだけ選ぶ</td><td>起動→開いているウィンドウ一覧から選択。キャプチャ元は <code>window</code> のみ列挙し <code>screen</code> は一切扱わない。</td></tr>
+            <tr><td>URLを発行</td><td>選択すると共有URL（<code>…/s/&lt;token&gt;</code>）を自動発行・コピー。</td></tr>
+            <tr><td>ブラウザだけで一時操作</td><td>WebRTC で映像、DataChannel でマウス/キー操作。相手はブラウザのみ。</td></tr>
+            <tr><td>デスクトップ全体は出さない</td><td>選んだ1ウィンドウの映像のみ。構造的に画面全体を渡せない設計。</td></tr>
+            <tr><td>アカウント不要</td><td>URLのトークンだけで接続。ログインなし。</td></tr>
+          </table>
+        </section>
+
+        <section id="arch">
+          <h2>3. アーキテクチャ</h2>
+          <pre class="diagram">
+  ┌──────────────────────── ホストPC (PAssist) ────────────────────────┐
+  │  Electron アプリ（タスクトレイ常駐）                                 │
+  │   ├─ ウィンドウ選択 / 管理UI（renderer）                            │
+  │   ├─ シグナリング/配信サーバ（Node: express + ws）※内部起動         │
+  │   └─ 入力注入（nut.js：座標クランプ＋危険キー遮断）                  │
+  └───────────┬───────────────────────────────────────┬───────────────┘
+              │ WebRTC 映像(DTLS-SRTP)                  │ シグナリング(WSS)
+              │ ＋ DataChannel 操作                      │ ＋ ページ配信
+              ▼                                         ▼
+        ┌──────────────┐                         （UPnP / Cloudflare トンネル）
+        │  操作する人    │  ブラウザでURLを開くだけ
+        │ ブラウザのみ   │  iframe 埋め込みも可
+        └──────────────┘
+          </pre>
+          <ul>
+            <li><strong>ホスト</strong>：Electron 製。ウィンドウのキャプチャ（<code>getDisplayMedia</code>＋<code>setDisplayMediaRequestHandler</code>）、WebRTC の offer、入力注入を担当。</li>
+            <li><strong>サーバ</strong>：Node（express + ws）。セッション/トークン管理、SDP/ICE 中継、ビューア配信。ホストが内部で起動。</li>
+            <li><strong>ビューア</strong>：ブラウザの素のページ（WebRTC の answer 側）。映像表示と入力送信。</li>
+            <li><strong>暗号化</strong>：映像・操作は WebRTC（DTLS-SRTP）で常に暗号化。シグナリングは https/wss 化可能。</li>
+          </ul>
+        </section>
+
+        <section id="usage">
+          <h2>4. 使い方</h2>
+          <h3>ホスト（共有する人）</h3>
+          <ol>
+            <li><code>dist\PAssist.exe</code> をダブルクリック（または開発時は <code>npm start</code>）</li>
+            <li>共有したいウィンドウをクリックして選択</li>
+            <li>表示された<strong>共有URL</strong>をコピーして相手に送る</li>
+            <li>接続リクエストが来たら<strong>「許可」</strong>（または「この端末を信頼」で次回から自動）</li>
+          </ol>
+          <h3>ゲスト（操作する人）</h3>
+          <ol>
+            <li>送られたURLを<strong>ブラウザで開く</strong></li>
+            <li>「クリックして操作を開始」→ マウス/キーボードで対象ウィンドウを操作</li>
+          </ol>
+          <h3>タスクトレイ常駐</h3>
+          <ul>
+            <li>ウィンドウの「×」は<strong>終了せずトレイに格納</strong>。トレイアイコンのクリックで再表示。</li>
+            <li>トレイ右クリック →「管理画面を開く」「ログイン時に自動起動」「終了」。</li>
+          </ul>
+          <div class="warn">未署名のため、初回は SmartScreen 警告が出ることがあります（「詳細情報 → 実行」）。常用ならコード署名を推奨。</div>
+        </section>
+
+        <section id="public">
+          <h2>5. インターネット公開</h2>
+          <h3>方法A：UPnP 自動公開（公開IP＋UPnP有効が前提）</h3>
+          <p>起動時にアプリが <strong>UPnP で Web ポート(TCP 8443)を自動開放</strong>し、共有URLを <code>http://&lt;公開IP&gt;:8443/s/…</code> に自動設定します。</p>
+          <pre>npm start
+# ログに「[host] インターネット公開: http://&lt;公開IP&gt;:8443 …」が出れば成功
+# 同一LAN内のみにしたい場合: $env:PASSIST_PUBLIC="0"; npm start</pre>
+          <h3>方法B：Cloudflare トンネル（https・ポート開け不要・推奨）</h3>
+          <p>独自ドメイン（例 <code>passist.paps.jp</code>）で正規の https URL になります。Cloudflare 側の公開ホスト名設定は <strong>タイプ=HTTP / URL=localhost:8443 / パス=空</strong>。</p>
+          <pre>$env:PASSIST_PUBLIC="0"; $env:PUBLIC_BASE_URL="https://passist.paps.jp"; npm start
+# 共有URL = https://passist.paps.jp/s/…（ブラウザで開くだけ）</pre>
+          <div class="note">
+            映像/操作は WebRTC の P2P（STUN）で流れ、トンネルは通りません。厳しい NAT の相手とは TURN サーバが必要になることがあります（多人数運用なら中継集約型を推奨）。
+          </div>
+        </section>
+
+        <section id="security">
+          <h2>6. セキュリティ</h2>
+          <table>
+            <tr><th>観点</th><th>対策</th></tr>
+            <tr><td>1ウィンドウ限定</td><td>キャプチャ元に <code>screen</code> を列挙せず、選択IDに固定。デスクトップ・他ウィンドウは映らない。</td></tr>
+            <tr><td>一時利用</td><td>セッションに有効期限（既定30分）。期限切れで自動失効。</td></tr>
+            <tr><td>勝手に繋がせない</td><td>既定でホスト承認制。許可するまで映像は流れない。PIN併用モードも有り。</td></tr>
+            <tr><td>事前承認（信頼端末）</td><td>承認時に「信頼」した端末は次回から自動接続（端末ごとのクレデンシャル、ハッシュ保存）。</td></tr>
+            <tr><td>操作範囲の限定</td><td>入力座標を対象ウィンドウの矩形にクランプ。窓外には出さない。</td></tr>
+            <tr><td>デスクトップへの脱出防止</td><td>Win / Alt+Tab / Alt+F4 / Ctrl+Esc / タスクマネージャ 等のキーをブロック。</td></tr>
+            <tr><td>暗号化</td><td>映像・操作は常に DTLS-SRTP。シグナリング/ページは https/wss 化可能。</td></tr>
+          </table>
+          <h3>アクセス制御モード（<code>ACCESS_MODE</code>）</h3>
+          <p><code>approve</code>（既定・ホスト承認）／ <code>pin</code>（6桁ワンタイムPIN併用）／ <code>token</code>（URLのみで即接続）。</p>
+        </section>
+
+        <section id="reliability">
+          <h2>7. 信頼性・配信向け堅牢化</h2>
+          <p>長時間稼働でフリーズ／メモリリーク／クラッシュしないための対策を実装済み。</p>
+          <table>
+            <tr><th>リスク</th><th>対策</th></tr>
+            <tr><td>常時ポーリングの負荷</td><td>対象ウィンドウ矩形の取得を<strong>操作中のみの遅延更新</strong>に（旧：700msごとに全ウィンドウ列挙 → 廃止）。アイドル時ゼロ負荷。</td></tr>
+            <tr><td>再接続でのPeerリーク</td><td>新規接続前に旧 <code>RTCPeerConnection</code> を確実に <code>close</code>＋ハンドラ解除。失敗/切断時も自動解放。</td></tr>
+            <tr><td>DataChannelのバッファ肥大</td><td>マウス移動を約60Hzに間引き＋<code>bufferedAmount</code> 上限(256KB)で破棄（バックプレッシャ対策）。</td></tr>
+            <tr><td>クラッシュ</td><td>レンダラがクラッシュしても<strong>自動リロードで復帰</strong>（ループ防止付き）。未処理例外/Promise を <code>%TEMP%\passist-crash.log</code> に記録。</td></tr>
+          </table>
+        </section>
+
+        <section id="config">
+          <h2>8. 設定（環境変数）</h2>
+          <table>
+            <tr><th>変数</th><th>既定</th><th>説明</th></tr>
+            <tr><td><code>PORT</code></td><td>8443</td><td>サーバの待受ポート</td></tr>
+            <tr><td><code>ACCESS_MODE</code></td><td>approve</td><td>approve / pin / token</td></tr>
+            <tr><td><code>SESSION_TTL_MS</code></td><td>1800000</td><td>セッション有効期限(ms)</td></tr>
+            <tr><td><code>PASSIST_PUBLIC</code></td><td>有効</td><td><code>0</code>で UPnP 公開を無効（同一LAN内のみ）</td></tr>
+            <tr><td><code>PUBLIC_BASE_URL</code></td><td>—</td><td>共有URLのベース（トンネル使用時に指定）</td></tr>
+            <tr><td><code>TLS_CERT</code> / <code>TLS_KEY</code></td><td>—</td><td>指定すると https/wss で待受</td></tr>
+            <tr><td><code>REMOTE_SERVER_URL</code></td><td>—</td><td>外部サーバ利用時のシグナリング先（内部起動を無効化）</td></tr>
+          </table>
+        </section>
+
+        <section id="build">
+          <h2>9. ビルドと配布</h2>
+          <pre>npm install                 # host/server の依存を一括導入
+npm start                   # 開発起動（Electron）
+npm test                    # 信頼ロジックの単体テスト
+npm --prefix host run dist  # 配布用 dist\PAssist.exe（portable）を生成</pre>
+          <ul>
+            <li>成果物：<code>dist\PAssist.exe</code>（単一実行ファイル・portable）。サーバ一式は <code>resources\server</code> に同梱、ネイティブ(nut.js)は asar から展開。</li>
+            <li>入力注入が「閲覧のみ」になる場合は <code>npm run rebuild</code>（nut.js を Electron 用に再ビルド）。</li>
+          </ul>
+        </section>
+
+        <section id="iframe">
+          <h2>10. iframe 埋め込み</h2>
+          <p>ビューアは普通の Web ページなので iframe に埋め込めます。</p>
+          <pre>&lt;iframe
+  src="https://passist.paps.jp/s/&lt;token&gt;"
+  allow="fullscreen; autoplay"
+  style="width:100%;height:600px;border:0"
+  title="PAssist"&gt;&lt;/iframe&gt;</pre>
+          <ul>
+            <li>親ページは https 推奨。<code>allow="fullscreen"</code> は全画面ボタン用。</li>
+            <li>埋め込み元を限定するなら CSP <code>frame-ancestors</code> を返す（実装可）。</li>
+            <li><code>sandbox</code> を付けるなら <code>allow-scripts allow-same-origin allow-fullscreen</code> が必要。</li>
+          </ul>
+        </section>
+
+        <section id="limits">
+          <h2>11. 制限と今後</h2>
+          <div class="grid2">
+            <div class="card">
+              <h3>現在の制限</h3>
+              <ul>
+                <li>ホストは Windows のみ（nut.js / WGC）。</li>
+                <li>厳しい NAT の相手は TURN が必要な場合あり。</li>
+                <li>exe は未署名（SmartScreen 警告）。</li>
+                <li>操作は OS レベルの実入力（ホストの実カーソルが動く）。</li>
+              </ul>
+            </div>
+            <div class="card">
+              <h3>今後の候補</h3>
+              <ul>
+                <li>TURN（coturn / マネージド）でNAT耐性とコスト管理。</li>
+                <li>コード署名（Azure Trusted Signing 等）。</li>
+                <li>サービス化：中央シグナリング（Workers + Durable Objects）＋ TURN 集約。</li>
+                <li>送信ビットレート上限・自動更新・アイコン。</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <footer>
+      PAssist — 単一ウィンドウ・ブラウザ完結・アカウント不要のリモート操作 / ドキュメント作成日: 2026-06-09
+    </footer>
+  </body>
+</html>
