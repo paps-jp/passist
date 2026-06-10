@@ -22,10 +22,6 @@
 
   let ws, pc, dc;
   let controlEnabled = true; // ホストが「閲覧のみ」を通知したら false（操作入力を一切送らない）
-  let makingOffer = false, srpPending = false; // Perfect Negotiation（viewer=polite）
-  const rosterStreams = new Map(); // streamId -> {pid, kind:'screen'|'camera'}
-  const pendingStreams = new Map(); // roster 到着前に来た stream を stash
-  let localMedia = null, vCamOn = false, vMicOn = false; // 自分のカメラ/マイク
   const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
   const wsUrl = `${wsProto}://${location.host}/ws`;
 
@@ -96,24 +92,12 @@
 
   function startPeer() {
     pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-    makingOffer = false; srpPending = false;
-    // 自分のカメラ等を追加したら offer を出す（viewer=polite）。P0では発火しない（受け身）。
-    pc.onnegotiationneeded = async () => {
-      try {
-        makingOffer = true;
-        await pc.setLocalDescription();
-        ws.send(JSON.stringify({ type: 'signal', data: { sdp: pc.localDescription } }));
-      } catch (e) {
-        console.warn('negotiationneeded', e);
-      } finally {
-        makingOffer = false;
-      }
-    };
     pc.ontrack = (e) => {
+      video.srcObject = e.streams[0];
       stage.classList.remove('hidden');
       toolbar.classList.remove('hidden');
       setStatus('', false);
-      if (e.streams[0]) routeStream(e.streams[0]); // roster で 画面/カメラ に振り分け
+      resetZoom(); // 新しい映像はズーム等倍から
     };
     pc.ondatachannel = (e) => {
       dc = e.channel; // ホストが作成した 'input' チャネル
@@ -123,7 +107,6 @@
           if (m && m.t === 'clip' && typeof m.s === 'string') onHostClip(m.s); // ホストのクリップボードを同期
           else if (m && m.t === 'cursor' && typeof m.s === 'string') applyHostCursor(m.s); // カーソル形状を反映
           else if (m && m.t === 'mode') applyMode(m); // 操作可否（閲覧のみ）の通知
-          else if (m && m.t === 'roster') applyRoster(m); // どの stream が画面/カメラか
         } catch {}
       };
     };
@@ -137,88 +120,22 @@
     };
   }
 
-  // Perfect Negotiation（viewer=polite）。ホストからの offer は衝突時も rollback して受ける。
   async function handleSignal(data) {
     if (!pc) return;
-    try {
-      if (data.sdp) {
-        const desc = data.sdp;
-        srpPending = desc.type === 'answer';
-        await pc.setRemoteDescription(desc); // polite: 衝突 offer でも受ける（暗黙 rollback）
-        srpPending = false;
-        if (desc.type === 'offer') {
-          await pc.setLocalDescription(); // 暗黙 createAnswer
-          ws.send(JSON.stringify({ type: 'signal', data: { sdp: pc.localDescription } }));
-        }
-      } else if (data.candidate) {
-        try { await pc.addIceCandidate(data.candidate); } catch (err) { console.warn('addIceCandidate', err); }
+    if (data.sdp) {
+      await pc.setRemoteDescription(data.sdp);
+      if (data.sdp.type === 'offer') {
+        const ans = await pc.createAnswer();
+        await pc.setLocalDescription(ans);
+        ws.send(JSON.stringify({ type: 'signal', data: { sdp: pc.localDescription } }));
       }
-    } catch (err) {
-      console.warn('handleSignal', err);
+    } else if (data.candidate) {
+      try {
+        await pc.addIceCandidate(data.candidate);
+      } catch (err) {
+        console.warn('addIceCandidate', err);
+      }
     }
-  }
-
-  /* ---------- ビデオ通話（カメラ/マイク・タイル） ---------- */
-  function routeStream(s) {
-    const info = rosterStreams.get(s.id);
-    if (info) return applyStream(s, info);
-    pendingStreams.set(s.id, s); // roster 未着 → 後で振り分け
-    if (!video.srcObject && s.getVideoTracks().length) { video.srcObject = s; resetZoom(); } // 暫定で画面表示（roster到着で訂正）
-  }
-  function applyStream(s, info) {
-    if (info.kind === 'screen') { if (video.srcObject !== s) { video.srcObject = s; resetZoom(); } }
-    else renderTile(info.pid, s, false); // camera
-  }
-  function applyRoster(m) {
-    rosterStreams.clear();
-    for (const r of m.streams || []) rosterStreams.set(r.streamId, { pid: r.pid, kind: r.kind });
-    for (const [id, s] of [...pendingStreams]) { const info = rosterStreams.get(id); if (info) { applyStream(s, info); pendingStreams.delete(id); } }
-  }
-  function tilesEl() { return document.getElementById('tiles'); }
-  function renderTile(pid, s, self) {
-    const el = tilesEl(); if (!el) return;
-    let t = el.querySelector('[data-pid="' + CSS.escape(pid) + '"]');
-    if (!t) {
-      t = document.createElement('div'); t.className = 'tile'; t.dataset.pid = pid;
-      const v = document.createElement('video'); v.autoplay = true; v.playsInline = true; v.muted = !!self;
-      if (self) v.style.transform = 'scaleX(-1)';
-      const n = document.createElement('span'); n.className = 'tname'; n.textContent = self ? 'あなた' : 'ホスト';
-      t.append(v, n);
-      self ? el.prepend(t) : el.appendChild(t);
-    }
-    t.querySelector('video').srcObject = s;
-  }
-  function removeTile(pid) { const el = tilesEl(); if (!el) return; const t = el.querySelector('[data-pid="' + CSS.escape(pid) + '"]'); if (t) t.remove(); }
-
-  async function vEnsureMedia() {
-    if (localMedia) return localMedia;
-    localMedia = await navigator.mediaDevices.getUserMedia({
-      video: { width: { max: 640 }, height: { max: 360 }, frameRate: { max: 24 } },
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-    });
-    localMedia.getVideoTracks().forEach((t) => (t.enabled = vCamOn));
-    localMedia.getAudioTracks().forEach((t) => (t.enabled = vMicOn));
-    if (pc) for (const tr of localMedia.getTracks()) pc.addTrack(tr, localMedia); // ホストへ送る（再ネゴ→host側 ontrack）
-    return localMedia;
-  }
-  async function vSetCam(on) {
-    try { if (on) await vEnsureMedia(); vCamOn = on; if (localMedia) localMedia.getVideoTracks().forEach((t) => (t.enabled = on)); updateViewerMediaUi(); }
-    catch (e) { setStatus('カメラを開始できません: ' + e.message); }
-  }
-  async function vSetMic(on) {
-    try { if (on) await vEnsureMedia(); vMicOn = on; if (localMedia) localMedia.getAudioTracks().forEach((t) => (t.enabled = on)); updateViewerMediaUi(); }
-    catch (e) { setStatus('マイクを開始できません: ' + e.message); }
-  }
-  function updateViewerMediaUi() {
-    const c = document.getElementById('vCamBtn'), m = document.getElementById('vMicBtn');
-    if (c) { c.classList.toggle('on', vCamOn); c.textContent = vCamOn ? '📹' : '📷'; }
-    if (m) { m.classList.toggle('on', vMicOn); m.textContent = vMicOn ? '🎤' : '🔇'; }
-    if (vCamOn && localMedia) renderTile('self', localMedia, true); else removeTile('self');
-  }
-  function attachCallButtons() {
-    const c = document.getElementById('vCamBtn'), m = document.getElementById('vMicBtn');
-    if (c) c.onclick = () => vSetCam(!vCamOn);
-    if (m) m.onclick = () => vSetMic(!vMicOn);
   }
 
   /* ---------- 入力キャプチャ ---------- */
@@ -621,10 +538,6 @@
     toolbar.classList.add('hidden');
     setLocalCursor(false);
     resetZoom();
-    if (localMedia) { localMedia.getTracks().forEach((t) => t.stop()); localMedia = null; }
-    vCamOn = false; vMicOn = false;
-    const te = tilesEl(); if (te) te.innerHTML = '';
-    rosterStreams.clear(); pendingStreams.clear();
   }
 
   // ホストからの操作可否通知。閲覧のみ時は入力送信を止め、バッジ表示と見た目を切り替える。
@@ -651,7 +564,6 @@
   attachClipboardMenu();
   attachKeybar();
   attachModeBtn();
-  attachCallButtons();
   attachLocalCursor();
   connect();
 })();

@@ -120,11 +120,6 @@ function setupDisplayMedia() {
     },
     { useSystemPicker: false },
   );
-  // カメラ/マイク（ビデオ通話）の許可。ホスト自身のUIからの getUserMedia を許可する。
-  session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => {
-    cb(permission === 'media' || permission === 'display-capture');
-  });
-  session.defaultSession.setPermissionCheckHandler((_wc, permission) => permission === 'media' || permission === 'display-capture');
 }
 
 ipcMain.handle('windows:list', async () => {
