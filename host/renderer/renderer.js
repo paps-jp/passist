@@ -46,6 +46,8 @@
     $('publicBase').addEventListener('change', () =>
       window.host.settingsSet({ publicBaseUrl: $('publicBase').value.trim() }),
     );
+    $('publicBase').addEventListener('input', validatePublicBase); // 入力中に書式の正否を表示
+    validatePublicBase();
     // 閲覧のみモード（グローバル設定）。ON の間は接続相手の操作をホスト側で全て無視する。
     $('readonlyChk').checked = !!(cfg.settings && cfg.settings.readonly);
     $('readonlyChk').addEventListener('change', () => {
@@ -340,6 +342,7 @@
     switch (msg.type) {
       case 'session':
         $('url').value = msg.viewerUrl;
+        verifyAppliedBase(msg.viewerUrl); // 入力した公開URLが実際に反映されたか確認
         if (!$('qrPanel').classList.contains('hidden')) showQr(); // URL確定時にQRを更新
         if (msg.pin) {
           $('pin').textContent = 'PIN: ' + msg.pin;
@@ -369,8 +372,40 @@
     }
   }
 
+  // 公開URL（トンネル）の書式チェック＋見える化。サーバ側 sanitizeBase と同じ判定で、
+  // 不正だと「黙って LAN/IP に戻る」ことを赤字で知らせる（cloudflared 設定ミスの自己診断）。
+  function normBase(u) {
+    try { const url = new URL(u); if (url.protocol !== 'http:' && url.protocol !== 'https:') return ''; return u.replace(/\/+$/, ''); }
+    catch { return ''; }
+  }
+  function validatePublicBase() {
+    const el = $('publicBase'), hint = $('publicBaseHint');
+    if (!el || !hint) return '';
+    const raw = el.value.trim();
+    if (!raw) { hint.textContent = '未入力なら社内LAN内のアドレスになります（外部からは接続できません）。'; hint.classList.remove('danger-hint'); return ''; }
+    const norm = normBase(raw);
+    if (!norm) {
+      hint.textContent = '⚠ URLの書式が正しくありません。例: https://usagi.paps.jp（「:」でなく「.」、余分な空白・全角に注意）。このままでは社内LANのアドレスになります。';
+      hint.classList.add('danger-hint');
+      return '';
+    }
+    hint.textContent = '✓ この公開URLで発行します: ' + norm;
+    hint.classList.remove('danger-hint');
+    return norm;
+  }
+  // 発行後、入力した公開URLが実際に使われたか確認（不正ならサーバが捨てて LAN/IP になっている）。
+  function verifyAppliedBase(viewerUrl) {
+    const hint = $('publicBaseHint'); if (!hint) return;
+    const want = normBase(($('publicBase').value || '').trim());
+    if (want && viewerUrl && viewerUrl.indexOf(want) !== 0) {
+      hint.textContent = '⚠ 入力した公開URLが使われていません（書式が不正のため LAN に戻りました）。発行: ' + viewerUrl;
+      hint.classList.add('danger-hint');
+    }
+  }
+
   function reissue() {
     // 既存接続を畳んで新しいセッションURLを発行
+    validatePublicBase();
     closeAllPeers();
     try { ws && ws.close(); } catch {}
     startSignaling();
