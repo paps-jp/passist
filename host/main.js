@@ -193,20 +193,55 @@ ipcMain.handle('input:focus', () => {
 
 // 現在フォーカスされているテキストフィールドの値をクリップボード経由で取得して返す。
 // 用途: viewer 側でカーソルが ibeam の場所をタップ→既存値を取って編集ダイアログに表示する。
-// 副作用: 一瞬クリップボードを書き換えるが、終了時に元の値を復元する。
+// 副作用対策: クリップボードを一時的に書き換えるが、終了時に元の内容を全て復元する。
+// ファイル等の復元不能なフォーマットがクリップボードに入っている場合は処理を中断（ユーザーの作業を壊さない）。
 ipcMain.handle('input:readSelected', async () => {
-  if (settings.get().readonly) return '';
-  if (!input || !input.selectAndCopy) return '';
-  let backup = '';
-  try { backup = clipboard.readText() || ''; } catch {}
+  if (settings.get().readonly) return { aborted: true, reason: 'readonly', value: '' };
+  if (!input || !input.selectAndCopy) return { aborted: true, reason: 'no-input', value: '' };
+
+  // Electron が write で復元できるフォーマット。これ以外（ファイル参照=CF_HDROP 等）があれば中断。
+  const RESTORABLE = new Set([
+    'text/plain', 'text/html', 'text/rtf',
+    'image/png', 'image/jpeg', 'image/jpg', 'image/bmp', 'image/tiff', 'image/svg+xml',
+    'public.utf8-plain-text', 'public.utf16-external-plain-text', // macOS 等の表記揺れ
+  ]);
+  let formats = [];
+  try { formats = clipboard.availableFormats() || []; } catch {}
+  const hasUnrestorable = formats.some((f) => !RESTORABLE.has(f));
+  if (hasUnrestorable) {
+    return { aborted: true, reason: 'clipboard-has-files', value: '' };
+  }
+
+  // 復元可能フォーマットを全てバックアップ
+  let backup;
+  try {
+    const img = clipboard.readImage();
+    backup = {
+      text: clipboard.readText() || '',
+      html: clipboard.readHTML() || '',
+      rtf: clipboard.readRTF() || '',
+      image: img && !img.isEmpty() ? img : null,
+    };
+  } catch { backup = { text: '', html: '', rtf: '', image: null }; }
+
   try {
     await input.selectAndCopy(); // Ctrl+A + Ctrl+C
     await new Promise((r) => setTimeout(r, 120)); // OS のクリップボード反映待ち
     const v = (() => { try { return clipboard.readText() || ''; } catch { return ''; } })();
     lastClip = v; // 自分が書いたクリップ変更を「外部から来た」扱いしない（broadcast抑制）
-    return v;
+    return { aborted: false, value: v };
   } finally {
-    try { clipboard.writeText(backup); lastClip = backup; } catch {} // ユーザーのクリップを必ず復元
+    // 復元: 保存していたフォーマットをまとめて書き戻す
+    try {
+      const data = {};
+      if (backup.text) data.text = backup.text;
+      if (backup.html) data.html = backup.html;
+      if (backup.rtf) data.rtf = backup.rtf;
+      if (backup.image) data.image = backup.image;
+      if (Object.keys(data).length) clipboard.write(data);
+      else clipboard.clear();
+      lastClip = backup.text;
+    } catch {}
   }
 });
 

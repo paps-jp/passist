@@ -673,10 +673,16 @@
       if (isReadonlyGlobal()) return; // 閲覧のみ時は誰の入力も無視
       let m; try { m = JSON.parse(e.data); } catch { return; }
       if (m && m.t === 'readtext') {
-        // テキスト編集モード: 現在のフィールド値をクリップボード経由で取得して返す
+        // テキスト編集モード: 現在のフィールド値をクリップボード経由で取得して返す。
+        // クリップボードにファイル等が入っていて保護できない場合は aborted=理由 を付けて返す。
         try {
-          const v = await window.host.readSelectedText();
-          if (dc.readyState === 'open') dc.send(JSON.stringify({ t: 'fieldtext', s: v || '' }));
+          const r = await window.host.readSelectedText();
+          if (dc.readyState === 'open') {
+            const out = (r && typeof r === 'object')
+              ? { t: 'fieldtext', s: r.value || '', aborted: r.aborted ? r.reason : null }
+              : { t: 'fieldtext', s: r || '' }; // 旧API互換
+            dc.send(JSON.stringify(out));
+          }
         } catch (err) { console.warn('readSelectedText', err); }
         return;
       }

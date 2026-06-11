@@ -141,7 +141,7 @@
           if (m && m.t === 'clip' && typeof m.s === 'string') onHostClip(m.s); // ホストのクリップボードを同期
           else if (m && m.t === 'cursor' && typeof m.s === 'string') applyHostCursor(m.s); // カーソル形状を反映
           else if (m && m.t === 'mode') applyMode(m); // 操作可否（閲覧のみ）の通知
-          else if (m && m.t === 'fieldtext') onFieldText(typeof m.s === 'string' ? m.s : ''); // テキスト編集モード: 現在値受信
+          else if (m && m.t === 'fieldtext') onFieldText(typeof m.s === 'string' ? m.s : '', m.aborted || null); // テキスト編集モード: 現在値受信
         } catch {}
       };
     };
@@ -424,11 +424,20 @@
       fieldReadTimer = null;
     }, 1800);
   }
-  function onFieldText(s) {
+  function onFieldText(s, aborted) {
     if (!textOverwriteMode) return; // 編集モードでないなら無視（誤配信対策）
     if (fieldReadTimer) { clearTimeout(fieldReadTimer); fieldReadTimer = null; }
-    textInput.value = s;
-    textInput.placeholder = '';
+    if (aborted === 'clipboard-has-files') {
+      // ホスト側のクリップボードにファイル等が入っていて、復元すると壊れるため取得をスキップ。
+      textInput.value = '';
+      textInput.placeholder = 'ホストのクリップボードにファイル等があるため現在値を取得しませんでした。新規入力で上書きされます。';
+    } else if (aborted) {
+      textInput.value = '';
+      textInput.placeholder = '現在値の取得をスキップしました（' + aborted + '）。新規入力で上書きされます。';
+    } else {
+      textInput.value = s;
+      textInput.placeholder = '';
+    }
     try { textInput.focus(); textInput.select(); } catch {} // 全選択でそのまま打ち替え可能
   }
   function attachTextDialog() {
