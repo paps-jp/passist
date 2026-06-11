@@ -192,6 +192,12 @@ button.small { padding: 6px 12px; font-size: 13px; border-radius: 8px; }
 .set-field select { padding: 4px 8px; border-radius: 8px; border: 1px solid var(--btn-border); background: var(--field-bg); color: var(--fg); font: inherit; }
 .radio { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
 .danger-hint { color: var(--danger); }
+/* 接続方法のラジオ4つは長さがバラバラで折り返しが汚いので 2x2 グリッドで揃える */
+.set-field:has(input[name="access"]) { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 14px; align-items: center; }
+.set-field:has(input[name="access"]) .radio { font-size: 13.5px; }
+.set-field:has(input[name="access"]) .hint { grid-column: 1 / -1; min-height: 1.4em; margin-top: 4px; }
+/* サーバのラジオ2つは1行が長いので縦並び。 ヒントや URL row も同じ列に積む */
+.set-field:has(input[name="serverMode"]) { flex-direction: column; align-items: stretch; gap: 6px; }
 
 /* 手順番号バッジ */
 h2 .step {
