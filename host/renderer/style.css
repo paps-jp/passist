@@ -92,7 +92,7 @@ button:disabled { opacity: 0.45; pointer-events: none; } /* 無効時はグレ�
   border-color: transparent;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
 }
-.primary:hover { filter: brightness(1.08); } /* 任意の Windows アクセント色に対応 */
+.primary:hover { background: var(--primary); filter: brightness(1.08); } /* button:hoverのbtn-hoverで真っ白にならないよう背景を保持 */
 .ghost { background: var(--btn-bg); color: var(--btn-fg); border-color: var(--btn-border); }
 .danger { background: transparent; color: var(--danger); border-color: var(--danger-border); }
 .danger:hover { background: var(--danger-hover); }
