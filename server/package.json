@@ -1,20 +1,13 @@
 {
   "name": "passist-server",
-  "version": "0.2.2",
+  "version": "0.2.1",
   "private": true,
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "build:sigstore": "node tools/build-sigstore.mjs"
+    "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.21.2",
     "ws": "^8.18.0"
-  },
-  "devDependencies": {
-    "@sigstore/verify": "^2.1.0",
-    "@sigstore/bundle": "^3.1.0",
-    "@sigstore/protobuf-specs": "^0.4.0",
-    "esbuild": "^0.25.5"
   }
 }

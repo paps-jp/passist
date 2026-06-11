@@ -648,32 +648,17 @@
   }
 
   /* ---------- バージョン情報モーダル + サーバ検証(B) + 暗号化情報(D) ---------- */
-  // B: ブラウザだけで Sigstore Bundle を完全検証する。
-  //   - /api/build からサーバ申告（commit, imageDigest, tag, bundleUrl）を取得
-  //   - /api/cosign/bundle?tag=... で GitHub Release から Sigstore Bundle を取得（サーバは中継のみ）
-  //   - 動的 import('/sigstore-app.js') で @sigstore/verify をロード（esbuild バンドル）
-  //   - Fulcio root CA + SCT + signature + Rekor inclusion proof + identity を完全検証
-  //   - サーバが嘘の bundle を返しても署名検証で破綻 → 数学的に確実
+  // B: サーバ /api/build から「動かしている image の commit / digest」を取得して表示する。
+  //   - digest は Cosign 署名対象。利用者は cosign で「公開ソースからビルドされた」を完全検証可能。
+  //   - ブラウザだけで完全検証する API（Rekor index）は image digest 直接検索に対応していないため、
+  //     ここでは「サーバ申告を可視化＋外部検証リンク」を提供する（search.sigstore.dev / cosign コマンド）。
   // D: getStats() で DTLS state / 暗号アルゴリズム / 経路(P2P or TURN中継)を可視化。
   async function verifyServerCode() {
     try {
       const build = await fetch('/api/build', { cache: 'no-store' }).then((r) => r.json());
       if (!build) return { state: 'error', error: 'no response' };
-      if (!build.imageDigest || !build.bundleUrl) return { state: 'no-attest', build };
-      // ブラウザで完全検証
-      const bRes = await fetch(build.bundleUrl);
-      if (!bRes.ok) return { state: 'bundle-fetch-failed', build, error: 'HTTP ' + bRes.status };
-      const bundleJson = await bRes.json();
-      const lib = await import('/sigstore-app.js');
-      const result = await lib.verifyBundle({
-        bundleJson,
-        certificateIdentityRegexp: build.certificateIdentityRegexp,
-        certificateOidcIssuer: build.certificateOidcIssuer,
-      });
-      if (!result.ok) return { state: 'verify-failed', build, error: result.error };
-      const match = lib.digestMatches(bundleJson, build.imageDigest);
-      if (match === false) return { state: 'digest-mismatch', build, error: 'bundle subject != server digest' };
-      return { state: 'verified', build, subject: result.subject, issuer: result.issuer, integratedTime: result.integratedTime, digestVerified: match };
+      if (!build.imageDigest) return { state: 'no-attest', build };
+      return { state: 'reported', build };
     } catch (e) {
       return { state: 'error', error: e.message };
     }
@@ -739,41 +724,27 @@
     const registry = b.registry || 'ghcr.io/paps-jp/passist-signaling';
     const src = b.sourceUrl || 'https://github.com/paps-jp/passist';
     const builtAt = b.builtAt || '';
-    const tag = b.tag || '';
     const head = (label, klass) => `<div><span class="${klass}">${label}</span></div>`;
     const kv = `<div class="kv">
-        ${tag ? '<b>tag</b><code>' + tag + '</code>' : ''}
         <b>commit</b><code>${commit}</code>
         <b>digest</b><code>${digest}</code>
         ${builtAt ? '<b>built at</b><span>' + builtAt + '</span>' : ''}
         <b>registry</b><code>${registry}</code>
       </div>`;
+    const digestNoPrefix = (digest || '').replace(/^sha256:/, '');
+    const cosignCmd = `cosign verify ${registry}@${digest}\\\n  --certificate-identity-regexp 'https://github.com/paps-jp/passist'\\\n  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'`;
     switch (v.state) {
-      case 'verified': {
-        const ts = v.integratedTime ? new Date(v.integratedTime * 1000).toISOString() : '';
-        return head('✓ ブラウザで完全検証成功', 'ok')
-          + '<div style="margin-top:4px">このサーバが動かしている image は、公開コードから GitHub Actions でビルド・署名されたことを<strong>このブラウザ単独で</strong>暗号学的に確認しました。</div>'
+      case 'reported':
+        return head('✓ サーバが署名済 image digest を公開しています', 'ok')
           + kv
-          + `<div class="kv" style="margin-top:6px">
-              ${v.subject ? '<b>署名者</b><code>' + v.subject + '</code>' : ''}
-              ${v.issuer ? '<b>発行者</b><code>' + v.issuer + '</code>' : ''}
-              ${ts ? '<b>署名時刻</b><span>' + ts + '</span>' : ''}
-              ${v.digestVerified === true ? '<b>digest 一致</b><span class="ok">✓ サーバ申告 = Sigstore 署名</span>' : ''}
-            </div>`
-          + '<div style="margin-top:6px;font-size:11px;color:#9fb0c6">検証内容: ①Fulcio root → cert chain ②SCT (Sigstore CT) inclusion ③signature (ECDSA P-256) ④Rekor Merkle inclusion proof ⑤identity</div>';
-      }
+          + `<div style="margin-top:10px">この digest は GitHub Actions の release ワークフローで Cosign keyless 署名され、Sigstore Rekor の公開ログに記録されています。次のいずれかで暗号学的に検証できます:</div>`
+          + `<div style="margin-top:8px"><a href="https://search.sigstore.dev/?hash=sha256:${digestNoPrefix}" target="_blank" rel="noopener">🔍 Sigstore で署名を見る</a> ・ <a href="${src}/releases" target="_blank" rel="noopener">GitHub リリース</a> ・ <a href="${src}/actions" target="_blank" rel="noopener">ビルドログ</a></div>`
+          + `<details style="margin-top:8px"><summary style="cursor:pointer">cosign コマンドで完全検証</summary><pre style="white-space:pre-wrap;word-break:break-all;background:#0b0d10;color:#cfe1ff;padding:8px;border-radius:6px;font-size:11px;margin-top:6px">${cosignCmd}</pre></details>`;
       case 'no-attest':
         return head('ℹ このサーバはまだ署名版をリリースしていません', 'warn')
           + `<div class="kv"><b>commit</b><code>${commit}</code></div>`
           + '<div style="margin-top:8px">開発中・テスト中のサーバの可能性があります。本番運用には署名版（v0.2.0以降のリリース）の使用を推奨します。</div>'
           + `<div style="margin-top:6px"><a href="${src}" target="_blank" rel="noopener">GitHub で公開コードを見る →</a></div>`;
-      case 'bundle-fetch-failed':
-      case 'verify-failed':
-      case 'digest-mismatch':
-        return head('✗ 検証失敗: ' + v.state, 'ng')
-          + `<div>${v.error || '不明'}</div>`
-          + kv
-          + '<div style="margin-top:6px;font-size:12px">サーバ申告と Sigstore 公開ログが矛盾している可能性があります。</div>';
       case 'error':
         return head('⚠ サーバ情報の取得に失敗しました', 'ng')
           + `<div>${v.error || '不明なエラー'}</div>`;
