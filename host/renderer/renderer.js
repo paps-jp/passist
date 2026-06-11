@@ -8,12 +8,14 @@
   const $ = (id) => document.getElementById(id);
 
   let cfg, ws, stream;
-  const peers = new Map(); // viewerId -> { pc, dc }
+  const peers = new Map(); // viewerId -> { pc, dc, viaRelay, routeReported }
   let controllerId = null; // 操作権を持つビューアID（1人）。null=全員閲覧のみ
   let cursorStarted = false; // ホストのカーソル形状追跡を一度だけ開始するためのフラグ
   const reqQueue = []; // 承認待ちリクエストのキュー [{ viewerId, auth }]
   let activeReq = null; // 現在ダイアログ表示中のリクエスト
   let sessionStarted = false; // セッション確立済みか（別画面選択で「新規発行」か「映像差し替え」かを分岐）
+  // サーバから配布される TURN(relay) 経由ピア向けの帯域上限。P2P 直接接続には適用しない。
+  let bitratePolicy = { maxBpsRelay: 1500_000, relayCount: 0 };
 
   init();
 
@@ -369,7 +371,58 @@
         sessionStarted = false; // 期限切れ＝次の画面選択で新規発行
         endShareUi();
         break;
+      case 'bitrate-policy':
+        bitratePolicy = { maxBpsRelay: msg.maxBpsRelay | 0, relayCount: msg.relayCount | 0 };
+        applyBitrateLimits(); // 現在のrelay経由ピアに即時反映
+        renderNetInfo();
+        break;
     }
+  }
+
+  // TURN(relay) 経由と判定された viewer の video sender にのみ maxBitrate を適用。
+  // P2P 直接接続は VPS OUT を使わないので絞らない（操作・画質を最大化）。
+  async function applyBitrateLimits() {
+    for (const [, p] of peers) {
+      if (!p.viaRelay || !p.pc) continue;
+      for (const sender of p.pc.getSenders()) {
+        if (sender.track?.kind !== 'video') continue;
+        try {
+          const params = sender.getParameters();
+          if (!params.encodings || !params.encodings.length) params.encodings = [{}];
+          params.encodings[0].maxBitrate = bitratePolicy.maxBpsRelay;
+          await sender.setParameters(params); // 再ネゴ不要・即時反映
+        } catch (err) { console.warn('setParameters', err); }
+      }
+    }
+  }
+
+  // 接続確立直後、getStats でこの peer が TURN(relay) 経由か P2P かを判定。
+  // 判定結果は peer に記憶し、サーバへ peer-route で通知（サーバが relayCount を集計）。
+  async function detectAndReportRoute(viewerId) {
+    const p = peers.get(viewerId); if (!p || !p.pc) return;
+    try {
+      const stats = await p.pc.getStats();
+      let local = null;
+      for (const r of stats.values()) {
+        if (r.type === 'candidate-pair' && r.nominated && (r.state === 'succeeded' || r.state === 'in-progress')) {
+          const l = stats.get(r.localCandidateId);
+          if (l) { local = l; break; }
+        }
+      }
+      const via = local && local.candidateType === 'relay' ? 'relay' : 'p2p';
+      if (p.routeReported === via) return; // 同じ判定の重複送信を避ける
+      p.viaRelay = via === 'relay';
+      p.routeReported = via;
+      sendWs({ type: 'peer-route', viewerId, via });
+      if (p.viaRelay) applyBitrateLimits(); // 新たにrelay化したピアに即時適用
+    } catch (err) { console.warn('detectAndReportRoute', err); }
+  }
+
+  // ヘッダ下の小さい注記に「TURN利用 N人・各 X kbps」を出す（0人のときは何も出さない）
+  function renderNetInfo() {
+    const el = $('netInfo'); if (!el) return;
+    if (!bitratePolicy.relayCount) { el.textContent = ''; return; }
+    el.textContent = `TURN中継: ${bitratePolicy.relayCount}人 / 各 ${Math.round(bitratePolicy.maxBpsRelay / 1000)} kbps`;
   }
 
   // 公開URL（トンネル）の書式チェック＋見える化。サーバ側 sanitizeBase と同じ判定で、
@@ -479,7 +532,7 @@
   async function startPeerFor(viewerId) {
     closePeerFor(viewerId); // 再接続時の取りこぼし防止
     const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
-    const entry = { pc, dc: null };
+    const entry = { pc, dc: null, viaRelay: false, routeReported: null };
     peers.set(viewerId, entry);
     for (const track of stream.getTracks()) pc.addTrack(track, stream);
     const dc = pc.createDataChannel('input');
@@ -499,6 +552,10 @@
     pc.onconnectionstatechange = () => {
       const st = pc.connectionState;
       if (st === 'failed' || st === 'closed') closePeerFor(viewerId); // 死んだ接続を解放
+    };
+    pc.oniceconnectionstatechange = () => {
+      const s = pc.iceConnectionState;
+      if (s === 'connected' || s === 'completed') detectAndReportRoute(viewerId); // 経路確定後にrelay/p2p判定
     };
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
@@ -522,6 +579,8 @@
   function closePeerFor(viewerId) {
     const p = peers.get(viewerId);
     if (!p) return;
+    // 経路が relay 扱いだったらサーバ集計を確実に減らす（viewer 側 close を待たずに即時）
+    if (p.viaRelay) sendWs({ type: 'peer-route', viewerId, via: 'p2p' });
     // ハンドラを外してから閉じる（閉じた後のコールバックで古い参照を触らない）
     if (p.dc) {
       try { p.dc.onopen = null; p.dc.onmessage = null; p.dc.close(); } catch {}
@@ -530,6 +589,7 @@
       try {
         p.pc.onicecandidate = null;
         p.pc.onconnectionstatechange = null;
+        p.pc.oniceconnectionstatechange = null;
         p.pc.ontrack = null;
         p.pc.close();
       } catch {}

@@ -30,6 +30,30 @@ const sessions = new Map();
 let viewerSeq = 0; // ビューアの一意ID採番（複数同時接続のルーティング用）
 const clampMaxViewers = (n) => { const v = parseInt(n, 10); return Number.isFinite(v) ? Math.min(8, Math.max(1, v)) : 1; };
 
+// --- TURN(relay) 経由ピアの動的 bitrate ガバナ ---
+// サーバ OUT 帯域 cap（例: さくらVPSはOUT 10Mbps制限、安全側で 4Mbps を分配上限）。
+// メディアは P2P 直接なら VPS は通らないので、TURN(relay) 経由のピアにのみ適用する。
+const RELAY_BUDGET_BPS = parseInt(process.env.RELAY_BUDGET_BPS || String(4 * 1000 * 1000), 10);
+const RELAY_MIN_BPS = parseInt(process.env.RELAY_MIN_BPS || String(100 * 1000), 10);   // 下限：監視レベル
+const RELAY_MAX_BPS = parseInt(process.env.RELAY_MAX_BPS || String(1500 * 1000), 10);  // 上限：単独ピアでも盛りすぎない
+// session.relayViewers = Set<viewerId>。peer-route(via:'relay') 受信で更新。
+function relayCount() {
+  let n = 0; for (const s of sessions.values()) if (s.relayViewers) n += s.relayViewers.size; return n;
+}
+function calcRelayBitrate() {
+  const n = relayCount();
+  if (n === 0) return RELAY_MAX_BPS; // 0人なら上限値（実害なし）
+  const v = Math.floor(RELAY_BUDGET_BPS / n);
+  return Math.max(RELAY_MIN_BPS, Math.min(RELAY_MAX_BPS, v));
+}
+let lastPolicy = { maxBpsRelay: 0, relayCount: -1 };
+function broadcastBitratePolicy() {
+  const policy = { maxBpsRelay: calcRelayBitrate(), relayCount: relayCount() };
+  if (policy.maxBpsRelay === lastPolicy.maxBpsRelay && policy.relayCount === lastPolicy.relayCount) return; // 変化なし
+  lastPolicy = policy;
+  for (const s of sessions.values()) send(s.host, { type: 'bitrate-policy', ...policy });
+}
+
 function lanIp() {
   const ifaces = os.networkInterfaces();
   for (const name of Object.keys(ifaces)) {
@@ -102,6 +126,7 @@ function route(ws, msg) {
     case 'host:deny': return hostDecision(ws, false, msg);
     case 'host:end': return hostEnd(ws);
     case 'signal': return relaySignal(ws, msg);
+    case 'peer-route': return peerRoute(ws, msg); // host が viewer の経路(relay/p2p)を通知
     default: return;
   }
 }
@@ -121,6 +146,7 @@ function hostCreate(ws, msg) {
     maxViewers: clampMaxViewers(msg && msg.maxViewers),
     accessMode, // 'approve'(承認制) | 'pin' | 'token'(だれでも)
     status: 'idle',
+    relayViewers: new Set(), // TURN(relay)経由と判定されたviewerIdの集合（動的bitrate配分のため）
     base: baseUrl(msg && msg.publicBaseUrl),
     pin: accessMode === 'pin' ? newPin() : null,
     createdAt: Date.now(),
@@ -137,6 +163,8 @@ function hostCreate(ws, msg) {
     accessMode: s.accessMode,
     expiresAt: s.expiresAt,
   });
+  // 動的 bitrate ガバナの初期値を共有（TURN経由が0人なら上限値）
+  send(ws, { type: 'bitrate-policy', maxBpsRelay: calcRelayBitrate(), relayCount: relayCount() });
   console.log(`[server] session created: ${token} (${ACCESS_MODE})`);
 }
 
@@ -193,6 +221,16 @@ function acceptViewer(s, v, issue) {
   send(s.host, { type: 'viewer:joined', viewerId: v.viewerId }); // 当該ビューア向けにホストがオファー作成
 }
 
+function peerRoute(ws, msg) {
+  const s = sessions.get(ws.token);
+  if (!s || s.host !== ws) return; // ホストからのみ受け付け
+  const vid = msg && msg.viewerId; if (vid == null) return;
+  const wasRelay = s.relayViewers.has(vid);
+  if (msg.via === 'relay') s.relayViewers.add(vid);
+  else s.relayViewers.delete(vid); // p2p 等は外す
+  if (wasRelay !== s.relayViewers.has(vid)) broadcastBitratePolicy();
+}
+
 function relaySignal(ws, msg) {
   const s = sessions.get(ws.token);
   if (!s) return;
@@ -212,7 +250,9 @@ function hostEnd(ws) {
   }
   s.viewers.clear();
   s.pending.clear();
+  s.relayViewers.clear();
   s.status = 'idle';
+  broadcastBitratePolicy();
 }
 
 function onClose(ws) {
@@ -225,12 +265,14 @@ function onClose(ws) {
     }
     sessions.delete(s.token);
     console.log(`[server] session closed: ${s.token}`);
+    broadcastBitratePolicy();
   } else if (ws.role === 'viewer') {
     if (ws.viewerId != null && s.viewers.has(ws.viewerId)) {
       s.viewers.delete(ws.viewerId);
       send(s.host, { type: 'viewer:left', viewerId: ws.viewerId });
     }
     if (ws.viewerId != null) s.pending.delete(ws.viewerId);
+    if (ws.viewerId != null && s.relayViewers.delete(ws.viewerId)) broadcastBitratePolicy();
     if (!s.viewers.size && !s.pending.size) s.status = 'idle';
   }
 }
