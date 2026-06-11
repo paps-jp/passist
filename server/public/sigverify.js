@@ -88,10 +88,36 @@
     return { ok: true, rootHash: got };
   }
 
-  // X.509 PEM/DER から SubjectAlternativeName と OID 拡張をかなり緩く抽出する軽量パーサ。
-  // 完全な X.509 解析はしないが、 cosign が Fulcio で発行する典型形式から
-  // SAN URI (例: https://github.com/paps-jp/passist/.github/workflows/release-signaling.yml@refs/tags/v0.2.3) を
-  // 文字列スキャンで取り出すには十分。
+  // バイナリ Uint8Array 中で needle (bytes) を探す
+  function bytesIndexOf(haystack, needle, start) {
+    start = start || 0;
+    outer: for (let i = start; i <= haystack.length - needle.length; i++) {
+      for (let j = 0; j < needle.length; j++) {
+        if (haystack[i + j] !== needle[j]) continue outer;
+      }
+      return i;
+    }
+    return -1;
+  }
+  // DER バイナリの中から「prefix で始まる ASCII 印字可能文字列」を取り出す。
+  // ASN.1 IA5String / PrintableString として埋め込まれた URI を確実に拾うためにバイト単位でスキャン
+  // （TextDecoder().decode() だと invalid UTF-8 が � に置換されて regex が壊れる）。
+  function findUriInDer(der, prefix) {
+    const pb = new TextEncoder().encode(prefix);
+    const i = bytesIndexOf(der, pb);
+    if (i < 0) return '';
+    let end = i + pb.length;
+    while (end < der.length) {
+      const c = der[end];
+      // ASCII printable 範囲 (0x20-0x7e) のみ URL 文字とみなす
+      if (c < 0x20 || c > 0x7e) break;
+      end++;
+    }
+    return new TextDecoder().decode(der.slice(i, end));
+  }
+  // X.509 certificate (PEM or DER) から SAN URI と issuer を抽出。
+  // 完全な ASN.1 解析はせず、 cosign + Fulcio の典型的なフォーマットから
+  // 「https://github.com/...」 と 「https://token.actions.githubusercontent.com」 をバイト列で探す。
   function extractIdentityFromCertPem(pemOrDer) {
     let raw = pemOrDer;
     if (typeof raw === 'string') {
@@ -99,19 +125,11 @@
                .replace(/-----END CERTIFICATE-----/g, '')
                .replace(/\s+/g, '');
       try { raw = base64ToBytes(raw); } catch { raw = null; }
-    } else if (raw instanceof Uint8Array) {
-      // already DER
-    } else {
-      raw = null;
     }
-    if (!raw) return null;
-    const txt = bytesToString(raw);
-    // SubjectAlternativeName: 主に URI 形式の identity を抽出
-    const urlMatch = txt.match(/https?:\/\/[^\s\0\x01\x06\x82\x80\x86]+/);
-    const issuerMatch = txt.match(/https:\/\/token\.actions\.githubusercontent\.com/);
+    if (!raw || !(raw instanceof Uint8Array)) return null;
     return {
-      uri: urlMatch ? urlMatch[0] : '',
-      issuer: issuerMatch ? issuerMatch[0] : '',
+      uri: findUriInDer(raw, 'https://github.com/'),
+      issuer: findUriInDer(raw, 'https://token.actions.githubusercontent.com'),
     };
   }
 
