@@ -48,6 +48,14 @@ const REMOTE_SERVER_URL = process.env.REMOTE_SERVER_URL || ''; // 例: wss://exa
 let serverPort = parseInt(process.env.PORT || '8443', 10); // settings.init 後に確定
 let signalWs = REMOTE_SERVER_URL || `ws://127.0.0.1:${serverPort}/ws`;
 
+// 設定の serverMode に応じて signalWs を再計算（起動時・設定変更時に呼ぶ）
+function computeSignalWs() {
+  if (REMOTE_SERVER_URL) return REMOTE_SERVER_URL;
+  const s = settings.get();
+  if (s.serverMode === 'self') return `ws://127.0.0.1:${serverPort}/ws`;
+  return s.centralServerUrl || 'wss://passist.paps.jp/ws';
+}
+
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
@@ -188,7 +196,11 @@ ipcMain.handle('qr:make', async (_e, text) => {
   try { return await QRCode.toDataURL(String(text || ''), { margin: 1, width: 240 }); } catch { return null; }
 });
 ipcMain.handle('settings:get', () => settings.get());
-ipcMain.handle('settings:set', (_e, patch) => settings.set(patch || {}));
+ipcMain.handle('settings:set', (_e, patch) => {
+  const res = settings.set(patch || {});
+  signalWs = computeSignalWs(); // serverMode/centralServerUrl の変更を反映（再起動で完全反映）
+  return res;
+});
 
 // Windows のテーマ/アクセント色が変わったらレンダラへ新パレットを送る
 nativeTheme.on('updated', () => {
@@ -518,13 +530,16 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(async () => {
     settings.init(path.join(app.getPath('userData'), 'passist-settings.json'));
     serverPort = parseInt(String(settings.get().port), 10) || 8443;
-    signalWs = REMOTE_SERVER_URL || `ws://127.0.0.1:${serverPort}/ws`;
+    signalWs = computeSignalWs(); // 中央サーバ / 自分のPC を設定に従って決定
     trust.init(path.join(app.getPath('userData'), 'passist-trust.json'));
     setupDisplayMedia();
     buildAppMenu();
     createTray();
-    await openPublicPort(); // 公開IPを取得してから server を起動（共有URLを公開URLにするため）
-    maybeSpawnServer();
+    // self モードでのみ公開IP取得→子プロセスsignaling起動（中央モードはサーバ既存）
+    if (!REMOTE_SERVER_URL && settings.get().serverMode === 'self') {
+      await openPublicPort();
+      maybeSpawnServer();
+    }
     createWindow();
     startClipboardSync();
     app.on('activate', () => {

@@ -17,6 +17,9 @@ const DEFAULTS = {
   turnUrl: '',  // 例: turn:turn.example.com:3478 ・ turns:turn.example.com:5349 ・ turn:host:port?transport=tcp
   turnUser: '', // long-term credential のユーザ名
   turnPass: '', // long-term credential のパスワード
+  // 接続サーバ。central=中央サーバ(passist.paps.jp)に接続。self=自分のPCで内蔵signalingを起動（cloudflared併用）。
+  serverMode: 'central',
+  centralServerUrl: 'wss://passist.paps.jp/ws', // central時の接続先。viewerURLのbaseは https://passist.paps.jp を使う
 };
 
 let filePath = null;

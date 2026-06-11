@@ -27,6 +27,18 @@
             <button id="settingsClose" class="ghost small" aria-label="閉じる">✕</button>
           </div>
           <div class="set-row">
+            <span class="set-label">サーバ</span>
+            <div class="set-field">
+              <label class="radio"><input type="radio" name="serverMode" value="central" /> 中央サーバ（推奨）</label>
+              <label class="radio"><input type="radio" name="serverMode" value="self" /> 自分のPC（cloudflared 等を併用）</label>
+              <p id="serverModeHint" class="hint"></p>
+              <div id="centralUrlRow" class="urlrow" style="margin-top:6px;display:none">
+                <input id="centralServerUrl" placeholder="wss://passist.paps.jp/ws" />
+              </div>
+              <p id="serverRestartHint" class="hint danger-hint hidden">⟳ 変更を反映するにはアプリの再起動が必要です。</p>
+            </div>
+          </div>
+          <div class="set-row">
             <span class="set-label">接続方法</span>
             <div class="set-field">
               <label class="radio"><input type="radio" name="access" value="approve" /> 承認制（おすすめ）</label>

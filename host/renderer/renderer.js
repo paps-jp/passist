@@ -94,6 +94,37 @@
       window.host.settingsSet({ maxViewers: n });
       renderChips();
     });
+    // サーバ（中央 / 自分のPC）。central はユーザー設定不要。self は cloudflared 等を併用。
+    // 変更は再起動で完全反映（接続中の動的再接続は危険なので避ける）。
+    const smVal = (cfg.settings && cfg.settings.serverMode) || 'central';
+    $('centralServerUrl').value = (cfg.settings && cfg.settings.centralServerUrl) || 'wss://passist.paps.jp/ws';
+    function renderServerModeUi() {
+      const v = (cfg.settings && cfg.settings.serverMode) || 'central';
+      $('centralUrlRow').style.display = v === 'central' ? '' : 'none';
+      $('serverModeHint').textContent =
+        v === 'central'
+          ? '中央サーバ ' + ($('centralServerUrl').value || 'wss://passist.paps.jp/ws') + ' に接続。共有URLは https://passist.paps.jp/s/… で発行されます。'
+          : '自分のPCで内蔵サーバを動かし、cloudflared 等のトンネルURLを「くわしい設定」で設定してください。';
+    }
+    for (const r of document.querySelectorAll('input[name="serverMode"]')) {
+      r.checked = r.value === smVal;
+      r.addEventListener('change', () => {
+        if (!r.checked) return;
+        if (cfg.settings) cfg.settings.serverMode = r.value;
+        window.host.settingsSet({ serverMode: r.value });
+        renderServerModeUi();
+        $('serverRestartHint').classList.remove('hidden'); // 再起動が必要であることを明示
+      });
+    }
+    $('centralServerUrl').addEventListener('change', () => {
+      const v = $('centralServerUrl').value.trim();
+      if (cfg.settings) cfg.settings.centralServerUrl = v;
+      window.host.settingsSet({ centralServerUrl: v });
+      renderServerModeUi();
+      $('serverRestartHint').classList.remove('hidden');
+    });
+    renderServerModeUi();
+
     // 接続方法（承認制 / PIN / だれでも）。変更は次の共有から有効。
     const accVal = (cfg.settings && cfg.settings.accessMode) || 'approve';
     for (const r of document.querySelectorAll('input[name="access"]')) {
