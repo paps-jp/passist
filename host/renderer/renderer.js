@@ -208,6 +208,8 @@
       // 終了＝次回起動時に同じURLで復元しない（lastHostToken/Secretも破棄）。activeShareName も解除。
       window.host.settingsSet({ activeShareName: '', lastHostToken: '', lastHostSecret: '' });
       if (cfg.settings) { cfg.settings.lastHostToken = ''; cfg.settings.lastHostSecret = ''; }
+      shouldReconnect = false; // 明示的終了 = WS が閉じても自動再接続しない
+      clearReconnect();
       stopWatch();
       closeAllPeers();
       sessionStarted = false; // 次に画面を選ぶと新しいURLで開始
@@ -397,10 +399,33 @@
     b.classList.remove('hidden');
   }
 
+  // ホスト WS 自動再接続。指数バックオフで最大5回、5回失敗したら諦めてユーザー操作待ち。
+  // host:end / expired / sessionStarted=false（picker）では shouldReconnect=false にして停止。
+  // 成功した host:create で existingToken/hostSecret を送るため、URL は再接続前と同じが維持される。
+  let shouldReconnect = true;
+  let reconnectAttempt = 0;
+  let reconnectTimer = null;
+  const MAX_RECONNECT = 5;
+  function clearReconnect() { if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; } }
+  function scheduleReconnect() {
+    if (!shouldReconnect || reconnectTimer) return;
+    if (reconnectAttempt >= MAX_RECONNECT) {
+      setStatus(`✕ サーバとの接続が切れました（${MAX_RECONNECT}回再接続を試みて失敗）。「← 別の画面を選ぶ」から共有し直してください。`);
+      return;
+    }
+    const delay = Math.min(30000, 500 * Math.pow(2, reconnectAttempt));
+    reconnectAttempt++;
+    setStatus(`サーバとの接続が切れました。再接続中…（${reconnectAttempt}/${MAX_RECONNECT}）`);
+    reconnectTimer = setTimeout(() => { reconnectTimer = null; startSignaling(); }, delay);
+  }
+
   function startSignaling() {
+    shouldReconnect = true;  // 新規開始 or 再開 = 自動再接続を有効化（host:end / expired で再度 false に）
+    clearReconnect();
     if (ws) { try { ws.onclose = null; ws.onerror = null; ws.close(); } catch {} } // 旧接続を確実に閉じてから張り直す
     ws = new WebSocket(cfg.signalWs);
-    ws.onopen = () =>
+    ws.onopen = () => {
+      reconnectAttempt = 0; // 接続成功でカウンタをリセット
       sendWs({
         type: 'host:create',
         publicBaseUrl: $('publicBase').value.trim() || undefined, // 空欄なら server 側で LAN/環境変数にフォールバック
@@ -412,9 +437,10 @@
         existingToken: (cfg.settings && cfg.settings.lastHostToken) || undefined,
         hostSecret:    (cfg.settings && cfg.settings.lastHostSecret) || undefined,
       });
+    };
     ws.onmessage = (e) => onMsg(JSON.parse(e.data));
-    ws.onclose = () => setStatus('サーバとの接続が切断されました');
-    ws.onerror = () => setStatus('サーバに接続できません: ' + cfg.signalWs);
+    ws.onclose = () => scheduleReconnect();
+    ws.onerror = () => { /* onclose も呼ばれるので集約 */ };
   }
   const sendWs = (o) => ws && ws.readyState === WebSocket.OPEN && ws.send(JSON.stringify(o));
 
@@ -486,6 +512,11 @@
         break;
       case 'expired':
         setStatus('⏰ 有効期限が切れました。「← 別の画面を選ぶ」から共有し直してください');
+        // 期限切れ＝同じURLでの引き継ぎは不可。lastHostToken/Secret を破棄、再接続も停止。
+        window.host.settingsSet({ lastHostToken: '', lastHostSecret: '' });
+        if (cfg.settings) { cfg.settings.lastHostToken = ''; cfg.settings.lastHostSecret = ''; }
+        shouldReconnect = false;
+        clearReconnect();
         closeAllPeers();
         sessionStarted = false; // 期限切れ＝次の画面選択で新規発行
         endShareUi();
