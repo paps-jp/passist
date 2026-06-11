@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'none'" />
+  <title>PAssist について</title>
+  <style>
+    :root {
+      --bg: #faf9f7; --surface: #ffffff; --fg: #232321; --muted: #76746e;
+      --border: #e7e3da; --primary: #2f6fed; --accent: #2b6cff;
+      --ok: #2bb364; --warn: #d28800; --err: #c0392b;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #1d1d1b; --surface: #262624; --fg: #ededea; --muted: #9c9a93;
+        --border: #3a3934; --primary: #4b82f0; --ok: #3ddc84; --warn: #ffc266; --err: #ff8a80; }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+      font-family: system-ui, "Segoe UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+      font-size: 13.5px; line-height: 1.7; }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 20px 22px 28px; }
+    header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+    header .logo { width: 48px; height: 48px; flex: 0 0 auto; }
+    header h1 { margin: 0; font-size: 19px; font-weight: 700; }
+    header .ver { color: var(--muted); font-size: 13px; }
+    .lead { color: var(--muted); margin: 0 0 18px; }
+    section { background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 13px 16px; margin-bottom: 10px; }
+    section h2 { margin: 0 0 8px; font-size: 14px; font-weight: 600;
+      display: flex; align-items: center; gap: 7px; }
+    section p { margin: 0 0 5px; }
+    .kv { display: grid; grid-template-columns: 110px 1fr; gap: 3px 12px; font-size: 12.5px; }
+    .kv b { color: var(--fg); font-weight: 600; }
+    code { background: rgba(120, 120, 120, 0.12); padding: 1px 6px; border-radius: 4px;
+      font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 11.5px;
+      word-break: break-all; }
+    .badge { display: inline-block; padding: 1px 8px; border-radius: 10px;
+      font-size: 11.5px; font-weight: 600; }
+    .badge.ok { background: rgba(45, 179, 100, 0.16); color: var(--ok); }
+    .badge.warn { background: rgba(210, 136, 0, 0.16); color: var(--warn); }
+    .badge.err { background: rgba(192, 57, 43, 0.16); color: var(--err); }
+    .badge.loading { background: rgba(120, 120, 120, 0.16); color: var(--muted); }
+    .loading-row { display: flex; align-items: center; gap: 10px; padding: 8px 0;
+      color: var(--muted); font-size: 13px; }
+    .spinner { width: 16px; height: 16px; border: 2.5px solid rgba(120,120,120,.3);
+      border-top-color: var(--primary); border-radius: 50%; animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    pre { background: #0f1d33; color: #cfe1ff; padding: 10px 12px; border-radius: 6px;
+      overflow-x: auto; font-size: 11.5px; line-height: 1.55;
+      font-family: ui-monospace, "SF Mono", Consolas, monospace; margin: 6px 0 0;
+      white-space: pre-wrap; word-break: break-all; max-height: 240px; }
+    @media (prefers-color-scheme: light) { pre { background: #1b2230; } }
+    .links { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 0; }
+    .links button { background: var(--surface); border: 1px solid var(--border);
+      color: var(--fg); padding: 7px 14px; border-radius: 8px; cursor: pointer;
+      font-size: 12.5px; font-family: inherit; }
+    .links button:hover { background: rgba(120, 120, 120, 0.08); border-color: var(--primary); }
+    .links button.primary { background: var(--primary); color: #fff; border-color: transparent; }
+    .links button.primary:hover { filter: brightness(1.06); }
+    .footer { text-align: center; color: var(--muted); font-size: 11.5px; margin-top: 14px; }
+    details { margin-top: 8px; }
+    details summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+    .ok-text { color: var(--ok); }
+    .warn-text { color: var(--warn); }
+    .err-text { color: var(--err); }
+    .muted { color: var(--muted); font-size: 12px; }
+    .row { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+    .row .label { flex: 1; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <img id="logoImg" class="logo" alt="" />
+      <div>
+        <h1>PAssist</h1>
+        <div class="ver">バージョン <span id="appVersion">…</span></div>
+      </div>
+    </header>
+
+    <p class="lead">ブラウザだけで、選んだ1ウィンドウを共有・遠隔操作するツール。映像も音声も操作も、すべて <strong>WebRTC で暗号化</strong>されます（DTLS-SRTP / AES-128-GCM）。</p>
+
+    <section>
+      <h2>🔐 サーバの真正性（cosign で自動検証）</h2>
+      <div id="serverInfo" class="loading-row"><div class="spinner"></div><span>サーバ情報を取得中…</span></div>
+      <div id="cosignResult"></div>
+    </section>
+
+    <section>
+      <h2>🔧 技術情報</h2>
+      <div class="kv" id="techInfo"></div>
+    </section>
+
+    <section>
+      <h2>📜 著作権・ライセンス</h2>
+      <p>© 2026 特定非営利活動法人ぱっぷす (PAPS)</p>
+      <p>PolyForm Shield License 1.0.0 — Source-Available</p>
+      <p class="muted">使う・改変・自社サービス運用は商用含めて自由。PAssistと競合する製品としての提供のみご遠慮ください。</p>
+    </section>
+
+    <section>
+      <h2>🔗 リンク</h2>
+      <div class="links">
+        <button class="primary" data-href="https://paps-jp.github.io/passist/">ホームページ</button>
+        <button data-href="https://github.com/paps-jp/passist">GitHub</button>
+        <button data-href="https://github.com/paps-jp/passist/releases">リリース</button>
+        <button data-href="https://paps-jp.github.io/passist/verification.html">安全性の検証</button>
+        <button data-href="https://paps.jp">ぱっぷす</button>
+      </div>
+    </section>
+
+    <div class="footer">PAssist は NPO「ぱっぷす」の支援活動から生まれたツールです。</div>
+  </div>
+
+  <script src="about.js"></script>
+</body>
+</html>

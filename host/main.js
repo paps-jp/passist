@@ -465,59 +465,100 @@ function createTray() {
   tray.on('click', showMainWindow);
 }
 
+// HTMLベースの「PAssist について」ウィンドウ。
+// バージョン情報・サーバ真正性検証（cosign verify を main で自動実行）・暗号化情報を1画面に。
+let aboutWindow = null;
 function showAbout() {
-  const win = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
-  let icon;
-  try {
-    const i = nativeImage.createFromPath(ICON_PATH);
-    icon = i && !i.isEmpty() ? i : undefined;
-  } catch {}
-  const detail = [
-    `PAssist  v${app.getVersion()}`,
-    'ブラウザだけで、選んだ1ウィンドウを共有・遠隔操作',
-    '',
-    '──── 仕組み ────',
-    '• 共有対象は「1つのウィンドウ」のみ — デスクトップ全体は構造的に映りません',
-    '• 相手はインストール・アカウント不要、ブラウザでURLを開くだけ',
-    '• 映像・音声・操作はWebRTC（DTLS-SRTP / AES-128-GCM）で暗号化',
-    '• 鍵交換はECDHE（前方秘匿性） — サーバには鍵が一度も渡りません',
-    '• 中央サーバはシグナリングのみ。メディアはホスト⇔ビューア直接',
-    '',
-    '──── 技術情報 ────',
-    `Electron : ${process.versions.electron}`,
-    `Chromium : ${process.versions.chrome}`,
-    `Node.js  : ${process.versions.node}`,
-    `V8       : ${process.versions.v8}`,
-    `Platform : ${process.platform} ${process.arch}`,
-    '',
-    '──── 著作権・ライセンス ────',
-    '© 2026 特定非営利活動法人ぱっぷす (PAPS)',
-    'PolyForm Shield License 1.0.0（Source-Available）',
-    '使う・自社運用は自由（商用含む）／競合製品としての提供はご遠慮ください',
-    '',
-    '──── サポート ────',
-    'GitHub      : github.com/paps-jp/passist',
-    'ホームページ : paps-jp.github.io/passist',
-    'ぱっぷす    : paps.jp',
-    'リリース    : github.com/paps-jp/passist/releases',
-    'セキュリティ: paps-jp.github.io/passist/verification.html',
-  ].join('\n');
-
-  const choice = dialog.showMessageBoxSync(win, {
-    type: 'info',
+  if (aboutWindow && !aboutWindow.isDestroyed()) { aboutWindow.focus(); return; }
+  aboutWindow = new BrowserWindow({
+    parent: mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined,
+    modal: false,
+    width: 760, height: 720,
+    minWidth: 540, minHeight: 480,
     title: 'PAssist について',
-    message: 'PAssist',
-    detail,
-    icon,
-    buttons: ['閉じる', 'GitHub', 'ホームページ', '安全性の検証'],
-    defaultId: 0,
-    cancelId: 0,
-    noLink: true,
+    icon: ICON_PATH,
+    backgroundColor: getSystemPalette().bg,
+    autoHideMenuBar: true,
+    webPreferences: {
+      preload: path.join(__dirname, 'about-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false, // main process が child_process で cosign を呼ぶ (preload 経由なら sandbox 可)
+    },
   });
-  if (choice === 1) shell.openExternal('https://github.com/paps-jp/passist');
-  else if (choice === 2) shell.openExternal('https://paps-jp.github.io/passist/');
-  else if (choice === 3) shell.openExternal('https://paps-jp.github.io/passist/verification.html');
+  aboutWindow.setMenu(null);
+  aboutWindow.loadFile(path.join(__dirname, 'renderer', 'about.html'));
+  aboutWindow.on('closed', () => { aboutWindow = null; });
 }
+
+// /api/build の取得（main 側で fetch して CSP 問題を回避）
+ipcMain.handle('about:info', () => {
+  let iconDataUrl = '';
+  try {
+    const img = nativeImage.createFromPath(ICON_PATH);
+    if (img && !img.isEmpty()) iconDataUrl = img.resize({ width: 96, height: 96 }).toDataURL();
+  } catch {}
+  return {
+    version: app.getVersion(),
+    electron: process.versions.electron,
+    chrome: process.versions.chrome,
+    node: process.versions.node,
+    v8: process.versions.v8,
+    platform: process.platform,
+    arch: process.arch,
+    signalWs,
+    iconDataUrl,
+  };
+});
+
+ipcMain.handle('about:fetch-server', async (_e, signalUrl) => {
+  try {
+    const wsUrl = new URL(signalUrl || signalWs);
+    const httpProto = wsUrl.protocol === 'wss:' ? 'https:' : 'http:';
+    const apiUrl = `${httpProto}//${wsUrl.host}/api/build`;
+    const res = await fetch(apiUrl);
+    if (!res.ok) return { ok: false, reason: 'HTTP ' + res.status };
+    const data = await res.json();
+    return { ok: true, data };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+ipcMain.handle('about:cosign-verify', async (_e, { registry, digest }) => {
+  if (!registry || !digest) return { ok: false, reason: 'missing_args' };
+  const image = `${registry}@${digest}`;
+  const args = [
+    'verify', image,
+    '--certificate-identity-regexp', 'https://github.com/paps-jp/passist',
+    '--certificate-oidc-issuer', 'https://token.actions.githubusercontent.com',
+  ];
+  return new Promise((resolve) => {
+    const child = spawn('cosign', args, { windowsHide: true });
+    let stdout = '', stderr = '';
+    child.stdout?.on('data', (d) => { stdout += d.toString(); });
+    child.stderr?.on('data', (d) => { stderr += d.toString(); });
+    child.on('error', (err) => {
+      if (err && err.code === 'ENOENT') resolve({ ok: false, reason: 'no_cosign' });
+      else resolve({ ok: false, reason: 'spawn_failed', error: err.message });
+    });
+    child.on('close', (code) => {
+      if (code === 0) {
+        let parsed = null;
+        try { parsed = JSON.parse(stdout); } catch {}
+        resolve({ ok: true, image, stdout, stderr, parsed });
+      } else {
+        resolve({ ok: false, reason: 'verify_failed', error: 'cosign exited with code ' + code, stdout, stderr });
+      }
+    });
+    // タイムアウト対策（30秒）
+    setTimeout(() => { try { child.kill(); } catch {} }, 30000);
+  });
+});
+
+ipcMain.handle('about:open-external', (_e, url) => {
+  if (typeof url === 'string' && /^https?:\/\//i.test(url)) shell.openExternal(url);
+});
 
 // カスタムのアプリメニュー（Edit / 開発者ツール / ズームは付けない）
 function buildAppMenu() {
