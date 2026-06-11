@@ -8,13 +8,13 @@
     "build:sigstore": "node tools/build-sigstore.mjs"
   },
   "dependencies": {
-    "express": "^4.21.2",
+    "express": "^5.2.1",
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "@sigstore/verify": "^2.1.0",
-    "@sigstore/bundle": "^3.1.0",
-    "@sigstore/protobuf-specs": "^0.4.0",
-    "esbuild": "^0.25.5"
+    "@sigstore/verify": "^4.0.0",
+    "@sigstore/bundle": "^5.0.0",
+    "@sigstore/protobuf-specs": "^0.5.1",
+    "esbuild": "^0.28.0"
   }
 }
