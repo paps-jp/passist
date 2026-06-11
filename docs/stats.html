@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja">
+<html lang="ja" data-i18n-title="stats.docTitle">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -39,6 +39,12 @@
       .hero .asof .dot{width:8px;height:8px;border-radius:50%;background:#86efac;box-shadow:0 0 0 4px rgba(134,239,172,.25);animation:pulse 2.4s ease-in-out infinite}
       @keyframes pulse{0%,100%{opacity:.9}50%{opacity:.45}}
 
+      /* 言語切替 (右上の小チップ) */
+      .lang-switch{position:absolute;top:14px;right:16px;display:flex;gap:5px;z-index:3}
+      .lang-btn{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.45);font-size:12px;font-weight:600;padding:5px 11px;border-radius:999px;cursor:pointer;font-family:inherit;transition:.15s}
+      .lang-btn:hover{background:rgba(255,255,255,.28)}
+      .lang-btn.active{background:#fff;color:#2f6df0;border-color:#fff;cursor:default}
+
       /* セクション */
       section.block{padding:36px 0}
       h2.title{font-size:20px;font-weight:800;margin:0 0 14px}
@@ -75,15 +81,19 @@
   </head>
   <body>
     <header class="hero">
+      <div class="lang-switch">
+        <button class="lang-btn" data-lang-btn="ja" onclick="setLang('ja')">日本語</button>
+        <button class="lang-btn" data-lang-btn="en" onclick="setLang('en')">English</button>
+      </div>
       <div class="wrap">
         <div class="crumbs">
-          <a href="./">トップ</a>
+          <a href="./" data-i18n="stats.crumbs.top">トップ</a>
           <span>›</span>
-          <span>運用統計</span>
+          <span data-i18n="stats.crumbs.stats">運用統計</span>
         </div>
-        <h1>PAssist 運用統計</h1>
-        <p class="sub">リアルタイム接続数と直近の利用サマリ（匿名集計）。10秒ごとに自動更新します。</p>
-        <span class="asof"><span class="dot"></span><span id="asOf">読み込み中…</span></span>
+        <h1 data-i18n="stats.h1">PAssist 運用統計</h1>
+        <p class="sub" data-i18n="stats.sub">リアルタイム接続数と直近の利用サマリ（匿名集計）。10秒ごとに自動更新します。</p>
+        <span class="asof"><span class="dot"></span><span id="asOf" data-i18n="stats.asOfLoading">読み込み中…</span></span>
       </div>
     </header>
 
@@ -92,24 +102,24 @@
         <div class="wrap">
           <div id="errState" class="state err hidden"></div>
 
-          <h2 class="title">いま</h2>
+          <h2 class="title" data-i18n="stats.now">いま</h2>
           <div class="kpis">
-            <div class="kpi live skel"><div class="label">共有中セッション</div><div class="value" id="liveSessions">—</div></div>
-            <div class="kpi live skel"><div class="label">接続中ビューア</div><div class="value" id="liveViewers">—</div></div>
-            <div class="kpi live skel"><div class="label">TURN中継中</div><div class="value" id="liveRelays">—</div></div>
-            <div class="kpi skel"><div class="label">サーバ稼働</div><div class="value" id="uptime" style="font-size:18px;margin-top:14px">—</div></div>
+            <div class="kpi live skel"><div class="label" data-i18n="stats.live.sessions">共有中セッション</div><div class="value" id="liveSessions">—</div></div>
+            <div class="kpi live skel"><div class="label" data-i18n="stats.live.viewers">接続中ビューア</div><div class="value" id="liveViewers">—</div></div>
+            <div class="kpi live skel"><div class="label" data-i18n="stats.live.relays">TURN中継中</div><div class="value" id="liveRelays">—</div></div>
+            <div class="kpi skel"><div class="label" data-i18n="stats.live.uptime">サーバ稼働</div><div class="value" id="uptime" style="font-size:18px;margin-top:14px">—</div></div>
           </div>
         </div>
       </section>
 
       <section class="block" style="padding-top:0">
         <div class="wrap">
-          <h2 class="title">直近24時間</h2>
+          <h2 class="title" data-i18n="stats.last24h">直近24時間</h2>
           <div class="kpis">
-            <div class="kpi skel"><div class="label">セッション数</div><div class="value" id="d24Sessions">—</div></div>
-            <div class="kpi skel"><div class="label">ビューア参加</div><div class="value" id="d24Accepted">—</div></div>
-            <div class="kpi skel"><div class="label">承認率</div><div class="value"><span id="d24Accept">—</span><span class="unit">%</span></div></div>
-            <div class="kpi skel"><div class="label">TURN利用率</div><div class="value"><span id="d24Turn">—</span><span class="unit">%</span></div></div>
+            <div class="kpi skel"><div class="label" data-i18n="stats.d24.sessions">セッション数</div><div class="value" id="d24Sessions">—</div></div>
+            <div class="kpi skel"><div class="label" data-i18n="stats.d24.viewers">ビューア参加</div><div class="value" id="d24Accepted">—</div></div>
+            <div class="kpi skel"><div class="label" data-i18n="stats.d24.accept">承認率</div><div class="value"><span id="d24Accept">—</span><span class="unit">%</span></div></div>
+            <div class="kpi skel"><div class="label" data-i18n="stats.d24.turn">TURN利用率</div><div class="value"><span id="d24Turn">—</span><span class="unit">%</span></div></div>
           </div>
         </div>
       </section>
@@ -117,31 +127,31 @@
       <section class="block" style="padding-top:0">
         <div class="wrap">
           <div class="panel">
-            <h2 class="title">日次推移（最大30日）</h2>
+            <h2 class="title" data-i18n="stats.daily">日次推移（最大30日）</h2>
             <div class="scroll-x">
               <table class="simple">
                 <thead>
                   <tr>
-                    <th>日付</th>
-                    <th class="num">セッション</th>
-                    <th class="num">承認</th>
-                    <th class="num">拒否</th>
-                    <th class="num">P2P</th>
-                    <th class="num">TURN</th>
-                    <th class="num">合計時間</th>
+                    <th data-i18n="stats.tbl.date">日付</th>
+                    <th class="num" data-i18n="stats.tbl.sessions">セッション</th>
+                    <th class="num" data-i18n="stats.tbl.accept">承認</th>
+                    <th class="num" data-i18n="stats.tbl.deny">拒否</th>
+                    <th class="num" data-i18n="stats.tbl.p2p">P2P</th>
+                    <th class="num" data-i18n="stats.tbl.turn">TURN</th>
+                    <th class="num" data-i18n="stats.tbl.duration">合計時間</th>
                   </tr>
                 </thead>
-                <tbody id="dailyBody"><tr><td colspan="7" class="note">読み込み中…</td></tr></tbody>
+                <tbody id="dailyBody"><tr><td colspan="7" class="note" data-i18n="stats.tbl.loading">読み込み中…</td></tr></tbody>
               </table>
             </div>
-            <p class="note" style="margin-top:14px">「合計時間」はその日のすべてのセッション時間の合計。「P2P / TURN」はその日に確立された接続経路の数。</p>
+            <p class="note" style="margin-top:14px" data-i18n="stats.note.duration">「合計時間」はその日のすべてのセッション時間の合計。「P2P / TURN」はその日に確立された接続経路の数。</p>
           </div>
         </div>
       </section>
 
       <section class="block" style="padding-top:0">
         <div class="wrap">
-          <p class="note">
+          <p class="note" data-i18n-html="stats.privacy">
             <strong>プライバシー:</strong> 個人を特定する情報（IPアドレス、トークン、ユーザー名等）は一切記録していません。接続イベントの数のみを匿名で集計しています。
             生データ: <a id="apiLink" href="https://passist.paps.jp/api/stats" target="_blank" rel="noopener">https://passist.paps.jp/api/stats</a>（CORS 全許可で公開）。
           </p>
@@ -150,11 +160,27 @@
     </main>
 
     <footer>
-      PAssist — 単一ウィンドウ・ブラウザ完結・アカウント不要のリモート操作 ／
+      <span data-i18n="stats.footer">PAssist — 単一ウィンドウ・ブラウザ完結・アカウント不要のリモート操作</span> ／
       <a href="https://github.com/paps-jp/passist">github.com/paps-jp/passist</a>
     </footer>
 
+    <script src="i18n.js?v=2"></script>
     <script>
+    // 現在の言語ボタンに .active を付与
+    (function () {
+      if (!window.getLang) return;
+      const cur = window.getLang();
+      document.querySelectorAll('[data-lang-btn]').forEach(function (b) {
+        b.classList.toggle('active', b.dataset.langBtn === cur);
+      });
+    })();
+
+    const tr = (k, vars) => {
+      let s = window.t ? window.t(k) : k;
+      if (vars) for (const kk in vars) s = s.split('{' + kk + '}').join(vars[kk]);
+      return s;
+    };
+
     // 非同期で passist.paps.jp/api/stats を取得して描画。CORS は server.js が * で許可済み。
     // ?api=https://example.com で API のベースを差し替え可能（テスト用）。
     const API = (() => {
@@ -162,8 +188,11 @@
       if (q) try { return new URL(q).origin + '/api/stats'; } catch {}
       return 'https://passist.paps.jp/api/stats';
     })();
-    document.getElementById('apiLink').href = API;
-    document.getElementById('apiLink').textContent = API;
+    // applyI18n が privacy ノードを innerHTML で上書きするため、 翻訳適用後に取り直す
+    setTimeout(() => {
+      const a = document.getElementById('apiLink');
+      if (a) { a.href = API; a.textContent = API; }
+    }, 0);
 
     const $ = (id) => document.getElementById(id);
     const fmtPct = (v) => Number.isFinite(v) ? v.toFixed(1) : '—';
@@ -172,9 +201,9 @@
       const h = Math.floor(sec / 3600);
       const m = Math.floor((sec % 3600) / 60);
       const s = sec % 60;
-      if (h) return h + '時間' + m + '分';
-      if (m) return m + '分' + s + '秒';
-      return s + '秒';
+      if (h) return tr('stats.fmt.hourMin', { h, m });
+      if (m) return tr('stats.fmt.minSec', { m, s });
+      return tr('stats.fmt.sec', { s });
     }
     function fmtDateTime(ms) {
       const d = new Date(ms);
@@ -197,7 +226,7 @@
         const j = await r.json();
         setErr(null);
         clearSkel();
-        $('asOf').textContent = '最終更新: ' + fmtDateTime(j.asOf);
+        $('asOf').textContent = tr('stats.asOf', { time: fmtDateTime(j.asOf) });
         $('liveSessions').textContent = j.live.sessions;
         $('liveViewers').textContent = j.live.viewers;
         $('liveRelays').textContent = j.live.relays;
@@ -210,25 +239,25 @@
         const tbody = $('dailyBody');
         const days = Object.keys(j.daily || {}).sort().reverse();
         if (!days.length) {
-          tbody.innerHTML = '<tr><td colspan="7" class="note">まだデータがありません。最初のセッションを開始すると記録が始まります。</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="7" class="note">' + tr('stats.tbl.empty') + '</td></tr>';
         } else {
           tbody.innerHTML = '';
           for (const k of days) {
             const d = j.daily[k];
-            const tr = document.createElement('tr');
+            const trEl = document.createElement('tr');
             const cells = [k, d.sessions, d.viewersAccepted, d.viewersDenied, d.p2pPeers, d.relayPeers, fmtDuration(d.totalSeconds)];
             for (let i = 0; i < cells.length; i++) {
               const td = document.createElement('td');
               td.textContent = cells[i];
               if (i > 0) td.className = 'num';
-              tr.appendChild(td);
+              trEl.appendChild(td);
             }
-            tbody.appendChild(tr);
+            tbody.appendChild(trEl);
           }
         }
       } catch (e) {
-        setErr('統計サーバから取得できませんでした（' + e.message + '）。サーバが起動していないか、ネットワーク・CORSの問題かもしれません。');
-        $('asOf').textContent = '取得に失敗しました';
+        setErr(tr('stats.fetchError', { error: e.message }));
+        $('asOf').textContent = tr('stats.asOfFail');
       }
     }
     // ページが非表示の間はポーリング停止（負荷削減）

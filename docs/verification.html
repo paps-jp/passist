@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja">
+<html lang="ja" data-i18n-title="ver.docTitle">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -37,6 +37,12 @@
       .hero p{margin:0 auto;max-width:660px;color:rgba(255,255,255,.95);font-size:15.5px}
       .back{display:inline-flex;align-items:center;gap:6px;color:rgba(255,255,255,.92);text-decoration:none;font-size:14px;margin-bottom:14px}
       .back:hover{color:#fff;text-decoration:underline}
+
+      /* 言語切替 (右上の小チップ) */
+      .lang-switch{position:absolute;top:14px;right:16px;display:flex;gap:5px;z-index:3}
+      .lang-btn{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.45);font-size:12px;font-weight:600;padding:5px 11px;border-radius:999px;cursor:pointer;font-family:inherit;transition:.15s}
+      .lang-btn:hover{background:rgba(255,255,255,.28)}
+      .lang-btn.active{background:#fff;color:#2f6df0;border-color:#fff;cursor:default}
 
       /* sections */
       section{padding:46px 0}
@@ -109,74 +115,78 @@
   </head>
   <body>
     <header class="hero">
+      <div class="lang-switch">
+        <button class="lang-btn" data-lang-btn="ja" onclick="setLang('ja')">日本語</button>
+        <button class="lang-btn" data-lang-btn="en" onclick="setLang('en')">English</button>
+      </div>
       <div class="wrap">
-        <a class="back" href="index.html">← PAssist トップへ</a>
-        <h1>🔐 検証に基づく安全性</h1>
-        <p>PAssist のサーバが「GitHub で公開しているコードと同じもの」を動かしていることを、<strong>数学（暗号学）</strong>で確かめられます。むずかしい操作は要りません — <strong>ブラウザが自動で検証</strong>して結果を表示します。</p>
+        <a class="back" href="index.html" data-i18n="ver.back">← PAssist トップへ</a>
+        <h1 data-i18n="ver.h1">🔐 検証に基づく安全性</h1>
+        <p data-i18n-html="ver.lead">PAssist のサーバが「GitHub で公開しているコードと同じもの」を動かしていることを、<strong>数学（暗号学）</strong>で確かめられます。むずかしい操作は要りません — <strong>ブラウザが自動で検証</strong>して結果を表示します。</p>
       </div>
     </header>
 
     <section style="padding-top:8px">
       <div class="wrap">
         <div class="tldr">
-          <p class="t">まず結論：3つの「数学」で守られています</p>
+          <p class="t" data-i18n="ver.tldr.title">まず結論：3つの「数学」で守られています</p>
           <ol>
-            <li><b>通信は解読できない暗号で守られる</b> — 画面・音声・操作は端末どうしを直接結ぶ暗号で流れ、サーバにも中継業者にも中身は見えません。</li>
-            <li><b>サーバ＝公開コードと同一を証明できる</b> — 「指紋・封印・公開台帳」という3つの数学の道具で、運営者でも後からこっそり書き換えられません。</li>
-            <li><b>しかもブラウザが自動で検証する</b> — 相手の画面の「ℹ︎ → PAssist について」を開くだけ。ブラウザ自身が計算して <strong>✓（一致）</strong> を表示します。インストールも専門知識も不要。</li>
+            <li data-i18n-html="ver.tldr.li1"><b>通信は解読できない暗号で守られる</b> — 画面・音声・操作は端末どうしを直接結ぶ暗号で流れ、サーバにも中継業者にも中身は見えません。</li>
+            <li data-i18n-html="ver.tldr.li2"><b>サーバ＝公開コードと同一を証明できる</b> — 「指紋・封印・公開台帳」という3つの数学の道具で、運営者でも後からこっそり書き換えられません。</li>
+            <li data-i18n-html="ver.tldr.li3"><b>しかもブラウザが自動で検証する</b> — 相手の画面の「ℹ︎ → PAssist について」を開くだけ。ブラウザ自身が計算して <strong>✓（一致）</strong> を表示します。インストールも専門知識も不要。</li>
           </ol>
         </div>
-        <p class="lead" style="margin-top:18px">以下では、なぜ「数学的に安全」と言い切れるのかを、順を追ってやさしく説明します。</p>
+        <p class="lead" style="margin-top:18px" data-i18n="ver.lead2">以下では、なぜ「数学的に安全」と言い切れるのかを、順を追ってやさしく説明します。</p>
       </div>
     </section>
 
     <section>
       <div class="wrap">
-        <h2><span class="num">1</span>通信は数学的に解読できない</h2>
-        <p class="lead">サーバを信用するかどうかの前に、まず「そもそも中身が見えない」ことから整理します。</p>
+        <h2><span class="num">1</span><span data-i18n="ver.s1.title">通信は数学的に解読できない</span></h2>
+        <p class="lead" data-i18n="ver.s1.lead">サーバを信用するかどうかの前に、まず「そもそも中身が見えない」ことから整理します。</p>
 
         <div class="card">
-          <h3>① 画面・音声・操作は “端末どうしの直接通信”</h3>
-          <p>WebRTC により、あなたの PC と相手のブラウザは <strong>直接</strong>つながります。中央サーバは「最初の引き合わせ（シグナリング）」をするだけで、<strong>映像の本体はサーバを通りません</strong>。</p>
-          <h3>② 通信はすべて暗号化（DTLS-SRTP）</h3>
-          <p>映像・音声は <span class="alg">AES-128-GCM</span>、鍵交換は <span class="alg">ECDHE (Curve25519)</span>。<strong>鍵はあなたと相手の端末でだけ作られ、サーバには一度も渡りません。</strong>たとえるなら「二人だけが持つ鍵で施錠した箱」を郵送するイメージで、配達業者（サーバ）は中身を開けられません。</p>
-          <h3>③ 中継（TURN）が入っても同じ</h3>
-          <p>ネットワークの都合で TURN サーバが中継する場合も、流れるのは<strong>暗号化された塊（SRTP）</strong>だけ。鍵を持たないので中継業者にも解読できません。</p>
+          <h3 data-i18n="ver.s1.h3a">① 画面・音声・操作は "端末どうしの直接通信"</h3>
+          <p data-i18n-html="ver.s1.pa">WebRTC により、あなたの PC と相手のブラウザは <strong>直接</strong>つながります。中央サーバは「最初の引き合わせ（シグナリング）」をするだけで、<strong>映像の本体はサーバを通りません</strong>。</p>
+          <h3 data-i18n="ver.s1.h3b">② 通信はすべて暗号化（DTLS-SRTP）</h3>
+          <p data-i18n-html="ver.s1.pb">映像・音声は <span class="alg">AES-128-GCM</span>、鍵交換は <span class="alg">ECDHE (Curve25519)</span>。<strong>鍵はあなたと相手の端末でだけ作られ、サーバには一度も渡りません。</strong>たとえるなら「二人だけが持つ鍵で施錠した箱」を郵送するイメージで、配達業者（サーバ）は中身を開けられません。</p>
+          <h3 data-i18n="ver.s1.h3c">③ 中継（TURN）が入っても同じ</h3>
+          <p data-i18n-html="ver.s1.pc">ネットワークの都合で TURN サーバが中継する場合も、流れるのは<strong>暗号化された塊（SRTP）</strong>だけ。鍵を持たないので中継業者にも解読できません。</p>
         </div>
 
         <table>
-          <thead><tr><th>経路</th><th>暗号化</th><th>鍵を知るのは？</th></tr></thead>
+          <thead><tr><th data-i18n="ver.s1.tbl.th.path">経路</th><th data-i18n="ver.s1.tbl.th.crypto">暗号化</th><th data-i18n="ver.s1.tbl.th.who">鍵を知るのは？</th></tr></thead>
           <tbody>
-            <tr><td>メディア（画面/音声）</td><td>DTLS-SRTP / AES-128-GCM</td><td>あなたと相手だけ</td></tr>
-            <tr><td>DataChannel（操作入力）</td><td>SCTP over DTLS</td><td>同上</td></tr>
-            <tr><td>TURN 中継時</td><td>中継するのは暗号化済み SRTP</td><td>TURN サーバは鍵を持たない</td></tr>
+            <tr><td data-i18n="ver.s1.tbl.r1.path">メディア（画面/音声）</td><td data-i18n="ver.s1.tbl.r1.crypto">DTLS-SRTP / AES-128-GCM</td><td data-i18n="ver.s1.tbl.r1.who">あなたと相手だけ</td></tr>
+            <tr><td data-i18n="ver.s1.tbl.r2.path">DataChannel（操作入力）</td><td data-i18n="ver.s1.tbl.r2.crypto">SCTP over DTLS</td><td data-i18n="ver.s1.tbl.r2.who">同上</td></tr>
+            <tr><td data-i18n="ver.s1.tbl.r3.path">TURN 中継時</td><td data-i18n="ver.s1.tbl.r3.crypto">中継するのは暗号化済み SRTP</td><td data-i18n="ver.s1.tbl.r3.who">TURN サーバは鍵を持たない</td></tr>
           </tbody>
         </table>
 
-        <p>使われている暗号は <strong>TLS 1.3 / NIST / IETF</strong> の標準。現在の数学の常識では、総当たりで破るのに<strong>宇宙の年齢を超える計算時間</strong>がかかります。実際の暗号方式は、接続中の「PAssist について」画面に表示されます。</p>
-        <p class="lead">つまりサーバが覗ける情報は、接続時刻や IP などの<strong>メタデータに限られ</strong>、映像の中身は数学的に守られています。</p>
+        <p data-i18n-html="ver.s1.std">使われている暗号は <strong>TLS 1.3 / NIST / IETF</strong> の標準。現在の数学の常識では、総当たりで破るのに<strong>宇宙の年齢を超える計算時間</strong>がかかります。実際の暗号方式は、接続中の「PAssist について」画面に表示されます。</p>
+        <p class="lead" data-i18n-html="ver.s1.summary">つまりサーバが覗ける情報は、接続時刻や IP などの<strong>メタデータに限られ</strong>、映像の中身は数学的に守られています。</p>
       </div>
     </section>
 
     <section style="background:#eef4fb">
       <div class="wrap">
-        <h2><span class="num">2</span>暗号の「3つの道具」— やさしい解説</h2>
-        <p class="lead">この先の「サーバが公開コードと同じ」を支えるのは、次の3つの数学の道具です。難しい言葉が出てきたら、ここに戻ってください。</p>
+        <h2><span class="num">2</span><span data-i18n="ver.s2.title">暗号の「3つの道具」— やさしい解説</span></h2>
+        <p class="lead" data-i18n="ver.s2.lead">この先の「サーバが公開コードと同じ」を支えるのは、次の3つの数学の道具です。難しい言葉が出てきたら、ここに戻ってください。</p>
         <div class="tools">
           <div class="tool">
             <div class="ico">🔍</div>
-            <h3>① 指紋（ハッシュ／SHA-256）</h3>
-            <p>データを一方向の計算で短い「指紋」に変えます。中身を1文字でも変えると指紋は全く別物に。<b>同じ指紋なら中身も同じ</b>と数学的に言えます（偶然の一致は事実上起こりません）。</p>
+            <h3 data-i18n="ver.s2.tool1.title">① 指紋（ハッシュ／SHA-256）</h3>
+            <p data-i18n-html="ver.s2.tool1.desc">データを一方向の計算で短い「指紋」に変えます。中身を1文字でも変えると指紋は全く別物に。<b>同じ指紋なら中身も同じ</b>と数学的に言えます（偶然の一致は事実上起こりません）。</p>
           </div>
           <div class="tool">
             <div class="ico">🖋️</div>
-            <h3>② 封印（デジタル署名）</h3>
-            <p>「本人にしか作れず、誰でも本物か確認できる」ハンコです。偽造には秘密鍵が必要。PAssist では署名のたびに<b>使い捨ての鍵</b>を使い、すぐ破棄するので「鍵が漏れて偽造」も起きません。</p>
+            <h3 data-i18n="ver.s2.tool2.title">② 封印（デジタル署名）</h3>
+            <p data-i18n-html="ver.s2.tool2.desc">「本人にしか作れず、誰でも本物か確認できる」ハンコです。偽造には秘密鍵が必要。PAssist では署名のたびに<b>使い捨ての鍵</b>を使い、すぐ破棄するので「鍵が漏れて偽造」も起きません。</p>
           </div>
           <div class="tool">
             <div class="ico">📖</div>
-            <h3>③ 公開の台帳（透明性ログ／Rekor）</h3>
-            <p>署名を、世界中から見える<b>「追記しかできない公開ノート」</b>に記録します。後からこっそり消す・書き換えると、数学（ハッシュの木）でバレる仕組みです。</p>
+            <h3 data-i18n="ver.s2.tool3.title">③ 公開の台帳（透明性ログ／Rekor）</h3>
+            <p data-i18n-html="ver.s2.tool3.desc">署名を、世界中から見える<b>「追記しかできない公開ノート」</b>に記録します。後からこっそり消す・書き換えると、数学（ハッシュの木）でバレる仕組みです。</p>
           </div>
         </div>
       </div>
@@ -184,74 +194,74 @@
 
     <section>
       <div class="wrap">
-        <h2><span class="num">3</span>サーバ＝「公開コードと同じもの」の証明</h2>
-        <p>WebRTC で守られるのは「中身（映像）」だけ。理屈の上では、<strong>サーバ自体</strong>がこっそり改造コードを動かしてメタデータを盗む余地が残ります。これを封じるのが <strong>Reproducible Build ＋ Cosign 署名</strong>です（道具①②③をフル活用）。</p>
+        <h2><span class="num">3</span><span data-i18n="ver.s3.title">サーバ＝「公開コードと同じもの」の証明</span></h2>
+        <p data-i18n-html="ver.s3.p">WebRTC で守られるのは「中身（映像）」だけ。理屈の上では、<strong>サーバ自体</strong>がこっそり改造コードを動かしてメタデータを盗む余地が残ります。これを封じるのが <strong>Reproducible Build ＋ Cosign 署名</strong>です（道具①②③をフル活用）。</p>
 
         <div class="card tinted">
-          <h3>Reproducible Build（再現可能ビルド）</h3>
-          <p><strong>同じソースコードから誰がビルドしても、寸分たがわず同じ Docker イメージ（同じ指紋）になる</strong>仕組みです。タイムスタンプを git コミット時刻に固定（<code>SOURCE_DATE_EPOCH</code>）し、依存を <code>package-lock.json</code> 通りに厳格再現（<code>npm ci</code>）。道具①により「同じ指紋＝同じ中身」と確定できます。</p>
+          <h3 data-i18n="ver.s3.repro.title">Reproducible Build（再現可能ビルド）</h3>
+          <p data-i18n-html="ver.s3.repro.desc"><strong>同じソースコードから誰がビルドしても、寸分たがわず同じ Docker イメージ（同じ指紋）になる</strong>仕組みです。タイムスタンプを git コミット時刻に固定（<code>SOURCE_DATE_EPOCH</code>）し、依存を <code>package-lock.json</code> 通りに厳格再現（<code>npm ci</code>）。道具①により「同じ指紋＝同じ中身」と確定できます。</p>
         </div>
 
         <div class="card tinted">
-          <h3>Cosign keyless 署名 ＋ Sigstore Rekor</h3>
-          <p>GitHub Actions がイメージをビルドした直後、<strong>GitHub の身分証明（OIDC）を使い、秘密鍵を持たずに</strong>署名します（道具②）。署名は公開の改ざん不能な台帳 <strong>Rekor</strong> に記録されます（道具③）。「この署名は <code>github.com/paps-jp/passist</code> の release ワークフローが作った」という事実が、世界中から検証可能な形で残ります。</p>
-          <p style="margin-bottom:0">運営者は秘密鍵を持たないので、<strong>鍵漏洩による偽造のリスクがありません。</strong></p>
+          <h3 data-i18n="ver.s3.cosign.title">Cosign keyless 署名 ＋ Sigstore Rekor</h3>
+          <p data-i18n-html="ver.s3.cosign.desc">GitHub Actions がイメージをビルドした直後、<strong>GitHub の身分証明（OIDC）を使い、秘密鍵を持たずに</strong>署名します（道具②）。署名は公開の改ざん不能な台帳 <strong>Rekor</strong> に記録されます（道具③）。「この署名は <code>github.com/paps-jp/passist</code> の release ワークフローが作った」という事実が、世界中から検証可能な形で残ります。</p>
+          <p style="margin-bottom:0" data-i18n-html="ver.s3.cosign.note">運営者は秘密鍵を持たないので、<strong>鍵漏洩による偽造のリスクがありません。</strong></p>
         </div>
       </div>
     </section>
 
     <section style="background:#eef4fb">
       <div class="wrap">
-        <h2><span class="num">4</span>ブラウザがワンタッチで自動検証 ⭐</h2>
-        <p>ここが PAssist の肝です。<strong>専門知識も追加インストールも不要</strong>。相手の操作画面（ビューア）の右上 <strong>「ℹ︎ → PAssist について」</strong>を開くと、<strong>ブラウザ自身がその場で数学の計算をして</strong>、いま接続しているサーバの正体を検証します。</p>
+        <h2><span class="num">4</span><span data-i18n="ver.s4.title">ブラウザがワンタッチで自動検証 ⭐</span></h2>
+        <p data-i18n-html="ver.s4.p">ここが PAssist の肝です。<strong>専門知識も追加インストールも不要</strong>。相手の操作画面（ビューア）の右上 <strong>「ℹ︎ → PAssist について」</strong>を開くと、<strong>ブラウザ自身がその場で数学の計算をして</strong>、いま接続しているサーバの正体を検証します。</p>
 
         <div class="verify-demo">
           <div class="badge">✓</div>
-          <div class="t"><b>検証OK</b> — このサーバは <code>github.com/paps-jp/passist</code> の公開コードから作られたものです（GitHub Actions が署名・Rekor に記録済み）。</div>
+          <div class="t" data-i18n-html="ver.s4.demo.text"><b>検証OK</b> — このサーバは <code>github.com/paps-jp/passist</code> の公開コードから作られたものです（GitHub Actions が署名・Rekor に記録済み）。</div>
         </div>
 
-        <p>ブラウザは内部で、サーバから受け取った署名と Sigstore の公開ログを取り寄せ、次を確かめています：</p>
+        <p data-i18n="ver.s4.list.intro">ブラウザは内部で、サーバから受け取った署名と Sigstore の公開ログを取り寄せ、次を確かめています：</p>
         <ul class="checks">
-          <li><b>この署名は公開ログに実在する</b> — Rekor の<strong>ハッシュの木（Merkle 証明 / RFC 6962）</strong>を再計算して、台帳に確かに載っていることを確認（道具①③）。</li>
-          <li><b>署名の対象＝いま動いているサーバと一致</b> — 署名された中身の指紋と、稼働中イメージの dig（<code>sha256:…</code>）が一致することを確認（道具①）。</li>
-          <li><b>署名した主体＝正規のリポジトリ</b> — 証明書に記録された発行元が <code>github.com/paps-jp/passist</code> で、発行者が GitHub の OIDC(<code>token.actions.githubusercontent.com</code>)であることを確認（道具②）。</li>
+          <li data-i18n-html="ver.s4.check1"><b>この署名は公開ログに実在する</b> — Rekor の<strong>ハッシュの木（Merkle 証明 / RFC 6962）</strong>を再計算して、台帳に確かに載っていることを確認（道具①③）。</li>
+          <li data-i18n-html="ver.s4.check2"><b>署名の対象＝いま動いているサーバと一致</b> — 署名された中身の指紋と、稼働中イメージの dig（<code>sha256:…</code>）が一致することを確認（道具①）。</li>
+          <li data-i18n-html="ver.s4.check3"><b>署名した主体＝正規のリポジトリ</b> — 証明書に記録された発行元が <code>github.com/paps-jp/passist</code> で、発行者が GitHub の OIDC(<code>token.actions.githubusercontent.com</code>)であることを確認（道具②）。</li>
         </ul>
-        <p class="pill">💡 同じ自動検証は、<strong>ホストアプリ（PAssist.exe）の「PAssist について」</strong>でも実行できます。</p>
+        <p class="pill" data-i18n-html="ver.s4.pill">💡 同じ自動検証は、<strong>ホストアプリ（PAssist.exe）の「PAssist について」</strong>でも実行できます。</p>
 
         <div class="card warn">
-          <h3>正直な但し書き（透明性のために明記）</h3>
-          <p style="margin-bottom:0">ブラウザ内検証は手軽さのため<strong>一部を簡略化</strong>しています（Rekor 自身の署名や証明書チェーンの完全な検証までは行いません）。日常利用には十分な確認ですが、<strong>「絶対の確証」が欲しいときは下記の <code>cosign verify</code></strong> を使ってください。同じ署名を、省略なしでフル検証します。</p>
+          <h3 data-i18n="ver.s4.warn.title">正直な但し書き（透明性のために明記）</h3>
+          <p style="margin-bottom:0" data-i18n-html="ver.s4.warn.desc">ブラウザ内検証は手軽さのため<strong>一部を簡略化</strong>しています（Rekor 自身の署名や証明書チェーンの完全な検証までは行いません）。日常利用には十分な確認ですが、<strong>「絶対の確証」が欲しいときは下記の <code>cosign verify</code></strong> を使ってください。同じ署名を、省略なしでフル検証します。</p>
         </div>
       </div>
     </section>
 
     <section>
       <div class="wrap">
-        <h2><span class="num">5</span>信頼の連鎖</h2>
-        <p class="lead">ソースコードから、あなたの画面の ✓ まで、すべてが数学でつながっています。</p>
+        <h2><span class="num">5</span><span data-i18n="ver.s5.title">信頼の連鎖</span></h2>
+        <p class="lead" data-i18n="ver.s5.lead">ソースコードから、あなたの画面の ✓ まで、すべてが数学でつながっています。</p>
         <ol class="chain">
-          <li><b>Git コミット</b>：ソース改ざんは指紋（SHA-256）で検知。GitHub が履歴を保管。</li>
-          <li><b>GitHub Actions が自動ビルド</b>：人手を介さず、ビルドのログは誰でも閲覧可能。</li>
-          <li><b>イメージを GHCR に公開</b>：イメージの指紋 <code>sha256:…</code> が確定。</li>
-          <li><b>Cosign keyless 署名</b>：「<code>paps-jp/passist</code> の release が作った」を Rekor 公開ログに記録。</li>
-          <li><b>VPS で <code>docker pull</code></b>：指紋が一致しなければ取得時点でエラー。</li>
-          <li><b>あなたが検証</b>：ブラウザの自動検証（ワンタッチ）／さらに cosign verify・自前再ビルドでも一致を確認可能。</li>
+          <li data-i18n-html="ver.s5.li1"><b>Git コミット</b>：ソース改ざんは指紋（SHA-256）で検知。GitHub が履歴を保管。</li>
+          <li data-i18n-html="ver.s5.li2"><b>GitHub Actions が自動ビルド</b>：人手を介さず、ビルドのログは誰でも閲覧可能。</li>
+          <li data-i18n-html="ver.s5.li3"><b>イメージを GHCR に公開</b>：イメージの指紋 <code>sha256:…</code> が確定。</li>
+          <li data-i18n-html="ver.s5.li4"><b>Cosign keyless 署名</b>：「<code>paps-jp/passist</code> の release が作った」を Rekor 公開ログに記録。</li>
+          <li data-i18n-html="ver.s5.li5"><b>VPS で <code>docker pull</code></b>：指紋が一致しなければ取得時点でエラー。</li>
+          <li data-i18n-html="ver.s5.li6"><b>あなたが検証</b>：ブラウザの自動検証（ワンタッチ）／さらに cosign verify・自前再ビルドでも一致を確認可能。</li>
         </ol>
       </div>
     </section>
 
     <section style="background:#eef4fb">
       <div class="wrap">
-        <h2><span class="num">6</span>上級者向け：自分の手でも確認できる</h2>
-        <p class="lead">ブラウザの ✓ だけで十分ですが、技術に詳しい方は同じことを手元のコマンドで「省略なし」に確かめられます。</p>
+        <h2><span class="num">6</span><span data-i18n="ver.s6.title">上級者向け：自分の手でも確認できる</span></h2>
+        <p class="lead" data-i18n="ver.s6.lead">ブラウザの ✓ だけで十分ですが、技術に詳しい方は同じことを手元のコマンドで「省略なし」に確かめられます。</p>
 
-        <h3>A. 公開イメージの真正性（30秒・フル検証）</h3>
+        <h3 data-i18n="ver.s6.aH">A. 公開イメージの真正性（30秒・フル検証）</h3>
         <pre><code>cosign verify ghcr.io/paps-jp/passist-signaling@&lt;digest&gt; \
   --certificate-identity-regexp 'https://github.com/paps-jp/passist' \
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'</code></pre>
-        <p>→ Sigstore Rekor の公開ログを参照し、「このイメージは確かに paps-jp/passist の release ワークフローから生まれた」を完全に検証します。</p>
+        <p data-i18n="ver.s6.aP">→ Sigstore Rekor の公開ログを参照し、「このイメージは確かに paps-jp/passist の release ワークフローから生まれた」を完全に検証します。</p>
 
-        <h3>B. 自分でも同じ指紋を再現（数分）</h3>
+        <h3 data-i18n="ver.s6.bH">B. 自分でも同じ指紋を再現（数分）</h3>
         <pre><code>git clone https://github.com/paps-jp/passist
 cd passist &amp;&amp; git checkout v0.2.0
 docker buildx build server \
@@ -260,44 +270,55 @@ docker buildx build server \
 docker inspect local-rebuild --format='{{.Id}}'
 # → 公開 digest と一致するはず</code></pre>
 
-        <h3>C. 運用中サーバの自己申告（入口の確認）</h3>
+        <h3 data-i18n="ver.s6.cH">C. 運用中サーバの自己申告（入口の確認）</h3>
         <pre><code>curl https://passist.paps.jp/api/build</code></pre>
-        <p>サーバが動かしている commit / イメージ digest / build 時刻を返します。<strong>これ自体は嘘がつける</strong>ので、必ず A の <code>cosign verify</code> と digest を突き合わせて判断します（ブラウザの自動検証も、この digest と署名の一致を確かめています）。</p>
+        <p data-i18n-html="ver.s6.cP">サーバが動かしている commit / イメージ digest / build 時刻を返します。<strong>これ自体は嘘がつける</strong>ので、必ず A の <code>cosign verify</code> と digest を突き合わせて判断します（ブラウザの自動検証も、この digest と署名の一致を確かめています）。</p>
       </div>
     </section>
 
     <section style="background:#fff4ea">
       <div class="wrap">
-        <h2><span class="num">7</span>ライセンス</h2>
-        <p class="lead">PAssist は <a href="https://opensource.org/license/mit" target="_blank" rel="noopener"><strong>MIT License</strong></a> のもとで公開しています。OSI 認定の最もシンプルな許諾型 OSS ライセンスで、商用利用を含むほぼすべての利用が自由です。</p>
+        <h2><span class="num">7</span><span data-i18n="ver.s7.title">ライセンス</span></h2>
+        <p class="lead" data-i18n-html="ver.s7.lead">PAssist は <a href="https://opensource.org/license/mit" target="_blank" rel="noopener"><strong>MIT License</strong></a> のもとで公開しています。OSI 認定の最もシンプルな許諾型 OSS ライセンスで、商用利用を含むほぼすべての利用が自由です。</p>
 
         <div class="card success">
-          <h3>✅ 自由にできること</h3>
+          <h3 data-i18n="ver.s7.free.title">✅ 自由にできること</h3>
           <ul>
-            <li><strong>使う</strong>こと — 個人・法人を問わず、商用・非商用を問わず、PAssist を動かして自分の業務、支援活動、サービス提供に用いること（有償サービスとして提供することも含む）。</li>
-            <li>自分または所属組織のサーバで PAssist を立て、社内・組織内・対外サービスとして運用すること。</li>
-            <li><strong>改変</strong>すること、コードを読んで監査・検証すること、ビルド再現性を確かめること。</li>
-            <li>改変版や派生物を、商用・非商用を問わず<strong>頒布・公開</strong>すること。</li>
-            <li>派生物に<strong>独自のライセンス</strong>を付けて公開・販売すること（プロプライエタリ化も可）。</li>
+            <li data-i18n-html="ver.s7.free.li1"><strong>使う</strong>こと — 個人・法人を問わず、商用・非商用を問わず、PAssist を動かして自分の業務、支援活動、サービス提供に用いること（有償サービスとして提供することも含む）。</li>
+            <li data-i18n="ver.s7.free.li2">自分または所属組織のサーバで PAssist を立て、社内・組織内・対外サービスとして運用すること。</li>
+            <li data-i18n-html="ver.s7.free.li3"><strong>改変</strong>すること、コードを読んで監査・検証すること、ビルド再現性を確かめること。</li>
+            <li data-i18n-html="ver.s7.free.li4">改変版や派生物を、商用・非商用を問わず<strong>頒布・公開</strong>すること。</li>
+            <li data-i18n-html="ver.s7.free.li5">派生物に<strong>独自のライセンス</strong>を付けて公開・販売すること（プロプライエタリ化も可）。</li>
           </ul>
         </div>
 
         <div class="card">
-          <h3>📌 唯一の条件</h3>
+          <h3 data-i18n="ver.s7.cond.title">📌 唯一の条件</h3>
           <ul>
-            <li>再配布する際は、ソースコードまたはバイナリの配布物に <strong>著作権表示と MIT ライセンス全文</strong> を含めてください。</li>
+            <li data-i18n-html="ver.s7.cond.li1">再配布する際は、ソースコードまたはバイナリの配布物に <strong>著作権表示と MIT ライセンス全文</strong> を含めてください。</li>
           </ul>
-          <p style="margin-top:10px;margin-bottom:0">これだけです。サービスとして社内・社外で運用する場合、配布行為が発生しないため、特に何もする必要はありません。</p>
+          <p style="margin-top:10px;margin-bottom:0" data-i18n="ver.s7.cond.note">これだけです。サービスとして社内・社外で運用する場合、配布行為が発生しないため、特に何もする必要はありません。</p>
         </div>
 
-        <p style="margin-top:16px;color:var(--mut);font-size:14px">詳細は <a href="https://github.com/paps-jp/passist/blob/main/LICENSE" target="_blank" rel="noopener">LICENSE ファイル</a> または <a href="https://opensource.org/license/mit" target="_blank" rel="noopener">MIT License 公式ページ (OSI)</a> を参照してください。</p>
+        <p style="margin-top:16px;color:var(--mut);font-size:14px" data-i18n-html="ver.s7.more">詳細は <a href="https://github.com/paps-jp/passist/blob/main/LICENSE" target="_blank" rel="noopener">LICENSE ファイル</a> または <a href="https://opensource.org/license/mit" target="_blank" rel="noopener">MIT License 公式ページ (OSI)</a> を参照してください。</p>
       </div>
     </section>
 
     <footer>
-      PAssist — 検証に基づく安全性 ／
-      <a href="index.html">トップに戻る</a> ／
+      <span data-i18n="ver.footer1">PAssist — 検証に基づく安全性</span> ／
+      <a href="index.html" data-i18n="ver.footer.top">トップに戻る</a> ／
       <a href="https://github.com/paps-jp/passist">github.com/paps-jp/passist</a>
     </footer>
+
+    <script src="i18n.js?v=2"></script>
+    <script>
+      (function () {
+        if (!window.getLang) return;
+        const cur = window.getLang();
+        document.querySelectorAll('[data-lang-btn]').forEach(function (b) {
+          b.classList.toggle('active', b.dataset.langBtn === cur);
+        });
+      })();
+    </script>
   </body>
 </html>
