@@ -1,31 +1,55 @@
 name: passist-turn
 
 # 新規 TURN サーバ専用の最小構成。
-# 起動すると 60 秒ごとに signaling (passist.paps.jp) へ自分の URL と派生鍵を POST し、
-# signaling 側のレジストリに登録される。5 分 heartbeat が途絶えると自動除外。
+# 使い方:
+#   1) このVPSにDocker(+composeプラグイン)を入れる
+#   2) ufw でポート開放: 3478/tcp,udp / 5349/tcp,udp / 49152-65535/udp
+#   3) git clone <repo> && cd deploy/coturn-only
+#   4) cp .env.example .env  # TURN_URL, THIS_TURN_AUTH_SECRET, EXTERNAL_IP を埋める
+#   5) docker compose up -d
 #
-# 必須 env (.env を用意):
-#   TURN_URL                 例: turn:turn2.paps.jp:3478
-#   THIS_TURN_AUTH_SECRET    signaling 上で HMAC-SHA256(MASTER, TURN_URL) を計算した派生鍵
-#   EXTERNAL_IP              この VPS のグローバル IPv4
-#   REALM                    既定: paps.jp
-# 任意:
-#   SIGNALING_URL            既定: https://passist.paps.jp
-#   BUDGET_BPS               この TURN が引き受ける帯域上限（既定 4000000）
+# 起動時に init コンテナ (config-init) が envsubst で turnserver.conf を生成し、
+# coturn はそれを読んで起動。 heartbeat が60秒ごとに signaling へ自分の派生鍵を送る。
+# 5分heartbeatが途絶えれば signaling 側で自動除外。
 
 services:
+  # turnserver.conf を env から生成する init container（起動→完了で抜ける）
+  config-init:
+    image: alpine:3.20
+    command:
+      - sh
+      - -c
+      - |
+        apk add --no-cache gettext >/dev/null
+        envsubst < /template/turnserver.conf.template > /out/turnserver.conf
+        echo '=== generated turnserver.conf ==='
+        cat /out/turnserver.conf
+    environment:
+      EXTERNAL_IP: ${EXTERNAL_IP}
+      THIS_TURN_AUTH_SECRET: ${THIS_TURN_AUTH_SECRET}
+      REALM: ${REALM:-paps.jp}
+    volumes:
+      - ./turnserver.conf.template:/template/turnserver.conf.template:ro
+      - turn-config:/out
+
   coturn:
     image: coturn/coturn:latest
     restart: unless-stopped
     network_mode: host
+    depends_on:
+      config-init:
+        condition: service_completed_successfully
     volumes:
-      - ./turnserver.conf:/etc/turnserver.conf:ro
+      - turn-config:/etc/coturn:ro
+    command: ['-c', '/etc/coturn/turnserver.conf']
 
-  # signaling へ60秒ごとに「自分は生きている」を通知するサイドカー。
+  # signaling へ 60 秒ごとに「自分は生きている」を通知するサイドカー。
   # curl 一発、起動失敗してもループで自動再試行。
   heartbeat:
     image: alpine:3.20
     restart: unless-stopped
+    depends_on:
+      - coturn
     environment:
       SIGNALING_URL: ${SIGNALING_URL:-https://passist.paps.jp}
       TURN_URL: ${TURN_URL}
@@ -37,11 +61,16 @@ services:
       - |
         apk add --no-cache curl >/dev/null
         while :; do
-          curl -fsS -X POST "$$SIGNALING_URL/admin/turn-register" \
-            -H 'Content-Type: application/json' \
-            -d "{\"url\":\"$$TURN_URL\",\"secret\":\"$$THIS_TURN_AUTH_SECRET\",\"budgetBps\":$$BUDGET_BPS}" \
-            >/dev/null 2>&1 \
-            && echo "[heartbeat] OK $$TURN_URL" \
-            || echo "[heartbeat] FAILED $$TURN_URL"
+          if curl -fsS -X POST "$$SIGNALING_URL/admin/turn-register" \
+               -H 'Content-Type: application/json' \
+               -d "{\"url\":\"$$TURN_URL\",\"secret\":\"$$THIS_TURN_AUTH_SECRET\",\"budgetBps\":$$BUDGET_BPS}" \
+               >/dev/null 2>&1; then
+            echo "[heartbeat] OK $$TURN_URL"
+          else
+            echo "[heartbeat] FAILED $$TURN_URL"
+          fi
           sleep 60
         done
+
+volumes:
+  turn-config:
