@@ -125,7 +125,7 @@
     });
     renderServerModeUi();
 
-    // 接続方法（承認制 / PIN / だれでも）。変更は次の共有から有効。
+    // 接続方法（承認制 / PIN / 招待リンク / だれでも）。変更は次の共有から有効。
     const accVal = (cfg.settings && cfg.settings.accessMode) || 'approve';
     for (const r of document.querySelectorAll('input[name="access"]')) {
       r.checked = r.value === accVal;
@@ -135,9 +135,11 @@
         window.host.settingsSet({ accessMode: r.value });
         updateAccessHint();
         renderChips();
+        updateInviteUi(); // 招待リンクUIの表示切替
       });
     }
     updateAccessHint();
+    updateInviteUi();
     // 有効期限（次の共有から有効）。0 = 無期限。
     $('ttlSel').value = String(cfg.settings && Number.isFinite(cfg.settings.sessionTtlMinutes) ? cfg.settings.sessionTtlMinutes : 30);
     $('ttlSel').addEventListener('change', () => {
@@ -603,11 +605,20 @@
       const res = await window.host.trustCheck(req.auth);
       if (res && res.trusted) {
         sendWs({ type: 'host:approve', viewerId: req.viewerId });
-        setStatus('信頼済み端末を自動承認しました' + (res.label ? '（' + res.label + '）' : ''));
+        setStatus('招待済み端末を自動承認しました' + (res.label ? '（' + res.label + '）' : ''));
         activeReq = null;
         processReqQueue();
         return;
       }
+    }
+    // 招待リンクモード: 招待されていない相手は手動承認させず自動拒否（誤って許可しないため）
+    const mode = (cfg.settings && cfg.settings.accessMode) || 'approve';
+    if (mode === 'invite') {
+      sendWs({ type: 'host:deny', viewerId: req.viewerId });
+      setStatus('招待リンクを持たない接続を自動拒否しました');
+      activeReq = null;
+      processReqQueue();
+      return;
     }
     $('request').classList.remove('hidden');
     setStatus('接続リクエストがあります');
@@ -641,7 +652,7 @@
   async function refreshTrustInfo() {
     const list = await window.host.trustList();
     const el = $('trustManage');
-    el.textContent = '信頼済み端末: ' + list.length + ' 件';
+    el.textContent = '招待済み端末: ' + list.length + ' 件';
     if (!list.length) return;
     el.append('　');
     const a = document.createElement('a');
@@ -653,6 +664,12 @@
       refreshTrustInfo();
     };
     el.appendChild(a);
+  }
+
+  // 接続方法ラジオ変更時の表示制御。invite モード時は招待リンクUIを表示。
+  function updateInviteUi() {
+    const isInvite = ((cfg.settings && cfg.settings.accessMode) || 'approve') === 'invite';
+    const box = $('inviteBox'); if (box) box.classList.toggle('hidden', !isInvite);
   }
 
   // ビューアごとに peer 接続を張る（同じキャプチャ stream を各接続へ送る＝メッシュ）
@@ -786,6 +803,7 @@
     el.textContent =
       v === 'approve' ? 'つなぐたびに、あなたの「許可」が必要です（安全）。'
       : v === 'pin' ? '相手は、表示されるPIN番号の入力が必要です。'
+      : v === 'invite' ? '事前に発行する「招待リンク」を持つ相手だけが自動接続できます。通常URLからの接続は自動拒否されます。'
       : '⚠ URLを知っていれば誰でも即接続できます。インターネット公開時はとくに注意してください。';
     el.classList.toggle('danger-hint', v === 'token');
   }
@@ -805,7 +823,7 @@
     const el = $('modeChips');
     if (!el) return;
     const s = cfg.settings || {};
-    const access = s.accessMode === 'token' ? 'だれでも' : s.accessMode === 'pin' ? 'PIN番号' : '承認制';
+    const access = s.accessMode === 'token' ? 'だれでも' : s.accessMode === 'pin' ? 'PIN番号' : s.accessMode === 'invite' ? '招待リンク' : '承認制';
     const max = s.maxViewers || 1;
     const op = s.readonly ? '全員 閲覧のみ' : max > 1 ? '操作は先着1人・他は閲覧' : '操作 可';
     el.innerHTML = '';

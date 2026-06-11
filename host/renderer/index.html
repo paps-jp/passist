@@ -43,6 +43,7 @@
             <div class="set-field">
               <label class="radio"><input type="radio" name="access" value="approve" /> 承認制（おすすめ）</label>
               <label class="radio"><input type="radio" name="access" value="pin" /> PIN番号</label>
+              <label class="radio"><input type="radio" name="access" value="invite" /> 招待リンク（事前許可者のみ）</label>
               <label class="radio"><input type="radio" name="access" value="token" /> だれでも（URLのみ）</label>
               <p id="accessHint" class="hint"></p>
             </div>
@@ -99,6 +100,23 @@
           <input id="url" readonly />
           <button id="copy" class="primary">コピー</button>
         </div>
+        <!-- 招待リンク（invite モードのみ表示）。事前に許可した相手だけが自動接続できる。 -->
+        <div id="inviteBox" class="panel hidden" style="margin-top:8px">
+          <div class="set-row">
+            <span class="set-label">招待リンク</span>
+            <div class="set-field" style="flex:1">
+              <p class="hint" style="margin:0 0 6px">事前に許可した端末だけが自動接続できる専用リンクです。発行して相手に送ってください。通常URLからの接続は自動で拒否されます。</p>
+              <div class="trust">
+                <button id="trustLink" class="ghost">招待リンクを発行</button>
+                <span id="trustManage" class="hint"></span>
+              </div>
+              <div id="trustLinkRow" class="urlrow hidden" style="margin-top:6px">
+                <input id="trustUrl" readonly />
+                <button id="copyTrust">コピー</button>
+              </div>
+            </div>
+          </div>
+        </div>
         <button id="qrToggle" class="toggle open">📱 スマホで読み取る（QRコード）</button>
         <div id="qrPanel" class="qrpanel"><img id="qrImg" alt="共有URLのQRコード" /></div>
         <div id="pin" class="pin hidden"></div>
@@ -147,17 +165,6 @@
             <input id="turnPass" type="password" placeholder="パスワード" />
           </div>
           <p id="turnHint" class="hint"></p>
-
-          <label style="margin-top:14px">信頼リンク（事前承認）</label>
-          <p class="hint">発行したリンクで接続した相手は、次回から承認なしで接続できます。</p>
-          <div class="trust">
-            <button id="trustLink" class="ghost">信頼リンクを発行</button>
-            <span id="trustManage" class="hint"></span>
-          </div>
-          <div id="trustLinkRow" class="urlrow hidden">
-            <input id="trustUrl" readonly />
-            <button id="copyTrust">コピー</button>
-          </div>
         </div>
       </div>
     </main>

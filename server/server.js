@@ -270,7 +270,8 @@ function route(ws, msg) {
 function hostCreate(ws, msg) {
   const token = newToken();
   // 接続方法はセッションごと（host:create で指定）。未指定/不正なら環境変数の既定。
-  const accessMode = ['approve', 'pin', 'token'].includes(msg && msg.accessMode) ? msg.accessMode : ACCESS_MODE;
+  // invite: 招待リンク(auth=信頼クレデンシャル)を持つ相手だけ自動接続。承認制(approve)の派生。
+  const accessMode = ['approve', 'pin', 'invite', 'token'].includes(msg && msg.accessMode) ? msg.accessMode : ACCESS_MODE;
   // 有効期限（分）。host:create の ttlMinutes 優先、未指定なら環境変数の既定。0 は「無期限」(expiresAt=null)。
   const ttlMin = msg && Number.isFinite(msg.ttlMinutes) ? msg.ttlMinutes : SESSION_TTL_MS > 0 ? SESSION_TTL_MS / 60000 : 0;
   const expiresAt = ttlMin > 0 ? Date.now() + ttlMin * 60000 : null;
@@ -321,17 +322,23 @@ function viewerJoin(ws, msg) {
     stats.event('viewer_denied', { reason: 'pin' });
     return send(ws, { type: 'error', code: 'pin', message: 'PINが違います' });
   }
+  // 招待リンクモード: auth(信頼クレデンシャル) が無ければ即拒否（通常URLでの接続を防ぐ）
+  if (s.accessMode === 'invite' && !msg.auth) {
+    stats.event('viewer_denied', { reason: 'no-invite' });
+    return send(ws, { type: 'error', code: 'invite', message: 'このセッションは招待リンク専用です。ホストから「招待リンク」を受け取ってください。' });
+  }
 
   ws.role = 'viewer';
   ws.token = s.token;
   ws.viewerId = String(++viewerSeq);
 
-  if (s.accessMode === 'approve') {
+  if (s.accessMode === 'approve' || s.accessMode === 'invite') {
+    // approve: ホスト承認 / invite: ホスト側で trust 照合し trusted なら自動承認・それ以外は自動拒否
     s.pending.set(ws.viewerId, ws);
     s.status = 'pending';
     send(ws, { type: 'waiting', message: 'ホストの承認を待っています…' });
     // ビューア提示の信頼クレデンシャル(auth)はそのままホストへ中継（サーバは保存・検証しない）
-    send(s.host, { type: 'viewer:request', viewerId: ws.viewerId, auth: msg.auth || null });
+    send(s.host, { type: 'viewer:request', viewerId: ws.viewerId, auth: msg.auth || null, mode: s.accessMode });
   } else {
     acceptViewer(s, ws);
   }
