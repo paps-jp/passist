@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#78b3f7" />
     <title>検証に基づく安全性 — PAssist</title>
-    <meta name="description" content="PAssist のサーバが GitHub で公開されているコードと完全に同じものを動かしていることを、暗号学的に検証する仕組みを解説します。" />
+    <meta name="description" content="PAssist のサーバが GitHub で公開されているコードと完全に同じものを動かしていることを、暗号学的に検証する仕組みを、初心者にも分かるように解説します。ブラウザが自動で数学的に検証します。" />
     <link rel="icon" href="passist_min.svg" />
     <meta property="og:type" content="article" />
     <meta property="og:title" content="検証に基づく安全性 — PAssist" />
-    <meta property="og:description" content="WebRTC の暗号化と Reproducible Build + Cosign 署名で「サーバが公開コードと同一」を数学的に保証します。" />
+    <meta property="og:description" content="WebRTC の暗号化と Reproducible Build + Cosign 署名で「サーバが公開コードと同一」を数学的に保証。ブラウザが自動検証します。" />
     <meta property="og:image" content="https://paps-jp.github.io/passist/passist.svg" />
     <meta property="og:url" content="https://paps-jp.github.io/passist/verification.html" />
     <meta name="twitter:card" content="summary_large_image" />
@@ -34,16 +34,18 @@
         radial-gradient(560px 420px at 14% 42%, rgba(132,224,216,.32), transparent 62%)}
       .hero>*{position:relative;z-index:1}
       .hero h1{margin:0 0 8px;font-size:clamp(24px,3.6vw,32px);font-weight:800;letter-spacing:.3px}
-      .hero p{margin:0 auto;max-width:640px;color:rgba(255,255,255,.95);font-size:15.5px}
+      .hero p{margin:0 auto;max-width:660px;color:rgba(255,255,255,.95);font-size:15.5px}
       .back{display:inline-flex;align-items:center;gap:6px;color:rgba(255,255,255,.92);text-decoration:none;font-size:14px;margin-bottom:14px}
       .back:hover{color:#fff;text-decoration:underline}
 
       /* sections */
       section{padding:46px 0}
       h2{font-size:22px;font-weight:800;margin:0 0 18px;display:flex;align-items:center;gap:10px}
-      h2 .num{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:50%;font-size:15px;color:#fff;background:linear-gradient(135deg,#3b80f7,#43c0bd);box-shadow:0 6px 14px rgba(30,50,90,.18)}
+      h2 .num{display:inline-grid;place-items:center;width:34px;height:34px;border-radius:50%;font-size:15px;color:#fff;background:linear-gradient(135deg,#3b80f7,#43c0bd);box-shadow:0 6px 14px rgba(30,50,90,.18);flex:0 0 auto}
       h3{margin:22px 0 8px;font-size:16.5px;font-weight:700}
       p{margin:0 0 13px;color:#2a3445}
+      ul{margin:0 0 13px;padding-left:22px}
+      li{margin:4px 0}
       .lead{color:var(--mut);font-size:15px;margin-bottom:24px}
 
       .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px 24px;box-shadow:0 10px 26px rgba(30,50,90,.05);margin-bottom:18px}
@@ -60,6 +62,35 @@
 
       .alg{display:inline-block;background:#1e3957;color:#fff;font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px;margin-right:6px;vertical-align:middle}
 
+      /* TL;DR 結論ボックス */
+      .tldr{background:linear-gradient(135deg,#eef5ff,#e7f6f4);border:1px solid #d3e6fb;border-radius:18px;padding:24px 26px;margin:30px 0 6px;box-shadow:0 10px 26px rgba(30,50,90,.06)}
+      .tldr .t{font-weight:800;font-size:18px;margin:0 0 14px}
+      .tldr ol{margin:0;padding:0;list-style:none;counter-reset:t}
+      .tldr li{counter-increment:t;position:relative;padding:9px 0 9px 42px;color:#26303f;font-size:15px}
+      .tldr li::before{content:counter(t);position:absolute;left:0;top:8px;width:27px;height:27px;border-radius:50%;background:linear-gradient(135deg,#3b80f7,#43c0bd);color:#fff;display:grid;place-items:center;font-weight:800;font-size:13px}
+      .tldr li b{color:#13294d}
+
+      /* 暗号の3つの道具 */
+      .tools{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin:6px 0 4px}
+      .tool{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 18px 16px}
+      .tool .ico{font-size:26px;margin-bottom:8px}
+      .tool h3{margin:0 0 6px;font-size:15.5px}
+      .tool p{margin:0;color:var(--mut);font-size:13.5px}
+
+      /* チェック項目 */
+      .checks{list-style:none;margin:8px 0 4px;padding:0}
+      .checks li{position:relative;padding:10px 0 10px 34px;border-bottom:1px dashed var(--line);font-size:14.5px;color:#2a3445}
+      .checks li:last-child{border-bottom:0}
+      .checks li::before{content:"✓";position:absolute;left:2px;top:9px;color:#15a35a;font-weight:900}
+      .checks b{color:#14336b}
+
+      /* ✓ 検証OK のUIモック */
+      .verify-demo{display:flex;align-items:center;gap:14px;background:#e8f7ee;border:1px solid #bfe6cc;border-radius:14px;padding:15px 18px;margin:10px 0 16px}
+      .verify-demo .badge{flex:0 0 auto;width:40px;height:40px;border-radius:50%;background:#15a35a;color:#fff;display:grid;place-items:center;font-size:21px;font-weight:900}
+      .verify-demo .t{font-size:14px;line-height:1.6}
+      .verify-demo .t b{color:#14633a}
+      .pill{display:inline-flex;align-items:center;gap:8px;background:#eef2f8;border-radius:999px;padding:7px 15px;font-size:13.5px;color:#33415a;margin:2px 0 14px}
+
       .chain{margin:0;padding:0;list-style:none;counter-reset:n}
       .chain li{counter-increment:n;position:relative;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 18px 14px 56px;margin-bottom:10px}
       .chain li::before{content:counter(n);position:absolute;left:14px;top:14px;width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#3b80f7,#43c0bd);color:#fff;display:grid;place-items:center;font-weight:800;font-size:14px}
@@ -71,6 +102,7 @@
       @media (max-width:600px){
         section{padding:32px 0}
         .card{padding:18px}
+        .tldr{padding:18px}
         h2{font-size:19px}
       }
     </style>
@@ -80,111 +112,163 @@
       <div class="wrap">
         <a class="back" href="index.html">← PAssist トップへ</a>
         <h1>🔐 検証に基づく安全性</h1>
-        <p>PAssist のサーバが「GitHub で公開しているコードと同じ」ことを、数学（暗号学）で証明できる仕組みを採用しています。</p>
+        <p>PAssist のサーバが「GitHub で公開しているコードと同じもの」を動かしていることを、<strong>数学（暗号学）</strong>で確かめられます。むずかしい操作は要りません — <strong>ブラウザが自動で検証</strong>して結果を表示します。</p>
       </div>
     </header>
 
+    <section style="padding-top:8px">
+      <div class="wrap">
+        <div class="tldr">
+          <p class="t">まず結論：3つの「数学」で守られています</p>
+          <ol>
+            <li><b>通信は解読できない暗号で守られる</b> — 画面・音声・操作は端末どうしを直接結ぶ暗号で流れ、サーバにも中継業者にも中身は見えません。</li>
+            <li><b>サーバ＝公開コードと同一を証明できる</b> — 「指紋・封印・公開台帳」という3つの数学の道具で、運営者でも後からこっそり書き換えられません。</li>
+            <li><b>しかもブラウザが自動で検証する</b> — 相手の画面の「ℹ︎ → PAssist について」を開くだけ。ブラウザ自身が計算して <strong>✓（一致）</strong> を表示します。インストールも専門知識も不要。</li>
+          </ol>
+        </div>
+        <p class="lead" style="margin-top:18px">以下では、なぜ「数学的に安全」と言い切れるのかを、順を追ってやさしく説明します。</p>
+      </div>
+    </section>
+
     <section>
       <div class="wrap">
-        <h2><span class="num">0</span>まず安心材料：そもそも見られない</h2>
-        <p class="lead">サーバを信用するかどうかの前に、技術的に「サーバが映像を見られない」ことから整理します。</p>
+        <h2><span class="num">1</span>通信は数学的に解読できない</h2>
+        <p class="lead">サーバを信用するかどうかの前に、まず「そもそも中身が見えない」ことから整理します。</p>
 
         <div class="card">
-          <h3>① 映像・音声・操作は P2P 直接通信</h3>
-          <p>WebRTC によりホスト PC と相手のブラウザは <strong>直接</strong>つながります。中央サーバは「最初の引き合わせ（シグナリング）」をするだけで、映像本体はサーバを通りません。</p>
-          <h3>② 通信はすべて DTLS-SRTP で暗号化</h3>
-          <p>映像・音声は <span class="alg">AES-128-GCM</span>、鍵交換は <span class="alg">ECDHE (Curve25519)</span>。鍵はホストと相手の端末でだけ生成され、サーバには一度も渡されません。</p>
-          <h3>③ TURN 中継時も同じ</h3>
-          <p>NAT 越えが難しい場合は TURN サーバが中継しますが、それは<strong>暗号化された塊（SRTP）</strong>を右から左に流すだけ。鍵を持たないので解読不可能です。</p>
+          <h3>① 画面・音声・操作は “端末どうしの直接通信”</h3>
+          <p>WebRTC により、あなたの PC と相手のブラウザは <strong>直接</strong>つながります。中央サーバは「最初の引き合わせ（シグナリング）」をするだけで、<strong>映像の本体はサーバを通りません</strong>。</p>
+          <h3>② 通信はすべて暗号化（DTLS-SRTP）</h3>
+          <p>映像・音声は <span class="alg">AES-128-GCM</span>、鍵交換は <span class="alg">ECDHE (Curve25519)</span>。<strong>鍵はあなたと相手の端末でだけ作られ、サーバには一度も渡りません。</strong>たとえるなら「二人だけが持つ鍵で施錠した箱」を郵送するイメージで、配達業者（サーバ）は中身を開けられません。</p>
+          <h3>③ 中継（TURN）が入っても同じ</h3>
+          <p>ネットワークの都合で TURN サーバが中継する場合も、流れるのは<strong>暗号化された塊（SRTP）</strong>だけ。鍵を持たないので中継業者にも解読できません。</p>
         </div>
 
         <table>
           <thead><tr><th>経路</th><th>暗号化</th><th>鍵を知るのは？</th></tr></thead>
           <tbody>
-            <tr><td>メディア（画面/音声）</td><td>DTLS-SRTP / AES-128-GCM</td><td>ホストとビューアだけ</td></tr>
-            <tr><td>DataChannel（入力）</td><td>SCTP over DTLS</td><td>同上</td></tr>
-            <tr><td>TURN 中継時</td><td>中継するのは暗号化済 SRTP</td><td>TURN サーバは鍵を持たない</td></tr>
+            <tr><td>メディア（画面/音声）</td><td>DTLS-SRTP / AES-128-GCM</td><td>あなたと相手だけ</td></tr>
+            <tr><td>DataChannel（操作入力）</td><td>SCTP over DTLS</td><td>同上</td></tr>
+            <tr><td>TURN 中継時</td><td>中継するのは暗号化済み SRTP</td><td>TURN サーバは鍵を持たない</td></tr>
           </tbody>
         </table>
 
-        <p class="lead">これだけでも「サーバが盗聴できる情報」は<strong>シグナリングの IP アドレスや接続時刻などのメタデータに限られます</strong>。映像の中身は数学的に守られています。</p>
+        <p>使われている暗号は <strong>TLS 1.3 / NIST / IETF</strong> の標準。現在の数学の常識では、総当たりで破るのに<strong>宇宙の年齢を超える計算時間</strong>がかかります。実際の暗号方式は、接続中の「PAssist について」画面に表示されます。</p>
+        <p class="lead">つまりサーバが覗ける情報は、接続時刻や IP などの<strong>メタデータに限られ</strong>、映像の中身は数学的に守られています。</p>
       </div>
     </section>
 
     <section style="background:#eef4fb">
       <div class="wrap">
-        <h2><span class="num">1</span>WebRTC ＝ 数学的に解読不可能</h2>
-        <p>WebRTC は SSL（TLS）の親戚である <strong>DTLS-SRTP</strong> を使います。</p>
-        <ul>
-          <li><strong>鍵交換</strong>：<span class="alg">ECDHE</span> — 楕円曲線ディフィー・ヘルマン鍵共有（前方秘匿性）</li>
-          <li><strong>共通鍵暗号</strong>：<span class="alg">AES-128-GCM</span> — 認証付き暗号化（改ざんも検知）</li>
-          <li><strong>署名</strong>：<span class="alg">ECDSA / Ed25519</span> — DTLS certificate fingerprint で対端末を認証</li>
-        </ul>
-        <p>これらは <strong>NIST、IETF、TLS 1.3</strong> で標準化されており、現在の数学的常識では破るには宇宙の年齢を超える計算時間がかかります。</p>
+        <h2><span class="num">2</span>暗号の「3つの道具」— やさしい解説</h2>
+        <p class="lead">この先の「サーバが公開コードと同じ」を支えるのは、次の3つの数学の道具です。難しい言葉が出てきたら、ここに戻ってください。</p>
+        <div class="tools">
+          <div class="tool">
+            <div class="ico">🔍</div>
+            <h3>① 指紋（ハッシュ／SHA-256）</h3>
+            <p>データを一方向の計算で短い「指紋」に変えます。中身を1文字でも変えると指紋は全く別物に。<b>同じ指紋なら中身も同じ</b>と数学的に言えます（偶然の一致は事実上起こりません）。</p>
+          </div>
+          <div class="tool">
+            <div class="ico">🖋️</div>
+            <h3>② 封印（デジタル署名）</h3>
+            <p>「本人にしか作れず、誰でも本物か確認できる」ハンコです。偽造には秘密鍵が必要。PAssist では署名のたびに<b>使い捨ての鍵</b>を使い、すぐ破棄するので「鍵が漏れて偽造」も起きません。</p>
+          </div>
+          <div class="tool">
+            <div class="ico">📖</div>
+            <h3>③ 公開の台帳（透明性ログ／Rekor）</h3>
+            <p>署名を、世界中から見える<b>「追記しかできない公開ノート」</b>に記録します。後からこっそり消す・書き換えると、数学（ハッシュの木）でバレる仕組みです。</p>
+          </div>
+        </div>
       </div>
     </section>
 
     <section>
       <div class="wrap">
-        <h2><span class="num">2</span>サーバが「公開コードと同じもの」であることを証明</h2>
-        <p>WebRTC で守られているのは「中身（映像）」だけ。<strong>サーバ自体</strong>がコードを書き換えてメタデータを盗む可能性は理論的にゼロではありません。これを防ぐのが <strong>Reproducible Build + Cosign 署名</strong>です。</p>
+        <h2><span class="num">3</span>サーバ＝「公開コードと同じもの」の証明</h2>
+        <p>WebRTC で守られるのは「中身（映像）」だけ。理屈の上では、<strong>サーバ自体</strong>がこっそり改造コードを動かしてメタデータを盗む余地が残ります。これを封じるのが <strong>Reproducible Build ＋ Cosign 署名</strong>です（道具①②③をフル活用）。</p>
 
         <div class="card tinted">
           <h3>Reproducible Build（再現可能ビルド）</h3>
-          <p><strong>同じソースコードから誰がビルドしても、完全に同じバイト列の Docker image が生成される</strong>仕組みです。</p>
-          <p>PAssist の Dockerfile は <code>SOURCE_DATE_EPOCH</code> でファイルのタイムスタンプを git コミット時刻に固定し、<code>npm ci</code> で依存ツリーを <code>package-lock.json</code> 通り厳格に再現します。これにより、<strong>SHA-256 衝突困難性</strong>を根拠に「同じ digest なら同じバイト列」と言えます。</p>
+          <p><strong>同じソースコードから誰がビルドしても、寸分たがわず同じ Docker イメージ（同じ指紋）になる</strong>仕組みです。タイムスタンプを git コミット時刻に固定（<code>SOURCE_DATE_EPOCH</code>）し、依存を <code>package-lock.json</code> 通りに厳格再現（<code>npm ci</code>）。道具①により「同じ指紋＝同じ中身」と確定できます。</p>
         </div>
 
         <div class="card tinted">
-          <h3>Cosign + Sigstore Rekor（鍵なし署名 + 公開ログ）</h3>
-          <p>GitHub Actions が image をビルドした直後に、<strong>GitHub OIDC を使って秘密鍵なしで署名</strong>します。署名は公開の改ざん不可能な台帳 <strong>Sigstore Rekor</strong>（transparency log）に記録され、誰でも検証できます。</p>
-          <p>運営者が秘密鍵を持たないので、「鍵が漏れたら偽造できる」リスクがありません。</p>
+          <h3>Cosign keyless 署名 ＋ Sigstore Rekor</h3>
+          <p>GitHub Actions がイメージをビルドした直後、<strong>GitHub の身分証明（OIDC）を使い、秘密鍵を持たずに</strong>署名します（道具②）。署名は公開の改ざん不能な台帳 <strong>Rekor</strong> に記録されます（道具③）。「この署名は <code>github.com/paps-jp/passist</code> の release ワークフローが作った」という事実が、世界中から検証可能な形で残ります。</p>
+          <p style="margin-bottom:0">運営者は秘密鍵を持たないので、<strong>鍵漏洩による偽造のリスクがありません。</strong></p>
         </div>
       </div>
     </section>
 
     <section style="background:#eef4fb">
       <div class="wrap">
-        <h2><span class="num">3</span>信頼の連鎖</h2>
+        <h2><span class="num">4</span>ブラウザがワンタッチで自動検証 ⭐</h2>
+        <p>ここが PAssist の肝です。<strong>専門知識も追加インストールも不要</strong>。相手の操作画面（ビューア）の右上 <strong>「ℹ︎ → PAssist について」</strong>を開くと、<strong>ブラウザ自身がその場で数学の計算をして</strong>、いま接続しているサーバの正体を検証します。</p>
+
+        <div class="verify-demo">
+          <div class="badge">✓</div>
+          <div class="t"><b>検証OK</b> — このサーバは <code>github.com/paps-jp/passist</code> の公開コードから作られたものです（GitHub Actions が署名・Rekor に記録済み）。</div>
+        </div>
+
+        <p>ブラウザは内部で、サーバから受け取った署名と Sigstore の公開ログを取り寄せ、次を確かめています：</p>
+        <ul class="checks">
+          <li><b>この署名は公開ログに実在する</b> — Rekor の<strong>ハッシュの木（Merkle 証明 / RFC 6962）</strong>を再計算して、台帳に確かに載っていることを確認（道具①③）。</li>
+          <li><b>署名の対象＝いま動いているサーバと一致</b> — 署名された中身の指紋と、稼働中イメージの dig（<code>sha256:…</code>）が一致することを確認（道具①）。</li>
+          <li><b>署名した主体＝正規のリポジトリ</b> — 証明書に記録された発行元が <code>github.com/paps-jp/passist</code> で、発行者が GitHub の OIDC(<code>token.actions.githubusercontent.com</code>)であることを確認（道具②）。</li>
+        </ul>
+        <p class="pill">💡 同じ自動検証は、<strong>ホストアプリ（PAssist.exe）の「PAssist について」</strong>でも実行できます。</p>
+
+        <div class="card warn">
+          <h3>正直な但し書き（透明性のために明記）</h3>
+          <p style="margin-bottom:0">ブラウザ内検証は手軽さのため<strong>一部を簡略化</strong>しています（Rekor 自身の署名や証明書チェーンの完全な検証までは行いません）。日常利用には十分な確認ですが、<strong>「絶対の確証」が欲しいときは下記の <code>cosign verify</code></strong> を使ってください。同じ署名を、省略なしでフル検証します。</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <h2><span class="num">5</span>信頼の連鎖</h2>
+        <p class="lead">ソースコードから、あなたの画面の ✓ まで、すべてが数学でつながっています。</p>
         <ol class="chain">
-          <li><b>Git コミット</b>：ソース改ざんは SHA-256 ハッシュで検知（GitHub が保管）</li>
-          <li><b>GitHub Actions が自動ビルド</b>：ログは誰でも閲覧可能・改ざん不可能</li>
-          <li><b>image を GHCR に公開</b>：digest <code>sha256:…</code> が確定</li>
-          <li><b>Cosign keyless 署名</b>：「この image は <code>github.com/paps-jp/passist</code> の release ワークフローからビルドされた」を Sigstore に記録</li>
-          <li><b>VPS で <code>docker pull</code></b>：pull した瞬間に digest が一致しなければエラー</li>
-          <li><b>誰でも検証可能</b>：cosign verify + 自前で再ビルドして digest 一致を確認</li>
+          <li><b>Git コミット</b>：ソース改ざんは指紋（SHA-256）で検知。GitHub が履歴を保管。</li>
+          <li><b>GitHub Actions が自動ビルド</b>：人手を介さず、ビルドのログは誰でも閲覧可能。</li>
+          <li><b>イメージを GHCR に公開</b>：イメージの指紋 <code>sha256:…</code> が確定。</li>
+          <li><b>Cosign keyless 署名</b>：「<code>paps-jp/passist</code> の release が作った」を Rekor 公開ログに記録。</li>
+          <li><b>VPS で <code>docker pull</code></b>：指紋が一致しなければ取得時点でエラー。</li>
+          <li><b>あなたが検証</b>：ブラウザの自動検証（ワンタッチ）／さらに cosign verify・自前再ビルドでも一致を確認可能。</li>
         </ol>
       </div>
     </section>
 
-    <section>
+    <section style="background:#eef4fb">
       <div class="wrap">
-        <h2><span class="num">4</span>あなたが確認する手順</h2>
+        <h2><span class="num">6</span>上級者向け：自分の手でも確認できる</h2>
+        <p class="lead">ブラウザの ✓ だけで十分ですが、技術に詳しい方は同じことを手元のコマンドで「省略なし」に確かめられます。</p>
 
-        <h3>A. 公開 image の真正性（30秒）</h3>
+        <h3>A. 公開イメージの真正性（30秒・フル検証）</h3>
         <pre><code>cosign verify ghcr.io/paps-jp/passist-signaling@&lt;digest&gt; \
   --certificate-identity-regexp 'https://github.com/paps-jp/passist' \
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'</code></pre>
-        <p>→ Sigstore Rekor の公開ログを参照して「この image は確かに paps-jp/passist の release ワークフローから生まれた」を検証します。</p>
+        <p>→ Sigstore Rekor の公開ログを参照し、「このイメージは確かに paps-jp/passist の release ワークフローから生まれた」を完全に検証します。</p>
 
-        <h3>B. 自分でも同じ digest を再現（数分）</h3>
+        <h3>B. 自分でも同じ指紋を再現（数分）</h3>
         <pre><code>git clone https://github.com/paps-jp/passist
-cd passist && git checkout v0.2.0
+cd passist &amp;&amp; git checkout v0.2.0
 docker buildx build server \
   --build-arg SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) \
   --provenance=mode=max --sbom=true -t local-rebuild
 docker inspect local-rebuild --format='{{.Id}}'
 # → 公開 digest と一致するはず</code></pre>
 
-        <h3>C. 運用中のサーバの自己申告</h3>
+        <h3>C. 運用中サーバの自己申告（入口の確認）</h3>
         <pre><code>curl https://passist.paps.jp/api/build</code></pre>
-        <p>サーバが動かしている commit / image digest / build時刻を返します。これ自体は嘘がつけるので、必ず <strong>A の cosign verify と突き合わせて</strong>判断します。</p>
+        <p>サーバが動かしている commit / イメージ digest / build 時刻を返します。<strong>これ自体は嘘がつける</strong>ので、必ず A の <code>cosign verify</code> と digest を突き合わせて判断します（ブラウザの自動検証も、この digest と署名の一致を確かめています）。</p>
       </div>
     </section>
 
     <section style="background:#fff4ea">
       <div class="wrap">
-        <h2><span class="num">5</span>ライセンス</h2>
+        <h2><span class="num">7</span>ライセンス</h2>
         <p class="lead">PAssist は <a href="https://polyformproject.org/licenses/shield/1.0.0" target="_blank" rel="noopener"><strong>PolyForm Shield License 1.0.0</strong></a> のもとで公開しています。安全性検証のためにコードは公開しつつ、競合製品としての利用を制限するシンプルな Source-Available ライセンスです。</p>
 
         <div class="card success">
@@ -203,7 +287,7 @@ docker inspect local-rebuild --format='{{.Id}}'
             <li>PAssist と<strong>競合する製品やサービス</strong>を作って提供すること（PAssist の代替品として売り出すこと）。</li>
             <li>名称・ブランドの混同を招く形での頒布。</li>
           </ul>
-          <p style="margin-top:10px">「競合」とは、PAssist と機能的・価値的に置き換わる製品を市場に提供することを指します。プラットフォームを変えた移植版、別言語への書き換え、無償提供であっても「機能の代替」として提供する場合は競合に含まれます（ライセンス本文の Noncompete 条項を参照）。</p>
+          <p style="margin-top:10px;margin-bottom:0">「競合」とは、PAssist と機能的・価値的に置き換わる製品を市場に提供することを指します。プラットフォームを変えた移植版、別言語への書き換え、無償提供であっても「機能の代替」として提供する場合は競合に含まれます（ライセンス本文の Noncompete 条項を参照）。</p>
         </div>
 
         <p style="margin-top:16px;color:var(--mut);font-size:14px">詳細は <a href="https://github.com/paps-jp/passist/blob/main/LICENSE" target="_blank" rel="noopener">LICENSE ファイル</a> または <a href="https://polyformproject.org/licenses/shield/1.0.0" target="_blank" rel="noopener">PolyForm Shield License 1.0.0 公式ページ</a> を参照してください。</p>
