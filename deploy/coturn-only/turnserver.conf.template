@@ -1,0 +1,34 @@
+# coturn 設定（TURN専用VPS用）。bootstrap-turn.sh から envsubst で展開する。
+# 変数: ${EXTERNAL_IP} ${THIS_TURN_AUTH_SECRET} ${REALM}
+# このサーバはマスタ TURN_AUTH_SECRET を持たない。signaling 上で計算された派生鍵だけを保持する。
+
+listening-port=3478
+tls-listening-port=5349
+listening-ip=0.0.0.0
+external-ip=${EXTERNAL_IP}
+
+min-port=49152
+max-port=65535
+
+# REST API mode のみ（時限credential）
+use-auth-secret
+static-auth-secret=${THIS_TURN_AUTH_SECRET}
+realm=${REALM}
+
+# 帯域上限。docker-compose.yml の BUDGET_BPS と合わせて運用する（こちらは coturn 自身の物理cap）。
+max-bps=1500000
+bps-capacity=8000000
+total-quota=200
+user-quota=50
+
+# プライベートIP宛のリレー禁止
+denied-peer-ip=10.0.0.0-10.255.255.255
+denied-peer-ip=192.168.0.0-192.168.255.255
+denied-peer-ip=172.16.0.0-172.31.255.255
+denied-peer-ip=169.254.0.0-169.254.255.255
+denied-peer-ip=127.0.0.0-127.255.255.255
+denied-peer-ip=224.0.0.0-239.255.255.255
+
+no-cli
+syslog
+fingerprint

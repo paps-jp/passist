@@ -31,7 +31,16 @@ const SIGN_TURN_URLS = (process.env.SIGN_TURN_URLS || '').split(',').map((s) => 
 const TURN_AUTH_SECRET = process.env.TURN_AUTH_SECRET || '';
 const SIGN_TURN_USERNAME = process.env.SIGN_TURN_USERNAME || 'passist';
 const SIGN_TURN_TTL_SEC = parseInt(process.env.SIGN_TURN_TTL_SEC || String(24 * 3600), 10);
+// 各 TURN の既定帯域上限。POST /admin/turn-register で budgetBps を明示すれば上書きされる。
+const TURN_DEFAULT_BUDGET_BPS = parseInt(process.env.TURN_DEFAULT_BUDGET_BPS || String(4 * 1000 * 1000), 10);
+// heartbeat 仕様。動的登録した TURN は HEARTBEAT_TTL_MS 来ないと自動除外。
+const HEARTBEAT_TTL_MS = parseInt(process.env.HEARTBEAT_TTL_MS || String(5 * 60 * 1000), 10);
 let turnRrIndex = 0;
+
+// 動的 TURN レジストリ: url -> { lastSeen, budgetBps }
+// signaling 起動時は SIGN_TURN_URLS のみ。新 TURN VPS が /admin/turn-register に
+// 派生鍵を proof として POST してくると追加される（heartbeat 60s, TTL 5min）。
+const dynamicTurns = new Map();
 
 // URL→派生鍵 のキャッシュ（マスタ から HMAC で都度計算するのは無駄なので）
 const derivedKeyCache = new Map();
@@ -45,9 +54,23 @@ function deriveSecretFor(url) {
   return k;
 }
 
+// 静的（環境変数）＋動的（heartbeat）で有効な TURN URL のリスト。TTL切れは除外。
+function activeTurnUrls() {
+  const now = Date.now();
+  for (const [url, info] of dynamicTurns) {
+    if (now - info.lastSeen > HEARTBEAT_TTL_MS) dynamicTurns.delete(url);
+  }
+  // 静的を先頭、動的を後ろに（重複は片方のみ）
+  const out = [...SIGN_TURN_URLS];
+  for (const url of dynamicTurns.keys()) if (!out.includes(url)) out.push(url);
+  return out;
+}
+
 function turnForViewer() {
-  if (!SIGN_TURN_URLS.length || !TURN_AUTH_SECRET) return null;
-  const url = SIGN_TURN_URLS[turnRrIndex++ % SIGN_TURN_URLS.length]; // ラウンドロビン
+  if (!TURN_AUTH_SECRET) return null;
+  const urls = activeTurnUrls();
+  if (!urls.length) return null;
+  const url = urls[turnRrIndex++ % urls.length]; // ラウンドロビン
   const derived = deriveSecretFor(url);
   const expiry = Math.floor(Date.now() / 1000) + SIGN_TURN_TTL_SEC;
   const username = `${expiry}:${SIGN_TURN_USERNAME}`;
@@ -92,10 +115,20 @@ const RELAY_MAX_BPS = parseInt(process.env.RELAY_MAX_BPS || String(1500 * 1000),
 function relayCount() {
   let n = 0; for (const s of sessions.values()) if (s.relayViewers) n += s.relayViewers.size; return n;
 }
+// 全 TURN の総帯域。静的TURN は RELAY_BUDGET_BPS をシェアし、動的TURN は登録時の budgetBps を加算。
+// 動的 TURN が増えれば総帯域が増え、1接続あたりの上限も自動的に拡大する。
+function totalBudgetBps() {
+  let total = SIGN_TURN_URLS.length ? RELAY_BUDGET_BPS : 0;
+  const now = Date.now();
+  for (const [url, info] of dynamicTurns) {
+    if (now - info.lastSeen <= HEARTBEAT_TTL_MS) total += info.budgetBps;
+  }
+  return total || RELAY_BUDGET_BPS; // フォールバック：静的1台分
+}
 function calcRelayBitrate() {
   const n = relayCount();
   if (n === 0) return RELAY_MAX_BPS; // 0人なら上限値（実害なし）
-  const v = Math.floor(RELAY_BUDGET_BPS / n);
+  const v = Math.floor(totalBudgetBps() / n);
   return Math.max(RELAY_MIN_BPS, Math.min(RELAY_MAX_BPS, v));
 }
 let lastPolicy = { maxBpsRelay: 0, relayCount: -1 };
@@ -159,6 +192,44 @@ app.get('/s/:token', (_req, res) => {
   noCache(res);
   res.sendFile(path.join(__dirname, 'public', 'viewer.html'));
 });
+
+// 動的 TURN 登録 API。新 TURN サーバが起動時/60秒ごとに heartbeat として POST する。
+// 検証: HMAC-SHA256(MASTER, url) === secret か（=正しい派生鍵を持っているか）。
+// マスタは signaling だけが知るので、正規 TURN VPS（派生鍵を渡された者）しか登録できない。
+app.post('/admin/turn-register', express.json({ limit: '1kb' }), (req, res) => {
+  if (!TURN_AUTH_SECRET) return res.status(503).json({ error: 'master secret not configured' });
+  const { url, secret, budgetBps } = req.body || {};
+  if (typeof url !== 'string' || typeof secret !== 'string') return res.status(400).json({ error: 'url and secret required' });
+  const expected = crypto.createHmac('sha256', TURN_AUTH_SECRET).update(url).digest('hex');
+  // タイミング攻撃対策: 文字列長を揃えて timingSafeEqual
+  let ok = false;
+  try { ok = expected.length === secret.length && crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(secret)); } catch {}
+  if (!ok) return res.status(401).json({ error: 'invalid secret' });
+  const budget = Number.isFinite(budgetBps) && budgetBps > 0
+    ? Math.max(100_000, Math.min(100_000_000, budgetBps | 0))
+    : TURN_DEFAULT_BUDGET_BPS;
+  const existing = dynamicTurns.get(url);
+  dynamicTurns.set(url, { lastSeen: Date.now(), budgetBps: budget });
+  if (!existing) {
+    console.log(`[server] TURN registered: ${url} (budget=${budget})`);
+    broadcastBitratePolicy(); // 新TURN加入で総帯域が増えた → 配分再計算
+  }
+  res.json({ ok: true, heartbeatSec: 60, ttlSec: Math.round(HEARTBEAT_TTL_MS / 1000) });
+});
+
+// 動的 TURN の TTL 監視。5分heartbeat来なかったらレジストリから除外し、配分を再計算。
+setInterval(() => {
+  const now = Date.now();
+  let removed = 0;
+  for (const [url, info] of dynamicTurns) {
+    if (now - info.lastSeen > HEARTBEAT_TTL_MS) {
+      dynamicTurns.delete(url);
+      removed++;
+      console.log(`[server] TURN expired (no heartbeat): ${url}`);
+    }
+  }
+  if (removed) broadcastBitratePolicy();
+}, 60 * 1000);
 
 // viewer の資産配信。index 自動配信は無効（"/" は上のリダイレクトで処理）。
 app.use(express.static(path.join(__dirname, 'public'), { etag: false, setHeaders: noCache, index: false }));
