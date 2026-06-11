@@ -49,12 +49,34 @@
   }
   let cred = loadCred();
 
+  // WebSocket 自動再接続（指数バックオフ）。
+  // ホストが意図的にセッションを終了したケース(ended/denied/expired)は再接続しない。
+  // 信頼クレデンシャル(cred)があれば再接続後の join で自動承認される＝映像はすぐ復旧する。
+  let shouldReconnect = true;       // ended/denied/expired/teardown で false に
+  let reconnectAttempt = 0;          // バックオフ用カウンタ
+  let reconnectTimer = null;         // 再接続のタイマー（多重起動防止）
+  const MAX_RECONNECT = 8;           // 最大試行回数（〜約2分）
+  function clearReconnect() { if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; } }
+  function scheduleReconnect() {
+    if (!shouldReconnect || reconnectTimer) return;
+    if (reconnectAttempt >= MAX_RECONNECT) {
+      setStatus('接続が切断されました。ページを再読み込みして接続し直してください。');
+      return;
+    }
+    const delay = Math.min(30000, 500 * Math.pow(2, reconnectAttempt));
+    reconnectAttempt++;
+    setStatus(`接続が切れました。再接続を試みています…（${reconnectAttempt}/${MAX_RECONNECT}）`);
+    reconnectTimer = setTimeout(() => { reconnectTimer = null; connect(); }, delay);
+  }
+
   function connect() {
+    try { if (ws) { ws.onopen = ws.onclose = ws.onerror = ws.onmessage = null; ws.close(); } } catch {}
+    try { if (pc) { pc.close(); pc = null; } } catch {} // 古いピアを必ず閉じてから張り直す
     ws = new WebSocket(wsUrl);
-    ws.onopen = () => join();
+    ws.onopen = () => { reconnectAttempt = 0; join(); };
     ws.onmessage = (e) => onSignal(JSON.parse(e.data));
-    ws.onclose = () => setStatus('接続が切断されました');
-    ws.onerror = () => setStatus('サーバに接続できません');
+    ws.onclose = () => scheduleReconnect(); // 切断＝自動再接続
+    ws.onerror = () => { /* onclose も呼ばれるので集約 */ };
   }
   function join(pin) {
     ws.send(JSON.stringify({ type: 'viewer:join', token, pin, auth: cred || undefined }));
@@ -75,9 +97,9 @@
         setStatus('接続中… 映像を待っています');
         startPeer();
         break;
-      case 'denied': setStatus(msg.message); teardown(); break;
-      case 'ended': setStatus(msg.message); teardown(); break;
-      case 'expired': setStatus('有効期限が切れました'); teardown(); break;
+      case 'denied': shouldReconnect = false; setStatus(msg.message); teardown(); break;
+      case 'ended': shouldReconnect = false; setStatus(msg.message); teardown(); break;
+      case 'expired': shouldReconnect = false; setStatus('有効期限が切れました'); teardown(); break;
       case 'error':
         if (msg.code === 'pin') showPin('PINを入力してください');
         else setStatus(msg.message);
@@ -365,7 +387,7 @@
     const t = textInput.value;
     if (t) send({ t: 'text', s: t });
     textInput.value = '';
-    textInput.focus(); // 続けて入力できるよう開いたままにする
+    closeTextDialog(); // 挿入後はダイアログを閉じる（連続入力は再度開いて行う）
   }
   function attachTextDialog() {
     if (!textDialog) return;
@@ -544,7 +566,9 @@
   };
 
   function teardown() {
-    try { pc && pc.close(); } catch {}
+    shouldReconnect = false; // 明示的撤収＝自動再接続を止める
+    clearReconnect();
+    try { pc && pc.close(); pc = null; } catch {}
     try { ws && ws.close(); } catch {}
     stage.classList.add('hidden');
     toolbar.classList.add('hidden');
