@@ -90,22 +90,27 @@ function send(ws, obj) {
 const app = express();
 // ビューアの資産はキャッシュさせない（CDN/ブラウザに古い viewer.js/css が残るのを防ぐ）
 const noCache = (res) => res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-app.use(express.static(path.join(__dirname, 'public'), { etag: false, setHeaders: noCache }));
-app.get('/s/:token', (_req, res) => {
-  noCache(res);
-  res.sendFile(path.join(__dirname, 'public', 'viewer.html'));
-});
+
+// ユーザー向けトップと統計画面は GitHub Pages を正とする。301 で恒久リダイレクト。
+// /api/stats（データ取得）と /s/:token（viewer）は機能上ここでしか提供できないので残す。
+const PAGES_BASE = 'https://paps-jp.github.io/passist';
+app.get('/', (_req, res) => res.redirect(301, PAGES_BASE + '/'));
+app.get('/stats', (_req, res) => res.redirect(301, PAGES_BASE + '/stats.html'));
+
 // 公開統計 API（個人情報なし。リアルタイム値と24h/日次サマリのみ）。
 app.get('/api/stats', (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Access-Control-Allow-Origin', '*'); // 外部サイトからの埋め込みも許容
   res.json(stats.snapshot());
 });
-app.get('/stats', (_req, res) => {
+
+app.get('/s/:token', (_req, res) => {
   noCache(res);
-  res.sendFile(path.join(__dirname, 'public', 'stats.html'));
+  res.sendFile(path.join(__dirname, 'public', 'viewer.html'));
 });
-// "/" は public/index.html を express.static が自動配信する。手書きHTMLは削除。
+
+// viewer の資産配信。index 自動配信は無効（"/" は上のリダイレクトで処理）。
+app.use(express.static(path.join(__dirname, 'public'), { etag: false, setHeaders: noCache, index: false }));
 
 const server = useTls
   ? https.createServer({ cert: fs.readFileSync(TLS_CERT), key: fs.readFileSync(TLS_KEY) }, app)
