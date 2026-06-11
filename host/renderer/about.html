@@ -78,40 +78,39 @@
       </div>
     </header>
 
-    <p class="lead">ブラウザだけで、選んだ1ウィンドウを共有・遠隔操作するツール。映像も音声も操作も、すべて <strong>WebRTC で暗号化</strong>されます（DTLS-SRTP / AES-128-GCM）。</p>
+    <p class="lead" id="aboutLead"></p>
 
     <section>
-      <h2>🔐 サーバの真正性（cosign で自動検証）</h2>
-      <div id="serverInfo" class="loading-row"><div class="spinner"></div><span>サーバ情報を取得中…</span></div>
+      <h2 id="verifyHeading">🔐 サーバの真正性</h2>
       <div id="cosignResult"></div>
+      <details style="margin-top:8px"><summary class="muted" style="cursor:pointer" id="serverDetailsLabel">詳細</summary>
+        <div id="serverInfo" class="loading-row" style="margin-top:6px"><div class="spinner"></div><span>...</span></div>
+      </details>
     </section>
 
     <section>
-      <h2>🔧 技術情報</h2>
+      <h2 id="techHeading">🔧</h2>
       <div class="kv" id="techInfo"></div>
     </section>
 
     <section>
-      <h2>📜 著作権・ライセンス</h2>
-      <p>© 2026 特定非営利活動法人ぱっぷす (PAPS)</p>
-      <p>PolyForm Shield License 1.0.0 — Source-Available</p>
-      <p class="muted">使う・改変・自社サービス運用は商用含めて自由。PAssistと競合する製品としての提供のみご遠慮ください。</p>
+      <h2 id="licenseHeading">📜</h2>
+      <p>© 2026 PAPS</p>
+      <p>PolyForm Shield License 1.0.0</p>
+      <p class="muted" id="licenseDesc"></p>
     </section>
 
     <section>
-      <h2>🔗 リンク</h2>
       <div class="links">
-        <button class="primary" data-href="https://paps-jp.github.io/passist/">ホームページ</button>
+        <button class="primary" data-href="https://paps-jp.github.io/passist/" id="linkHomepage"></button>
         <button data-href="https://github.com/paps-jp/passist">GitHub</button>
-        <button data-href="https://github.com/paps-jp/passist/releases">リリース</button>
-        <button data-href="https://paps-jp.github.io/passist/verification.html">安全性の検証</button>
-        <button data-href="https://paps.jp">ぱっぷす</button>
+        <button data-href="https://github.com/paps-jp/passist/releases" id="linkReleases"></button>
+        <button data-href="https://paps-jp.github.io/passist/verification.html" id="linkSecurity"></button>
       </div>
     </section>
-
-    <div class="footer">PAssist は NPO「ぱっぷす」の支援活動から生まれたツールです。</div>
   </div>
 
+  <script src="i18n.js"></script>
   <script src="sigverify.js"></script>
   <script src="about.js"></script>
 </body>

@@ -746,20 +746,22 @@
         <b>registry</b><code>${registry}</code>
       </div>`;
     const digestNoPrefix = (digest || '').replace(/^sha256:/, '');
+    const tr = (k) => (window.t ? window.t(k) : k);
+    const shortS = (s, n) => { s = String(s || ''); return s.length > n ? s.slice(0, n) + '…' : s; };
     if (v.state === 'verified') {
       const vr = v.verify || {};
-      const ts = vr.integratedTime ? new Date(vr.integratedTime * 1000).toISOString() : '';
-      return head('✓ ブラウザで完全検証成功', 'ok')
-        + '<div style="margin-top:4px">SHA-256 Merkle inclusion proof + 申告digest一致 + identity一致を <strong>このブラウザ単独で</strong> 確認しました。</div>'
+      const ts = vr.integratedTime ? new Date(vr.integratedTime * 1000).toISOString().replace('T', ' ').slice(0, 19) : '';
+      return head('✓ ' + tr('verify.success'), 'ok')
+        + `<div style="margin-top:4px">${tr('verify.successDesc')}</div>`
+        + `<details style="margin-top:8px"><summary style="cursor:pointer;color:#9fb0c6">${tr('verify.details')}</summary>`
         + kv
         + `<div class="kv" style="margin-top:6px">
-            <b>署名者</b><code>${vr.subject || ''}</code>
-            <b>発行者</b><code>${vr.issuer || ''}</code>
-            ${ts ? '<b>署名時刻</b><span>' + ts + '</span>' : ''}
-            <b>log index</b><code>${vr.logIndex || ''}</code>
-            <b>root hash</b><code>${vr.rootHash || ''}</code>
+            ${vr.subject ? '<b>' + tr('verify.signer') + '</b><code>' + shortS(vr.subject, 80) + '</code>' : ''}
+            ${ts ? '<b>' + tr('verify.signedAt') + '</b><span>' + ts + '</span>' : ''}
+            ${vr.logIndex ? '<b>' + tr('verify.logIndex') + '</b><code>' + vr.logIndex + '</code>' : ''}
           </div>`
-        + `<div style="margin-top:8px"><a href="https://search.sigstore.dev/?hash=sha256:${vr.checks?.payloadHashMatch?.got || ''}" target="_blank" rel="noopener">🔍 Sigstore で署名を検索 →</a> ・ <a href="${src}/releases/tag/${tag}" target="_blank" rel="noopener">GitHub Release</a> ・ <a href="${src}/actions" target="_blank" rel="noopener">ビルドログ</a></div>`;
+        + `<div style="margin-top:8px"><a href="https://search.sigstore.dev/?hash=sha256:${vr.checks?.payloadHashMatch?.got || ''}" target="_blank" rel="noopener">🔍 Sigstore</a> ・ <a href="${src}/releases/tag/${tag}" target="_blank" rel="noopener">Release</a></div>`
+        + '</details>';
     }
     if (v.state === 'verify-fail') {
       const vr = v.verify || {};
