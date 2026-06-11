@@ -466,24 +466,57 @@ function createTray() {
 }
 
 function showAbout() {
+  const win = mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined;
   let icon;
   try {
     const i = nativeImage.createFromPath(ICON_PATH);
     icon = i && !i.isEmpty() ? i : undefined;
   } catch {}
-  dialog.showMessageBox(mainWindow && !mainWindow.isDestroyed() ? mainWindow : undefined, {
+  const detail = [
+    `PAssist  v${app.getVersion()}`,
+    'ブラウザだけで、選んだ1ウィンドウを共有・遠隔操作',
+    '',
+    '──── 仕組み ────',
+    '• 共有対象は「1つのウィンドウ」のみ — デスクトップ全体は構造的に映りません',
+    '• 相手はインストール・アカウント不要、ブラウザでURLを開くだけ',
+    '• 映像・音声・操作はWebRTC（DTLS-SRTP / AES-128-GCM）で暗号化',
+    '• 鍵交換はECDHE（前方秘匿性） — サーバには鍵が一度も渡りません',
+    '• 中央サーバはシグナリングのみ。メディアはホスト⇔ビューア直接',
+    '',
+    '──── 技術情報 ────',
+    `Electron : ${process.versions.electron}`,
+    `Chromium : ${process.versions.chrome}`,
+    `Node.js  : ${process.versions.node}`,
+    `V8       : ${process.versions.v8}`,
+    `Platform : ${process.platform} ${process.arch}`,
+    '',
+    '──── 著作権・ライセンス ────',
+    '© 2026 特定非営利活動法人ぱっぷす (PAPS)',
+    'PolyForm Shield License 1.0.0（Source-Available）',
+    '使う・自社運用は自由（商用含む）／競合製品としての提供はご遠慮ください',
+    '',
+    '──── サポート ────',
+    'GitHub      : github.com/paps-jp/passist',
+    'ホームページ : paps-jp.github.io/passist',
+    'ぱっぷす    : paps.jp',
+    'リリース    : github.com/paps-jp/passist/releases',
+    'セキュリティ: paps-jp.github.io/passist/verification.html',
+  ].join('\n');
+
+  const choice = dialog.showMessageBoxSync(win, {
     type: 'info',
     title: 'PAssist について',
     message: 'PAssist',
-    detail:
-      `バージョン: ${app.getVersion()}\n` +
-      `Electron: ${process.versions.electron} / Chromium: ${process.versions.chrome}\n\n` +
-      'このPCの1つのウィンドウだけを、ブラウザでリモート操作してもらうツールです。\n' +
-      'https://paps.jp',
+    detail,
     icon,
-    buttons: ['OK'],
+    buttons: ['閉じる', 'GitHub', 'ホームページ', '安全性の検証'],
+    defaultId: 0,
+    cancelId: 0,
     noLink: true,
   });
+  if (choice === 1) shell.openExternal('https://github.com/paps-jp/passist');
+  else if (choice === 2) shell.openExternal('https://paps-jp.github.io/passist/');
+  else if (choice === 3) shell.openExternal('https://paps-jp.github.io/passist/verification.html');
 }
 
 // カスタムのアプリメニュー（Edit / 開発者ツール / ズームは付けない）

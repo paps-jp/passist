@@ -647,11 +647,144 @@
     }
   }
 
+  /* ---------- バージョン情報モーダル + サーバ検証(B) + 暗号化情報(D) ---------- */
+  // B: サーバ /api/build の image digest が Sigstore Rekor の公開transparency logに登録されているか検証する。
+  //   登録されていれば「GitHub Actions の release ワークフローからビルドされた」を暗号学的に確認できる。
+  //   登録がなければサーバの自己申告は信頼できない（嘘の digest を申告した可能性）。
+  // D: getStats() で DTLS state / 暗号アルゴリズム / 経路(P2P or TURN中継)を可視化。
+  async function verifyServerCode() {
+    try {
+      const build = await fetch('/api/build', { cache: 'no-store' }).then((r) => r.json());
+      if (!build || !build.imageDigest) return { state: 'no-attest', build: build || {} };
+      // Sigstore Rekor: image digest を hash として検索（CORS 対応済）
+      const digest = String(build.imageDigest).replace(/^sha256:/, '');
+      const res = await fetch('https://rekor.sigstore.dev/api/v1/index/retrieve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ hash: 'sha256:' + digest }),
+      });
+      if (!res.ok) return { state: 'rekor-fail', build, error: 'Rekor HTTP ' + res.status };
+      const entries = await res.json();
+      if (!entries || !entries.length) return { state: 'not-in-rekor', build };
+      return { state: 'verified', build, rekorEntries: entries };
+    } catch (e) {
+      return { state: 'error', error: e.message };
+    }
+  }
+
+  async function getCryptoInfo() {
+    if (!pc) return null;
+    try {
+      const stats = await pc.getStats();
+      const out = { dtlsState: '-', dtlsCipher: '-', srtpCipher: '-', iceState: pc.iceConnectionState || '-', route: '-', bytesSent: 0, bytesReceived: 0, localCandidate: '-', remoteCandidate: '-' };
+      let selectedPairId = null;
+      for (const s of stats.values()) {
+        if (s.type === 'transport') {
+          out.dtlsState = s.dtlsState || out.dtlsState;
+          out.dtlsCipher = s.dtlsCipher || s.tlsVersion || out.dtlsCipher;
+          out.srtpCipher = s.srtpCipher || out.srtpCipher;
+          out.bytesSent = s.bytesSent || 0;
+          out.bytesReceived = s.bytesReceived || 0;
+          selectedPairId = s.selectedCandidatePairId || selectedPairId;
+        }
+      }
+      for (const s of stats.values()) {
+        if (s.type === 'candidate-pair' && ((selectedPairId && s.id === selectedPairId) || s.nominated)) {
+          const local = stats.get(s.localCandidateId);
+          const remote = stats.get(s.remoteCandidateId);
+          out.localCandidate = local ? local.candidateType : out.localCandidate;
+          out.remoteCandidate = remote ? remote.candidateType : out.remoteCandidate;
+          const isRelay = (local && local.candidateType === 'relay') || (remote && remote.candidateType === 'relay');
+          out.route = isRelay ? 'TURN 中継経由' : 'P2P 直接接続';
+          break;
+        }
+      }
+      return out;
+    } catch { return null; }
+  }
+
+  const aboutModal = document.getElementById('aboutModal');
+  const aboutBtn = document.getElementById('aboutBtn');
+  function openAbout() {
+    if (!aboutModal) return;
+    const host = document.fullscreenElement || document.body;
+    if (aboutModal.parentNode !== host) host.appendChild(aboutModal);
+    aboutModal.classList.remove('hidden');
+    populateAbout();
+  }
+  function closeAbout() { if (aboutModal) aboutModal.classList.add('hidden'); }
+  async function populateAbout() {
+    const sv = document.getElementById('srvVerify');
+    const ci = document.getElementById('cryptoInfo');
+    if (sv) sv.innerHTML = 'Sigstore Rekor に問い合わせ中…';
+    if (ci) ci.innerHTML = '接続状態を取得中…';
+    // B: サーバ検証
+    const v = await verifyServerCode();
+    if (sv) sv.innerHTML = renderVerify(v);
+    // D: 暗号化情報
+    const c = await getCryptoInfo();
+    if (ci) ci.innerHTML = renderCrypto(c);
+  }
+  function renderVerify(v) {
+    const b = v.build || {};
+    const commit = b.commit || '(未公開)';
+    const digest = b.imageDigest || '(未公開)';
+    const registry = b.registry || 'ghcr.io/paps-jp/passist-signaling';
+    const src = b.sourceUrl || 'https://github.com/paps-jp/passist';
+    const head = (label, klass) => `<div><span class="${klass}">${label}</span></div>`;
+    const kv = `<div class="kv">
+        <b>commit</b><code>${commit}</code>
+        <b>digest</b><code>${digest}</code>
+        <b>registry</b><code>${registry}</code>
+      </div>`;
+    switch (v.state) {
+      case 'verified':
+        return head('✓ Sigstore Rekor で確認: 公開コードからビルド・署名された image です', 'ok')
+          + kv
+          + `<div style="margin-top:8px"><a href="https://search.sigstore.dev/?hash=sha256:${(digest||'').replace(/^sha256:/,'')}" target="_blank" rel="noopener">Sigstore で詳細を見る →</a> ・ <a href="${src}/releases" target="_blank" rel="noopener">GitHub リリース →</a></div>`;
+      case 'not-in-rekor':
+        return head('⚠ サーバ申告の digest が Sigstore Rekor に登録されていません', 'warn')
+          + kv
+          + '<div style="margin-top:8px">まだ署名版がリリースされていないか、サーバが本物の digest を申告していない可能性があります。</div>';
+      case 'no-attest':
+        return head('ℹ サーバが image digest を申告していません', 'warn')
+          + '<div>開発中のサーバの可能性があります。手元の cosign で検証してください。</div>'
+          + `<div style="margin-top:6px"><a href="${src}" target="_blank" rel="noopener">GitHub で公開コードを見る →</a></div>`;
+      case 'rekor-fail':
+      case 'error':
+        return head('⚠ 検証に失敗しました', 'ng')
+          + `<div>${v.error || '不明なエラー'}</div>`
+          + '<div style="margin-top:6px">ネットワーク制限で Sigstore に到達できないか、API が一時的に不調かもしれません。</div>';
+      default:
+        return head('? 不明', 'warn');
+    }
+  }
+  function renderCrypto(c) {
+    if (!c) return '接続が確立していません。映像表示後にもう一度開いてください。';
+    const fmtKB = (n) => (n / 1024).toFixed(1) + ' KiB';
+    return `<div class="kv">
+        <b>状態</b><span>DTLS: ${c.dtlsState} / ICE: ${c.iceState}</span>
+        <b>暗号</b><span>${c.dtlsCipher !== '-' ? c.dtlsCipher : 'DTLS-SRTP / AES-128-GCM'}${c.srtpCipher !== '-' ? ' + SRTP ' + c.srtpCipher : ''}</span>
+        <b>経路</b><span>${c.route}（local=${c.localCandidate} / remote=${c.remoteCandidate}）</span>
+        <b>転送量</b><span>送信 ${fmtKB(c.bytesSent)} / 受信 ${fmtKB(c.bytesReceived)}</span>
+      </div>
+      <div style="margin-top:8px;color:#9fb0c6;font-size:11.5px">鍵交換は ECDHE（前方秘匿性）で行われ、鍵はあなたのブラウザとホストPCにしか存在しません。サーバが盗聴しても解読はできません。</div>`;
+  }
+  function attachAbout() {
+    if (aboutBtn) aboutBtn.onclick = openAbout;
+    if (aboutModal) {
+      const cb = document.getElementById('aboutClose');
+      if (cb) cb.onclick = closeAbout;
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !aboutModal.classList.contains('hidden')) closeAbout(); });
+    }
+  }
+
   attachInput();
   attachTextDialog();
   attachClipboardMenu();
   attachKeybar();
   attachModeBtn();
   attachLocalCursor();
+  attachAbout();
   connect();
 })();

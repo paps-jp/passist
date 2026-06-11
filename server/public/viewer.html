@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
     <title>PAssist — リモート操作</title>
-    <link rel="stylesheet" href="/viewer.css?v=22" />
+    <link rel="stylesheet" href="/viewer.css?v=23" />
   </head>
   <body>
     <div id="status" class="status">接続を準備しています…</div>
@@ -25,6 +25,7 @@
       <button id="modeBtn">スクロール</button>
       <button id="kbBtn">⌨ キー</button>
       <button id="fsBtn">全画面</button>
+      <button id="aboutBtn" title="バージョン情報・接続の安全性">ℹ︎</button>
     </div>
 
     <!-- 画面上キーバー（スマホ用。特殊キー/修飾キーをホストへ送る。文字入力はテキスト入力ダイアログ） -->
@@ -78,6 +79,42 @@
       </div>
     </div>
 
-    <script src="/viewer.js?v=22"></script>
+    <!-- バージョン情報モーダル: アプリ情報・サーバ検証(Sigstore Rekor)・暗号化情報を表示 -->
+    <div id="aboutModal" class="aboutdialog hidden">
+      <div class="aboutdialog-head">
+        <h3>PAssist について</h3>
+        <button id="aboutClose" aria-label="閉じる">✕</button>
+      </div>
+      <div class="aboutdialog-body">
+        <section class="about-sec">
+          <h4>PAssist ブラウザビューア</h4>
+          <p class="about-desc">アカウント不要のリモート操作ツール。映像と操作は<strong>あなたのブラウザとホストPCで直接</strong>暗号化通信されます。</p>
+        </section>
+
+        <section class="about-sec">
+          <h4>🔐 サーバの真正性（Sigstore Rekor で検証）</h4>
+          <div id="srvVerify" class="about-block">確認中…</div>
+        </section>
+
+        <section class="about-sec">
+          <h4>🔒 接続の暗号化（WebRTC）</h4>
+          <div id="cryptoInfo" class="about-block">接続後に表示されます。</div>
+        </section>
+
+        <section class="about-sec">
+          <h4>📜 ライセンス</h4>
+          <p>PolyForm Shield License 1.0.0（Source-Available）</p>
+          <p class="about-mut">© 2026 特定非営利活動法人ぱっぷす (PAPS)</p>
+        </section>
+
+        <section class="about-sec about-links">
+          <a href="https://paps-jp.github.io/passist/" target="_blank" rel="noopener">ホームページ</a> ・
+          <a href="https://github.com/paps-jp/passist" target="_blank" rel="noopener">GitHub</a> ・
+          <a href="https://paps-jp.github.io/passist/verification.html" target="_blank" rel="noopener">安全性の検証について</a>
+        </section>
+      </div>
+    </div>
+
+    <script src="/viewer.js?v=23"></script>
   </body>
 </html>
