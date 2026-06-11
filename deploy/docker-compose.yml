@@ -7,7 +7,7 @@ services:
     # 公開リリースの GHCR image を使用（Reproducible Build + Cosign keyless 署名済）。
     # cosign で検証可能：cosign verify ghcr.io/paps-jp/passist-signaling:${SIGNALING_VERSION}
     # ローカル開発時は build セクションで上書きする (override compose)。
-    image: ghcr.io/paps-jp/passist-signaling:${SIGNALING_VERSION:-v0.2.0}
+    image: ghcr.io/paps-jp/passist-signaling:${SIGNALING_VERSION:-v0.2.1}
     pull_policy: ${PULL_POLICY:-missing}
     restart: unless-stopped
     environment:

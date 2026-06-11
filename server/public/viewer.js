@@ -648,25 +648,17 @@
   }
 
   /* ---------- バージョン情報モーダル + サーバ検証(B) + 暗号化情報(D) ---------- */
-  // B: サーバ /api/build の image digest が Sigstore Rekor の公開transparency logに登録されているか検証する。
-  //   登録されていれば「GitHub Actions の release ワークフローからビルドされた」を暗号学的に確認できる。
-  //   登録がなければサーバの自己申告は信頼できない（嘘の digest を申告した可能性）。
+  // B: サーバ /api/build から「動かしている image の commit / digest」を取得して表示する。
+  //   - digest は Cosign 署名対象。利用者は cosign で「公開ソースからビルドされた」を完全検証可能。
+  //   - ブラウザだけで完全検証する API（Rekor index）は image digest 直接検索に対応していないため、
+  //     ここでは「サーバ申告を可視化＋外部検証リンク」を提供する（search.sigstore.dev / cosign コマンド）。
   // D: getStats() で DTLS state / 暗号アルゴリズム / 経路(P2P or TURN中継)を可視化。
   async function verifyServerCode() {
     try {
       const build = await fetch('/api/build', { cache: 'no-store' }).then((r) => r.json());
-      if (!build || !build.imageDigest) return { state: 'no-attest', build: build || {} };
-      // Sigstore Rekor: image digest を hash として検索（CORS 対応済）
-      const digest = String(build.imageDigest).replace(/^sha256:/, '');
-      const res = await fetch('https://rekor.sigstore.dev/api/v1/index/retrieve', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hash: 'sha256:' + digest }),
-      });
-      if (!res.ok) return { state: 'rekor-fail', build, error: 'Rekor HTTP ' + res.status };
-      const entries = await res.json();
-      if (!entries || !entries.length) return { state: 'not-in-rekor', build };
-      return { state: 'verified', build, rekorEntries: entries };
+      if (!build) return { state: 'error', error: 'no response' };
+      if (!build.imageDigest) return { state: 'no-attest', build };
+      return { state: 'reported', build };
     } catch (e) {
       return { state: 'error', error: e.message };
     }
@@ -731,32 +723,33 @@
     const digest = b.imageDigest || '(未公開)';
     const registry = b.registry || 'ghcr.io/paps-jp/passist-signaling';
     const src = b.sourceUrl || 'https://github.com/paps-jp/passist';
+    const builtAt = b.builtAt || '';
     const head = (label, klass) => `<div><span class="${klass}">${label}</span></div>`;
     const kv = `<div class="kv">
         <b>commit</b><code>${commit}</code>
         <b>digest</b><code>${digest}</code>
+        ${builtAt ? '<b>built at</b><span>' + builtAt + '</span>' : ''}
         <b>registry</b><code>${registry}</code>
       </div>`;
+    const digestNoPrefix = (digest || '').replace(/^sha256:/, '');
+    const cosignCmd = `cosign verify ${registry}@${digest}\\\n  --certificate-identity-regexp 'https://github.com/paps-jp/passist'\\\n  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'`;
     switch (v.state) {
-      case 'verified':
-        return head('✓ Sigstore Rekor で確認: 公開コードからビルド・署名された image です', 'ok')
+      case 'reported':
+        return head('✓ サーバが署名済 image digest を公開しています', 'ok')
           + kv
-          + `<div style="margin-top:8px"><a href="https://search.sigstore.dev/?hash=sha256:${(digest||'').replace(/^sha256:/,'')}" target="_blank" rel="noopener">Sigstore で詳細を見る →</a> ・ <a href="${src}/releases" target="_blank" rel="noopener">GitHub リリース →</a></div>`;
-      case 'not-in-rekor':
-        return head('⚠ サーバ申告の digest が Sigstore Rekor に登録されていません', 'warn')
-          + kv
-          + '<div style="margin-top:8px">まだ署名版がリリースされていないか、サーバが本物の digest を申告していない可能性があります。</div>';
+          + `<div style="margin-top:10px">この digest は GitHub Actions の release ワークフローで Cosign keyless 署名され、Sigstore Rekor の公開ログに記録されています。次のいずれかで暗号学的に検証できます:</div>`
+          + `<div style="margin-top:8px"><a href="https://search.sigstore.dev/?hash=sha256:${digestNoPrefix}" target="_blank" rel="noopener">🔍 Sigstore で署名を見る</a> ・ <a href="${src}/releases" target="_blank" rel="noopener">GitHub リリース</a> ・ <a href="${src}/actions" target="_blank" rel="noopener">ビルドログ</a></div>`
+          + `<details style="margin-top:8px"><summary style="cursor:pointer">cosign コマンドで完全検証</summary><pre style="white-space:pre-wrap;word-break:break-all;background:#0b0d10;color:#cfe1ff;padding:8px;border-radius:6px;font-size:11px;margin-top:6px">${cosignCmd}</pre></details>`;
       case 'no-attest':
-        return head('ℹ サーバが image digest を申告していません', 'warn')
-          + '<div>開発中のサーバの可能性があります。手元の cosign で検証してください。</div>'
+        return head('ℹ このサーバはまだ署名版をリリースしていません', 'warn')
+          + `<div class="kv"><b>commit</b><code>${commit}</code></div>`
+          + '<div style="margin-top:8px">開発中・テスト中のサーバの可能性があります。本番運用には署名版（v0.2.0以降のリリース）の使用を推奨します。</div>'
           + `<div style="margin-top:6px"><a href="${src}" target="_blank" rel="noopener">GitHub で公開コードを見る →</a></div>`;
-      case 'rekor-fail':
       case 'error':
-        return head('⚠ 検証に失敗しました', 'ng')
-          + `<div>${v.error || '不明なエラー'}</div>`
-          + '<div style="margin-top:6px">ネットワーク制限で Sigstore に到達できないか、API が一時的に不調かもしれません。</div>';
+        return head('⚠ サーバ情報の取得に失敗しました', 'ng')
+          + `<div>${v.error || '不明なエラー'}</div>`;
       default:
-        return head('? 不明', 'warn');
+        return head('? 不明な状態', 'warn');
     }
   }
   function renderCrypto(c) {
