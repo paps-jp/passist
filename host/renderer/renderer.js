@@ -147,13 +147,22 @@
       window.host.settingsSet({ sessionTtlMinutes: v });
       renderChips();
     });
-    // ⚙ 設定モーダル: 開く/閉じる（×ボタン・背景クリック・ESC）
+    // ⚙ 設定 / ⋯ くわしい設定 モーダル: 開く/閉じる（×ボタン・背景クリック・ESC）
     const openSettings = () => $('settingsModal').classList.remove('hidden');
     const closeSettings = () => $('settingsModal').classList.add('hidden');
     $('settingsBtn').onclick = openSettings;
     $('settingsClose').onclick = closeSettings;
     $('settingsModal').addEventListener('click', (e) => { if (e.target.id === 'settingsModal') closeSettings(); });
-    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('settingsModal').classList.contains('hidden')) closeSettings(); });
+    const openAdvanced = () => $('advancedModal').classList.remove('hidden');
+    const closeAdvanced = () => $('advancedModal').classList.add('hidden');
+    $('openAdvanced').onclick = openAdvanced;
+    $('advancedClose').onclick = closeAdvanced;
+    $('advancedModal').addEventListener('click', (e) => { if (e.target.id === 'advancedModal') closeAdvanced(); });
+    document.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape') return;
+      if (!$('settingsModal').classList.contains('hidden')) closeSettings();
+      else if (!$('advancedModal').classList.contains('hidden')) closeAdvanced();
+    });
     // QRコードの開閉（既定は開）。相手はスマホのカメラで読み取って接続できる。
     $('qrToggle').onclick = () => {
       const shown = $('qrPanel').classList.toggle('hidden') === false;
