@@ -253,6 +253,15 @@ body.view-only #kbBtn { display: none !important; }
 .about-links { text-align: center; font-size: 13px; color: #9fb0c6; }
 .about-links a { color: #8ab4ff; text-decoration: none; }
 .about-links a:hover { text-decoration: underline; }
+.about-links .lang-btn {
+  background: transparent; color: #8ab4ff; border: 1px solid #2a313b;
+  font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 999px;
+  cursor: pointer; font-family: inherit; margin: 0 3px; transition: .15s;
+}
+.about-links .lang-btn:hover { background: #2a313b; }
+.about-links .lang-btn.active {
+  background: #2b6cff; color: #fff; border-color: #2b6cff; cursor: default;
+}
 #aboutBtn { padding: 6px 10px; font-size: 14px; }
 
 /* クライアント側ローカルカーソル（VNC風・即時描画） */

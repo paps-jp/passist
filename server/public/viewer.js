@@ -15,10 +15,12 @@
   const pinBtn = $('pinBtn');
   const fsBtn = $('fsBtn');
 
-  const setStatus = (t, show = true) => {
-    statusEl.textContent = t;
+  const setStatus = (msg, show = true) => {
+    statusEl.textContent = msg;
     statusEl.classList.toggle('hidden', !show);
   };
+  // i18n ヘルパ (window.t は i18n.js が定義。 未ロードならキーをそのまま返す)
+  const tr = (k) => (window.t ? window.t(k) : k);
 
   let ws, pc, dc;
   let controlEnabled = true; // ホストが「閲覧のみ」を通知したら false（操作入力を一切送らない）
@@ -60,12 +62,12 @@
   function scheduleReconnect() {
     if (!shouldReconnect || reconnectTimer) return;
     if (reconnectAttempt >= MAX_RECONNECT) {
-      setStatus('接続が切断されました。ページを再読み込みして接続し直してください。');
+      setStatus(tr('viewer.status.reconnectFail'));
       return;
     }
     const delay = Math.min(30000, 500 * Math.pow(2, reconnectAttempt));
     reconnectAttempt++;
-    setStatus(`接続が切れました。再接続を試みています…（${reconnectAttempt}/${MAX_RECONNECT}）`);
+    setStatus(tr('viewer.status.reconnect').replace('{n}', reconnectAttempt).replace('{max}', MAX_RECONNECT));
     reconnectTimer = setTimeout(() => { reconnectTimer = null; connect(); }, delay);
   }
 
@@ -94,14 +96,14 @@
         }
         // signaling から TURN credentials が配布されていれば iceServers に追加（NAT越え強化）
         if (msg.turn && msg.turn.urls && msg.turn.username && msg.turn.credential) turnFromServer = msg.turn;
-        setStatus('接続中… 映像を待っています');
+        setStatus(tr('viewer.status.connecting'));
         startPeer();
         break;
       case 'denied': shouldReconnect = false; setStatus(msg.message); teardown(); break;
       case 'ended': shouldReconnect = false; setStatus(msg.message); teardown(); break;
-      case 'expired': shouldReconnect = false; setStatus('有効期限が切れました'); teardown(); break;
+      case 'expired': shouldReconnect = false; setStatus(tr('viewer.status.expired')); teardown(); break;
       case 'error':
-        if (msg.code === 'pin') showPin('PINを入力してください');
+        if (msg.code === 'pin') showPin(tr('viewer.pin.label'));
         else setStatus(msg.message);
         break;
       case 'signal': handleSignal(msg.data); break;
@@ -150,7 +152,7 @@
     };
     pc.onconnectionstatechange = () => {
       if (['failed', 'disconnected'].includes(pc.connectionState)) {
-        setStatus('接続が不安定です (' + pc.connectionState + ')');
+        setStatus(tr('viewer.status.unstable').replace('{state}', pc.connectionState));
       }
     };
   }
@@ -240,7 +242,11 @@
       mouse: svg('<path d="M4 3l6.5 16 2.3-6.8 6.8-2.3L4 3z"/><path d="M13.5 13.5L19 19"/>'),
       pan: svg('<polyline points="5 9 2 12 5 15"/><polyline points="9 5 12 2 15 5"/><polyline points="15 19 12 22 9 19"/><polyline points="19 9 22 12 19 15"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/>'),
     };
-    const TEXT = { scroll: 'スクロール', mouse: 'マウス', pan: '画面移動' };
+    const TEXT = {
+      scroll: tr('viewer.toolbar.modeScroll'),
+      mouse: tr('viewer.toolbar.modeMouse'),
+      pan: tr('viewer.toolbar.modePan'),
+    };
     const set = (m) => { touchMode = m; modeBtn.innerHTML = ICON[m] + '<span>' + TEXT[m] + '</span>'; };
     set('scroll');
     modeBtn.onclick = () => set(MODES[(MODES.indexOf(touchMode) + 1) % MODES.length]); // タップで順に切替
@@ -416,11 +422,11 @@
     textOverwriteMode = true;
     openTextDialog();
     textInput.value = '';
-    textInput.placeholder = '現在の値を取得しています…';
+    textInput.placeholder = tr('viewer.textInputPh.loading');
     send({ t: 'readtext' }); // ホストへ値要求
     if (fieldReadTimer) clearTimeout(fieldReadTimer);
     fieldReadTimer = setTimeout(() => {
-      textInput.placeholder = '取得に失敗しました。新規入力 → 挿入で上書きされます。';
+      textInput.placeholder = tr('viewer.textInputPh.failed');
       fieldReadTimer = null;
     }, 1800);
   }
@@ -430,10 +436,10 @@
     if (aborted === 'clipboard-has-files') {
       // ホスト側のクリップボードにファイル等が入っていて、復元すると壊れるため取得をスキップ。
       textInput.value = '';
-      textInput.placeholder = 'ホストのクリップボードにファイル等があるため現在値を取得しませんでした。新規入力で上書きされます。';
+      textInput.placeholder = tr('viewer.textInputPh.file');
     } else if (aborted) {
       textInput.value = '';
-      textInput.placeholder = '現在値の取得をスキップしました（' + aborted + '）。新規入力で上書きされます。';
+      textInput.placeholder = tr('viewer.textInputPh.skipped').replace('{reason}', aborted);
     } else {
       textInput.value = s;
       textInput.placeholder = '';
@@ -633,10 +639,10 @@
     controlEnabled = !(m && m.readonly);
     const badge = document.getElementById('badge');
     if (controlEnabled) {
-      if (badge) { badge.textContent = '● 操作中'; badge.classList.remove('readonly'); }
+      if (badge) { badge.textContent = tr('viewer.badge.active'); badge.classList.remove('readonly'); }
       document.body.classList.remove('view-only');
     } else {
-      if (badge) { badge.textContent = '● 閲覧のみ'; badge.classList.add('readonly'); }
+      if (badge) { badge.textContent = tr('viewer.badge.viewOnly'); badge.classList.add('readonly'); }
       document.body.classList.add('view-only');
       gate.classList.add('hidden'); // 「クリックして操作を開始」ゲートは不要
       hasFocus = false;
@@ -720,8 +726,8 @@
   async function populateAbout() {
     const sv = document.getElementById('srvVerify');
     const ci = document.getElementById('cryptoInfo');
-    if (sv) sv.innerHTML = 'Sigstore Rekor に問い合わせ中…';
-    if (ci) ci.innerHTML = '接続状態を取得中…';
+    if (sv) sv.innerHTML = tr('viewer.populateLoadingVerify');
+    if (ci) ci.innerHTML = tr('viewer.populateLoadingCrypto');
     // B: サーバ検証
     const v = await verifyServerCode();
     if (sv) sv.innerHTML = renderVerify(v);
@@ -731,8 +737,8 @@
   }
   function renderVerify(v) {
     const b = v.build || {};
-    const commit = b.commit || '(未公開)';
-    const digest = b.imageDigest || '(未公開)';
+    const commit = b.commit || tr('viewer.unsetValue');
+    const digest = b.imageDigest || tr('viewer.unsetValue');
     const registry = b.registry || 'ghcr.io/paps-jp/passist-signaling';
     const src = b.sourceUrl || 'https://github.com/paps-jp/passist';
     const builtAt = b.builtAt || '';
@@ -746,7 +752,6 @@
         <b>registry</b><code>${registry}</code>
       </div>`;
     const digestNoPrefix = (digest || '').replace(/^sha256:/, '');
-    const tr = (k) => (window.t ? window.t(k) : k);
     const shortS = (s, n) => { s = String(s || ''); return s.length > n ? s.slice(0, n) + '…' : s; };
     if (v.state === 'verified') {
       const vr = v.verify || {};
@@ -766,38 +771,41 @@
     if (v.state === 'verify-fail') {
       const vr = v.verify || {};
       const chk = vr.checks || {};
-      return head('✗ ブラウザ検証失敗', 'ng')
+      return head('✗ ' + tr('viewer.renderVerifyFail'), 'ng')
         + `<div style="margin-top:4px">${vr.error || ''}</div>`
         + `<div class="kv" style="margin-top:6px">
-            <b>Merkle proof</b><span>${chk.merkleProof?.ok ? '✓' : '✗ ' + (chk.merkleProof?.error || '')}</span>
-            <b>digest 一致</b><span>${chk.digestMatch?.ok ? '✓' : '✗ got=' + (chk.digestMatch?.got || '')}</span>
-            <b>identity 一致</b><span>${chk.identityMatch?.ok ? '✓' : '✗ uri=' + (chk.identityMatch?.uri || '')}</span>
+            <b>${tr('viewer.renderMerkleProof')}</b><span>${chk.merkleProof?.ok ? '✓' : '✗ ' + (chk.merkleProof?.error || '')}</span>
+            <b>${tr('viewer.renderDigestMatch')}</b><span>${chk.digestMatch?.ok ? '✓' : '✗ got=' + (chk.digestMatch?.got || '')}</span>
+            <b>${tr('viewer.renderIdentityMatch')}</b><span>${chk.identityMatch?.ok ? '✓' : '✗ uri=' + (chk.identityMatch?.uri || '')}</span>
           </div>`
         + kv;
     }
     if (v.state === 'bundle-fail' || v.state === 'lib-missing') {
-      return head('⚠ 検証準備に失敗: ' + v.state, 'warn')
+      return head(tr('viewer.renderBundleFail') + ': ' + v.state, 'warn')
         + `<div>${v.error || ''}</div>`
         + kv;
     }
     if (v.state === 'no-attest') {
-      return head('ℹ このサーバはまだ署名版をリリースしていません', 'warn')
+      return head(tr('viewer.renderNotReleased'), 'warn')
         + `<div class="kv"><b>commit</b><code>${commit}</code></div>`
-        + '<div style="margin-top:8px">開発中・テスト中のサーバの可能性があります。本番運用には署名版（v0.2.x以降のリリース）の使用を推奨します。</div>'
-        + `<div style="margin-top:6px"><a href="${src}" target="_blank" rel="noopener">GitHub で公開コードを見る →</a></div>`;
+        + `<div style="margin-top:8px">${tr('viewer.renderDevServer')}</div>`
+        + `<div style="margin-top:6px"><a href="${src}" target="_blank" rel="noopener">${tr('viewer.renderSeeGithub')}</a></div>`;
     }
-    return head('⚠ サーバ情報の取得に失敗しました', 'ng') + `<div>${v.error || '不明なエラー'}</div>`;
+    return head(tr('viewer.renderFetchFail'), 'ng') + `<div>${v.error || tr('viewer.renderUnknownError')}</div>`;
   }
   function renderCrypto(c) {
-    if (!c) return '接続が確立していません。映像表示後にもう一度開いてください。';
+    if (!c) return tr('viewer.renderNotConnected');
     const fmtKB = (n) => (n / 1024).toFixed(1) + ' KiB';
+    const routeStr = c.route === 'TURN 中継経由' ? tr('crypto.routeTurn')
+                   : c.route === 'P2P 直接接続' ? tr('crypto.routeP2P')
+                   : c.route;
     return `<div class="kv">
-        <b>状態</b><span>DTLS: ${c.dtlsState} / ICE: ${c.iceState}</span>
-        <b>暗号</b><span>${c.dtlsCipher !== '-' ? c.dtlsCipher : 'DTLS-SRTP / AES-128-GCM'}${c.srtpCipher !== '-' ? ' + SRTP ' + c.srtpCipher : ''}</span>
-        <b>経路</b><span>${c.route}（local=${c.localCandidate} / remote=${c.remoteCandidate}）</span>
-        <b>転送量</b><span>送信 ${fmtKB(c.bytesSent)} / 受信 ${fmtKB(c.bytesReceived)}</span>
+        <b>${tr('crypto.state')}</b><span>DTLS: ${c.dtlsState} / ICE: ${c.iceState}</span>
+        <b>${tr('crypto.cipher')}</b><span>${c.dtlsCipher !== '-' ? c.dtlsCipher : 'DTLS-SRTP / AES-128-GCM'}${c.srtpCipher !== '-' ? ' + SRTP ' + c.srtpCipher : ''}</span>
+        <b>${tr('crypto.route')}</b><span>${routeStr}（local=${c.localCandidate} / remote=${c.remoteCandidate}）</span>
+        <b>${tr('crypto.bytes')}</b><span>${tr('viewer.renderSend')} ${fmtKB(c.bytesSent)} / ${tr('viewer.renderRecv')} ${fmtKB(c.bytesReceived)}</span>
       </div>
-      <div style="margin-top:8px;color:#9fb0c6;font-size:11.5px">鍵交換は ECDHE（前方秘匿性）で行われ、鍵はあなたのブラウザとホストPCにしか存在しません。サーバが盗聴しても解読はできません。</div>`;
+      <div style="margin-top:8px;color:#9fb0c6;font-size:11.5px">${tr('crypto.note')}</div>`;
   }
   function attachAbout() {
     if (aboutBtn) aboutBtn.onclick = openAbout;
