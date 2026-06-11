@@ -10,14 +10,14 @@
     "dist": "electron-builder --win portable"
   },
   "dependencies": {
-    "@nut-tree-fork/nut-js": "latest",
+    "@nut-tree-fork/nut-js": "4.2.6",
     "koffi": "^3.0.2",
     "qrcode": "^1.5.4"
   },
   "devDependencies": {
-    "@electron/rebuild": "latest",
-    "electron": "latest",
-    "electron-builder": "latest",
+    "@electron/rebuild": "^4.0.4",
+    "electron": "42.3.3",
+    "electron-builder": "26.15.2",
     "png-to-ico": "^3.0.1",
     "sharp": "^0.34.5"
   },

@@ -1,0 +1,41 @@
+version: 2
+# 月1で update PR を自動作成。security alert は即時。
+# 大きな破壊変更が起きやすいパッケージはメジャー更新を ignore。
+updates:
+  - package-ecosystem: npm
+    directory: /server
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 5
+    groups:
+      server-deps:
+        patterns: ['*']
+
+  - package-ecosystem: npm
+    directory: /host
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 5
+    ignore:
+      # Electron 系は major アップデートで API 破壊が定期的に起きる。
+      # 互換性確認後に手動で上げるため、自動 PR は minor/patch のみ。
+      - dependency-name: electron
+        update-types: [version-update:semver-major]
+      - dependency-name: electron-builder
+        update-types: [version-update:semver-major]
+      - dependency-name: '@electron/rebuild'
+        update-types: [version-update:semver-major]
+      # Win32 ネイティブ依存（FFI/オートメーション）。互換性を都度確認。
+      - dependency-name: '@nut-tree-fork/nut-js'
+        update-types: [version-update:semver-major]
+      - dependency-name: koffi
+        update-types: [version-update:semver-major]
+    groups:
+      host-deps:
+        patterns: ['*']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: monthly }
+    open-pull-requests-limit: 3
+    groups:
+      actions:
+        patterns: ['*']
