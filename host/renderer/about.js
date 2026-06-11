@@ -59,11 +59,15 @@
       const wsUrl = new URL(signalWs);
       const httpProto = wsUrl.protocol === 'wss:' ? 'https:' : 'http:';
       const apiBase = `${httpProto}//${wsUrl.host}`;
-      const bRes = await fetch(apiBase + build.bundleUrl);
+      const [bRes, sRes] = await Promise.all([
+        fetch(apiBase + build.bundleUrl),
+        build.signatureUrl ? fetch(apiBase + build.signatureUrl) : Promise.resolve(null),
+      ]);
       if (!bRes.ok) return { ok: false, reason: 'bundle_fetch_failed', error: 'HTTP ' + bRes.status };
       const bundle = await bRes.json();
+      const signatureArtifact = sRes && sRes.ok ? await sRes.json() : null;
       const result = await window.__passistSigVerify.verifyBundle(
-        bundle, build.imageDigest, build.certificateIdentityRegexp, build.certificateOidcIssuer
+        bundle, build.imageDigest, build.certificateIdentityRegexp, build.certificateOidcIssuer, signatureArtifact
       );
       return result;
     } catch (e) {

@@ -119,10 +119,11 @@
   // @param bundle: bundle.json をパースしたオブジェクト
   // @param expectedDigest: /api/build の imageDigest (sha256:...) 形式
   // @param expectedIdentityRegexp: 期待する subject (https://github.com/paps-jp/passist)
-  // 入力: Rekor REST API のエントリ形式（{"<UUID>": {body, verification, ...}}）または
-  // Sigstore Bundle 形式（{verificationMaterial: {tlogEntries: [...]}}）どちらも受け付ける。
-  async function verifyBundle(input, expectedDigest, expectedIdentityRegexp, expectedIssuer) {
-    const checks = { merkleProof: null, digestMatch: null, identityMatch: null, issuerMatch: null };
+  // 入力1: Rekor entry (UUID-keyed object) or Sigstore Bundle
+  // 入力2: cosign download signature の出力 ([{Payload(base64), Cert, Chain, Base64Signature}])
+  //        ※ なくても部分検証は可。 ある場合は payload 内の docker-manifest-digest を厳密 verify。
+  async function verifyBundle(input, expectedDigest, expectedIdentityRegexp, expectedIssuer, signatureArtifact) {
+    const checks = { merkleProof: null, payloadHashMatch: null, digestMatch: null, identityMatch: null, issuerMatch: null };
     try {
       // ---- フォーマット正規化 ----
       let tlog = null;
@@ -157,11 +158,28 @@
       checks.merkleProof = merkle;
       if (!merkle.ok) return { ok: false, error: 'Merkle inclusion proof failed: ' + merkle.error, checks };
 
-      // 2. body (hashedrekord JSON) を解析して image digest を取り出す
+      // 2. body (hashedrekord) の hash 値 = Payload(simplesigning JSON) の SHA-256。
+      //    cosign signature artifact から Payload を取り、 ① hash 一致 ② 中の docker-manifest-digest 確認。
       const bodyJson = JSON.parse(bytesToString(bodyBytes));
+      const rekorHashValue = bodyJson.spec?.data?.hash?.value || '';
       let extractedDigest = '';
-      if (bodyJson.spec?.data?.hash?.value) {
-        extractedDigest = 'sha256:' + bodyJson.spec.data.hash.value;
+      let payloadHashOk = false;
+      if (signatureArtifact && Array.isArray(signatureArtifact) && signatureArtifact[0]?.Payload) {
+        // Payload は base64 encoded simplesigning JSON
+        const payloadB64 = signatureArtifact[0].Payload;
+        const payloadBytes = base64ToBytes(payloadB64);
+        // ① payload SHA-256 が rekor entry の hash と一致するか
+        const computedHash = await sha256(payloadBytes);
+        const computedHex = bytesToHex(computedHash);
+        payloadHashOk = computedHex === rekorHashValue;
+        checks.payloadHashMatch = { ok: payloadHashOk, got: computedHex, expected: rekorHashValue };
+        // ② payload 内の docker-manifest-digest を抽出
+        if (payloadHashOk) {
+          try {
+            const payloadJson = JSON.parse(bytesToString(payloadBytes));
+            extractedDigest = payloadJson?.critical?.image?.['docker-manifest-digest'] || '';
+          } catch {}
+        }
       } else if (input.messageSignature?.messageDigest?.digest) {
         const md = input.messageSignature.messageDigest.digest;
         extractedDigest = 'sha256:' + bytesToHex(base64ToBytes(md));
@@ -171,7 +189,9 @@
 
       // 3. certificate (base64 encoded PEM) を取り出して identity を抽出
       let certInput = null;
-      if (bodyJson.spec?.signature?.publicKey?.content) {
+      if (signatureArtifact?.[0]?.Cert) {
+        certInput = signatureArtifact[0].Cert;
+      } else if (bodyJson.spec?.signature?.publicKey?.content) {
         // hashedrekord: publicKey.content は base64-encoded PEM
         certInput = atob(bodyJson.spec.signature.publicKey.content);
       } else if (input.verificationMaterial?.certificate?.rawBytes) {
@@ -185,7 +205,9 @@
       checks.issuerMatch = { ok: !!(ident && ident.issuer === expectedIssuer), got: ident?.issuer || '' };
 
       const integratedTime = Number(tlog.integratedTime) || null;
-      const allOk = checks.merkleProof?.ok && checks.digestMatch?.ok && checks.identityMatch?.ok;
+      // signatureArtifact があれば「payload hash 一致 + payload 内の digest 一致」 まで含めて完全 verify
+      const allOk = checks.merkleProof?.ok && checks.identityMatch?.ok
+        && (signatureArtifact ? (checks.payloadHashMatch?.ok && checks.digestMatch?.ok) : true);
       return {
         ok: !!allOk,
         checks,

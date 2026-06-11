@@ -658,13 +658,17 @@
       const build = await fetch('/api/build', { cache: 'no-store' }).then((r) => r.json());
       if (!build) return { state: 'error', error: 'no response' };
       if (!build.imageDigest || !build.bundleUrl) return { state: 'no-attest', build };
-      // ブラウザ自前 verify: sigverify.js が SHA-256 Merkle proof を独立に検証
+      // ブラウザ自前 verify: sigverify.js が SHA-256 Merkle proof + payload を独立に検証
       if (!window.__passistSigVerify) return { state: 'lib-missing', build, error: 'sigverify.js not loaded' };
-      const bRes = await fetch(build.bundleUrl);
+      const [bRes, sRes] = await Promise.all([
+        fetch(build.bundleUrl),
+        build.signatureUrl ? fetch(build.signatureUrl) : Promise.resolve(null),
+      ]);
       if (!bRes.ok) return { state: 'bundle-fail', build, error: 'HTTP ' + bRes.status };
       const bundle = await bRes.json();
+      const signatureArtifact = sRes && sRes.ok ? await sRes.json() : null;
       const v = await window.__passistSigVerify.verifyBundle(
-        bundle, build.imageDigest, build.certificateIdentityRegexp, build.certificateOidcIssuer
+        bundle, build.imageDigest, build.certificateIdentityRegexp, build.certificateOidcIssuer, signatureArtifact
       );
       return { state: v.ok ? 'verified' : 'verify-fail', build, verify: v };
     } catch (e) {

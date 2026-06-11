@@ -102,6 +102,10 @@ jobs:
           mkdir -p artifacts
           curl -sf "https://rekor.sigstore.dev/api/v1/log/entries?logIndex=${LOG_INDEX}" \
             -o "artifacts/signaling-${TAG}.rekor-entry.json"
+          # 3b. cosign signature artifact（Payload + signature + Cert）をダウンロードして保存
+          #     hashedrekord の hash は Payload の SHA-256 なので、 ブラウザはこの Payload を取得して
+          #     ① rekor entry の hash と一致 ② Payload 内の docker-manifest-digest を抽出 して厳密検証する。
+          cosign download signature "${IMAGE}@${DIGEST}" > "artifacts/signaling-${TAG}.signature.json"
           # 4. メタ情報を同梱
           cat > "artifacts/signaling-${TAG}.meta.json" <<EOF
           {

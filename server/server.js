@@ -186,6 +186,7 @@ const BUILD_INFO = Object.freeze({
   // ブラウザ単独 verify の入口。 sigverify.js が /api/cosign/bundle から bundle を取得し、
   // 自前で SHA-256 Merkle inclusion proof を verify する（@sigstore/verify を使わない軽量実装）
   bundleUrl: process.env.GIT_TAG ? `/api/cosign/bundle?tag=${encodeURIComponent(process.env.GIT_TAG)}` : '',
+  signatureUrl: process.env.GIT_TAG ? `/api/cosign/signature?tag=${encodeURIComponent(process.env.GIT_TAG)}` : '',
   certificateIdentityRegexp: 'https://github.com/paps-jp/passist',
   certificateOidcIssuer: 'https://token.actions.githubusercontent.com',
   cosignVerifyHint:
@@ -223,6 +224,31 @@ app.get('/api/cosign/bundle', async (req, res) => {
     if (!r.ok) return res.status(r.status).json({ error: 'bundle fetch failed', status: r.status });
     const text = await r.text();
     bundleCache.set(tag, { fetchedAt: now, payload: text, contentType: 'application/json' });
+    res.type('application/json').send(text);
+  } catch (e) {
+    res.status(502).json({ error: 'upstream error', message: e.message });
+  }
+});
+
+// /api/cosign/signature: cosign download signature の出力 (Payload + Cert) を中継。
+// ブラウザは Payload (base64) を decode して中の docker-manifest-digest を確認する。
+const signatureCache = new Map();
+app.get('/api/cosign/signature', async (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const tag = typeof req.query.tag === 'string' && /^v[0-9.]+$/.test(req.query.tag) ? req.query.tag : null;
+  if (!tag) return res.status(400).json({ error: 'tag query parameter required' });
+  const now = Date.now();
+  const cached = signatureCache.get(tag);
+  if (cached && now - cached.fetchedAt < BUNDLE_CACHE_TTL_MS) {
+    return res.type(cached.contentType).send(cached.payload);
+  }
+  try {
+    const url = `https://github.com/paps-jp/passist/releases/download/${encodeURIComponent(tag)}/signaling-${encodeURIComponent(tag)}.signature.json`;
+    const r = await fetch(url, { redirect: 'follow' });
+    if (!r.ok) return res.status(r.status).json({ error: 'signature fetch failed', status: r.status });
+    const text = await r.text();
+    signatureCache.set(tag, { fetchedAt: now, payload: text, contentType: 'application/json' });
     res.type('application/json').send(text);
   } catch (e) {
     res.status(502).json({ error: 'upstream error', message: e.message });
