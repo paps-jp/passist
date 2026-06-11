@@ -164,9 +164,11 @@
       const rekorHashValue = bodyJson.spec?.data?.hash?.value || '';
       let extractedDigest = '';
       let payloadHashOk = false;
-      if (signatureArtifact && Array.isArray(signatureArtifact) && signatureArtifact[0]?.Payload) {
+      // cosign download signature は cosign バージョンにより配列 or 単一オブジェクトを返すので両対応
+      const sigObj = Array.isArray(signatureArtifact) ? signatureArtifact[0] : signatureArtifact;
+      if (sigObj && sigObj.Payload) {
         // Payload は base64 encoded simplesigning JSON
-        const payloadB64 = signatureArtifact[0].Payload;
+        const payloadB64 = sigObj.Payload;
         const payloadBytes = base64ToBytes(payloadB64);
         // ① payload SHA-256 が rekor entry の hash と一致するか
         const computedHash = await sha256(payloadBytes);
@@ -189,8 +191,8 @@
 
       // 3. certificate (base64 encoded PEM) を取り出して identity を抽出
       let certInput = null;
-      if (signatureArtifact?.[0]?.Cert) {
-        certInput = signatureArtifact[0].Cert;
+      if (sigObj?.Cert) {
+        certInput = sigObj.Cert;
       } else if (bodyJson.spec?.signature?.publicKey?.content) {
         // hashedrekord: publicKey.content は base64-encoded PEM
         certInput = atob(bodyJson.spec.signature.publicKey.content);
