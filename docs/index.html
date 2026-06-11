@@ -69,22 +69,20 @@
       .feat h3{margin:0 0 6px;font-size:16.5px}
       .feat p{margin:0;color:var(--mut);font-size:14px}
 
-      /* steps — 番号バッジを3色に */
-      .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
-      .step{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:24px 22px;box-shadow:0 10px 26px rgba(30,50,90,.05)}
-      .step .n{width:38px;height:38px;border-radius:50%;color:#fff;font-weight:800;display:grid;place-items:center;margin-bottom:13px;font-size:17px;box-shadow:0 6px 14px rgba(30,50,90,.18)}
+      /* steps — 各ステップに実際の画面つき・番号バッジ3色 */
+      .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;align-items:start}
+      .step{background:var(--card);border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:0 10px 26px rgba(30,50,90,.05);transition:.15s}
+      .step:hover{transform:translateY(-3px);box-shadow:0 16px 34px rgba(30,50,90,.10)}
+      .step-shot{margin:0}
+      .step-shot img{display:block;width:100%;height:auto;border-bottom:1px solid var(--line)}
+      .step-body{padding:18px 20px 20px}
+      .step .n{width:34px;height:34px;border-radius:50%;color:#fff;font-weight:800;display:grid;place-items:center;margin-bottom:10px;font-size:16px;box-shadow:0 6px 14px rgba(30,50,90,.18)}
       .step:nth-child(1) .n{background:#3b80f7}
       .step:nth-child(2) .n{background:#43c0bd}
       .step:nth-child(3) .n{background:#ff8fa0}
       .step h3{margin:0 0 4px;font-size:16px}
       .step p{margin:0;color:var(--mut);font-size:14px}
       .guest-note{margin:22px auto 0;max-width:760px;text-align:center;background:#eaf6f5;border:1px solid #cfe9e7;border-radius:16px;padding:14px 18px;color:#27514f;font-size:14.5px}
-
-      /* screenshots */
-      .shots{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;align-items:start}
-      .shot{margin:0;background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 12px 30px rgba(20,40,80,.08)}
-      .shot img{display:block;width:100%;height:auto;border-bottom:1px solid var(--line)}
-      .shot figcaption{padding:13px 16px;font-size:13.5px;color:var(--ink);font-weight:600}
 
       /* download */
       .dl{background:#fff;border:1px solid var(--line);border-radius:24px;max-width:720px;margin:0 auto;padding:36px 30px;text-align:center;box-shadow:0 16px 40px rgba(20,40,80,.09)}
@@ -165,25 +163,22 @@
     <section class="block" id="how" style="background:#eef4fb">
       <div class="wrap">
         <h2 class="title">使い方は 3 ステップ</h2>
-        <p class="lead">共有する人（ホスト）の操作はこれだけ。</p>
+        <p class="lead">共有する人（ホスト）の操作はこれだけ。下は実際のアプリ画面です（デモ表示・IP や実URLは含みません）。</p>
         <div class="steps">
-          <div class="step"><div class="n">1</div><h3>ウィンドウを選ぶ</h3><p>PAssist を起動し、共有したいウィンドウを1つクリックして選びます。</p></div>
-          <div class="step"><div class="n">2</div><h3>URLを送る</h3><p>自動発行された共有URL（QRコードも可）を相手に送ります。</p></div>
-          <div class="step"><div class="n">3</div><h3>許可する</h3><p>接続リクエストを「許可」。これで相手がそのウィンドウを操作できます。</p></div>
+          <div class="step">
+            <figure class="step-shot"><img src="screenshots/pick.png" alt="共有する画面を1つ選ぶ" loading="lazy" /></figure>
+            <div class="step-body"><div class="n">1</div><h3>ウィンドウを選ぶ</h3><p>PAssist を起動し、共有したいウィンドウを 1 つクリックして選びます。</p></div>
+          </div>
+          <div class="step">
+            <figure class="step-shot"><img src="screenshots/share.png" alt="リンクとQRコードを送る" loading="lazy" /></figure>
+            <div class="step-body"><div class="n">2</div><h3>リンク／QR を送る</h3><p>自動発行された共有URL（QRコードも可）を相手に送ります。</p></div>
+          </div>
+          <div class="step">
+            <figure class="step-shot"><img src="screenshots/operate.png" alt="許可すると相手がブラウザで操作" loading="lazy" /></figure>
+            <div class="step-body"><div class="n">3</div><h3>許可すると操作開始</h3><p>接続リクエストを「許可」すると、相手はブラウザでそのウィンドウを操作できます。</p></div>
+          </div>
         </div>
         <p class="guest-note">操作する人（ゲスト）は、送られた URL を<strong>ブラウザで開くだけ</strong>。インストールもログインも要りません。</p>
-      </div>
-    </section>
-
-    <section class="block" id="screens">
-      <div class="wrap">
-        <h2 class="title">画面イメージ</h2>
-        <p class="lead">実際のアプリ画面です（デモ表示・IP や実URLは含みません）。</p>
-        <div class="shots">
-          <figure class="shot"><img src="screenshots/pick.png" alt="共有する画面を1つ選ぶ" loading="lazy" /><figcaption>① 共有する画面を 1 つ選ぶ</figcaption></figure>
-          <figure class="shot"><img src="screenshots/share.png" alt="リンクとQRコードを送って承認" loading="lazy" /><figcaption>② リンク／QR を送って承認</figcaption></figure>
-          <figure class="shot"><img src="screenshots/operate.png" alt="相手はブラウザで操作" loading="lazy" /><figcaption>③ 相手はブラウザで操作</figcaption></figure>
-        </div>
       </div>
     </section>
 
