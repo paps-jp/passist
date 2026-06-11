@@ -205,6 +205,7 @@
       setStatus('✓ 共有を終了しました（このリンクはもう使えません）');
       endShareUi(); // 終了ボタンを無効化して「終了済み」を明示
     };
+    $('pauseToggle').onclick = togglePause; // ⏸ 共有を停止 / ▶ 共有を再開（URL・接続・承認は維持）
     await loadWindows();
     maybeResume(); // 前回「終了」を押していなければ、同じウィンドウの共有を自動再開（無ければ起動を監視）
   }
@@ -772,6 +773,7 @@
     e.textContent = '■ 共有を終了しました';
     $('copy').disabled = true; // 死んだURLをコピーさせない
     $('qrToggle').disabled = true;
+    const p = $('pauseToggle'); if (p) { p.classList.add('hidden'); p.disabled = true; }
   }
   // 共有開始：上記を「共有中」状態へ戻す
   function resetShareUi() {
@@ -780,6 +782,23 @@
     e.textContent = '■ 共有を終了';
     $('copy').disabled = false;
     $('qrToggle').disabled = false;
+    const p = $('pauseToggle'); if (p) { p.classList.remove('hidden'); p.disabled = false; }
+    setPaused(false); // 共有再開時は「停止中」フラグをリセット
+  }
+
+  // 共有の一時停止 / 再開（接続・URL は維持。video track の enabled だけを切替＝即時・軽量）。
+  // 停止中: viewer 側は黒画面、状態バーに「⏸ 停止中」、ボタンは「▶ 再開」。
+  let paused = false;
+  function setPaused(v) {
+    paused = !!v;
+    const btn = $('pauseToggle');
+    if (btn) btn.textContent = paused ? '▶ 共有を再開' : '⏸ 共有を停止';
+    if (stream) for (const t of stream.getTracks()) t.enabled = !paused;
+    setStatus(paused ? '⏸ 共有を停止中（「▶ 共有を再開」で映像が戻ります）' : statusText());
+  }
+  function togglePause() {
+    if (!stream) return;
+    setPaused(!paused);
   }
 
   function copyUrl() {
