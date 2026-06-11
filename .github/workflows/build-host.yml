@@ -1,0 +1,104 @@
+name: build-host
+
+# PAssist.exe（Electron portable）を Windows ランナーでビルドする。
+# - workflow_dispatch: 手動実行（動作確認用）
+# - v* タグ: リリース時に exe をビルドして GitHub Release に添付
+# 生成物は artifact としてアップロードする。
+#
+# ※ コード署名（SignPath Foundation）連携の土台。
+#   申請が承認されると SignPath の Organization/Project/Policy ID と API トークンが払い出されるので、
+#   下部のコメントアウト済みステップを有効化して「CIでビルド → SignPath が署名 → 署名済み exe を配布」にする。
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write   # タグ時に Release へ exe を添付
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # exe には server 一式（runtime 依存）が同梱される（host の build.extraResources）。
+      # 配布物には dev 依存を入れないため --omit=dev。
+      - name: Install server deps (runtime only, bundled into exe)
+        working-directory: server
+        run: npm ci --omit=dev
+
+      - name: Install host deps
+        working-directory: host
+        run: npm ci
+
+      # nut.js のネイティブモジュールを Electron の ABI 向けに再ビルド（windows-latest は MSVC/Python 同梱）
+      - name: Rebuild native modules for Electron
+        working-directory: host
+        run: npm run rebuild
+
+      - name: Build PAssist.exe (electron-builder portable)
+        working-directory: host
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # 証明書なし＝この段階では署名しない（誤署名防止）
+        run: npm run dist
+
+      - name: Compute SHA256
+        shell: pwsh
+        run: |
+          $exe = "dist/PAssist.exe"
+          if (-not (Test-Path $exe)) { throw "PAssist.exe not found" }
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash.ToLower()
+          "$hash  PAssist.exe" | Out-File -Encoding ascii dist/SHA256SUMS.txt
+          Write-Host "SHA256: $hash"
+          "## PAssist.exe built" | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          "`n- SHA256: ``$hash``" | Out-File -Append $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload artifact
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: PAssist-exe
+          path: |
+            dist/PAssist.exe
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+
+      # ──────────────────────────────────────────────────────────────────────
+      # SignPath Foundation でのコード署名（申請が承認されたら有効化する）
+      # 1) SignPath 側で Project "passist" と Signing Policy（test-signing / release-signing）を作成
+      # 2) リポジトリ secrets に SIGNPATH_API_TOKEN を登録
+      # 3) <ORG_ID> を実際の Organization ID に置き換えて、以下を有効化:
+      #
+      # - name: Submit to SignPath for signing
+      #   uses: signpath/github-action-submit-signing-request@v1
+      #   with:
+      #     api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+      #     organization-id: '<ORG_ID>'
+      #     project-slug: 'passist'
+      #     signing-policy-slug: 'release-signing'
+      #     github-artifact-id: ${{ steps.upload.outputs.artifact-id }}
+      #     wait-for-completion: true
+      #     output-artifact-directory: 'signed'
+      # → signed/PAssist.exe が Authenticode 署名済み。これを下の Release 添付で使う。
+      # ──────────────────────────────────────────────────────────────────────
+
+      - name: Attach to GitHub Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --title "$TAG" --notes "PAssist.exe build"
+          fi
+          gh release upload "$TAG" dist/PAssist.exe dist/SHA256SUMS.txt --clobber
