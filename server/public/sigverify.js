@@ -119,17 +119,34 @@
   // @param bundle: bundle.json をパースしたオブジェクト
   // @param expectedDigest: /api/build の imageDigest (sha256:...) 形式
   // @param expectedIdentityRegexp: 期待する subject (https://github.com/paps-jp/passist)
-  async function verifyBundle(bundle, expectedDigest, expectedIdentityRegexp, expectedIssuer) {
+  // 入力: Rekor REST API のエントリ形式（{"<UUID>": {body, verification, ...}}）または
+  // Sigstore Bundle 形式（{verificationMaterial: {tlogEntries: [...]}}）どちらも受け付ける。
+  async function verifyBundle(input, expectedDigest, expectedIdentityRegexp, expectedIssuer) {
     const checks = { merkleProof: null, digestMatch: null, identityMatch: null, issuerMatch: null };
     try {
-      const tlog = (bundle.verificationMaterial?.tlogEntries || [])[0];
-      if (!tlog) return { ok: false, error: 'No tlog entry in bundle', checks };
+      // ---- フォーマット正規化 ----
+      let tlog = null;
+      if (input.verificationMaterial?.tlogEntries?.length) {
+        // Sigstore Bundle 形式
+        tlog = input.verificationMaterial.tlogEntries[0];
+      } else {
+        // Rekor entry 形式: UUID キーの最初の値
+        const uuid = Object.keys(input).find((k) => /^[0-9a-f]{40,}/.test(k)) || Object.keys(input)[0];
+        const e = input[uuid] || {};
+        tlog = {
+          canonicalizedBody: e.body,
+          inclusionProof: e.verification?.inclusionProof,
+          integratedTime: e.integratedTime,
+          logIndex: e.logIndex,
+        };
+      }
+      if (!tlog || !tlog.canonicalizedBody) return { ok: false, error: 'No body/canonicalizedBody in entry', checks };
+      if (!tlog.inclusionProof) return { ok: false, error: 'No inclusionProof in entry', checks };
 
-      // 1. canonicalizedBody → leaf hash → inclusion proof verify
+      // 1. canonicalizedBody → leaf hash → inclusion proof verify (RFC 6962, SHA-256)
       const bodyBytes = base64ToBytes(tlog.canonicalizedBody);
       const leaf = await leafHash(bodyBytes);
       const proof = tlog.inclusionProof;
-      if (!proof) return { ok: false, error: 'No inclusionProof in tlog entry', checks };
       const merkle = await verifyInclusionProof(
         Number(proof.logIndex),
         Number(proof.treeSize),
@@ -140,29 +157,29 @@
       checks.merkleProof = merkle;
       if (!merkle.ok) return { ok: false, error: 'Merkle inclusion proof failed: ' + merkle.error, checks };
 
-      // 2. body から image digest を抽出
+      // 2. body (hashedrekord JSON) を解析して image digest を取り出す
       const bodyJson = JSON.parse(bytesToString(bodyBytes));
-      // kind=hashedrekord の場合: spec.data.hash.value が payload (simplesigning JSON) の SHA-256
-      // simplesigning JSON 自体には critical.image.docker-manifest-digest が入る
-      // が、 cosign 2.x の bundle では bundle.dsseEnvelope か bundle.messageSignature に payload があり、
-      // 通常 messageSignature.messageDigest.digest が image digest になる。
       let extractedDigest = '';
-      if (bundle.messageSignature?.messageDigest?.digest) {
-        // base64 → hex に変換
-        const md = bundle.messageSignature.messageDigest.digest;
-        const mdBytes = base64ToBytes(md);
-        extractedDigest = 'sha256:' + bytesToHex(mdBytes);
-      } else if (bodyJson.spec?.data?.hash?.value) {
+      if (bodyJson.spec?.data?.hash?.value) {
         extractedDigest = 'sha256:' + bodyJson.spec.data.hash.value;
+      } else if (input.messageSignature?.messageDigest?.digest) {
+        const md = input.messageSignature.messageDigest.digest;
+        extractedDigest = 'sha256:' + bytesToHex(base64ToBytes(md));
       }
       const expected = expectedDigest || '';
       checks.digestMatch = { ok: !!extractedDigest && extractedDigest === expected, got: extractedDigest, expected };
 
-      // 3. certificate から identity 抽出
-      const cert = bundle.verificationMaterial?.certificate?.rawBytes
-        || bundle.verificationMaterial?.x509CertificateChain?.certificates?.[0]?.rawBytes;
-      let ident = null;
-      if (cert) ident = extractIdentityFromCertPem(typeof cert === 'string' ? base64ToBytes(cert) : cert);
+      // 3. certificate (base64 encoded PEM) を取り出して identity を抽出
+      let certInput = null;
+      if (bodyJson.spec?.signature?.publicKey?.content) {
+        // hashedrekord: publicKey.content は base64-encoded PEM
+        certInput = atob(bodyJson.spec.signature.publicKey.content);
+      } else if (input.verificationMaterial?.certificate?.rawBytes) {
+        certInput = input.verificationMaterial.certificate.rawBytes;
+      } else if (input.verificationMaterial?.x509CertificateChain?.certificates?.[0]?.rawBytes) {
+        certInput = input.verificationMaterial.x509CertificateChain.certificates[0].rawBytes;
+      }
+      let ident = certInput ? extractIdentityFromCertPem(certInput) : null;
       const re = expectedIdentityRegexp ? new RegExp(expectedIdentityRegexp) : null;
       checks.identityMatch = { ok: !!(ident && ident.uri && (!re || re.test(ident.uri))), uri: ident?.uri || '' };
       checks.issuerMatch = { ok: !!(ident && ident.issuer === expectedIssuer), got: ident?.issuer || '' };

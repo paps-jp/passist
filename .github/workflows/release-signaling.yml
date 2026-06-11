@@ -82,34 +82,42 @@ jobs:
       - name: Install cosign
         uses: sigstore/cosign-installer@v3
 
-      - name: Cosign sign (keyless) + Sigstore Bundle 出力
+      - name: Cosign sign (keyless) + Rekor entry 取得
         env:
           COSIGN_EXPERIMENTAL: '1'
           IMAGE: ${{ steps.meta.outputs.image }}
           DIGEST: ${{ steps.build.outputs.digest }}
+          TAG: ${{ steps.meta.outputs.tag }}
         run: |
-          # 1. 通常の cosign sign (GHCR signature attach + Rekor 登録)
-          cosign sign --yes "${IMAGE}@${DIGEST}"
-          # 2. ブラウザ自前 verify 用に Sigstore Bundle (v0.3) を別途出力。
-          #    bundle には canonicalizedBody + inclusionProof + certificate が全部入る。
-          #    ブラウザは @sigstore/verify を使わず、自前で SHA-256 Merkle proof verify する。
+          # 1. cosign sign は通常通り（cosign 2.xの sign に --bundle フラグはないため別経路で取得）
+          cosign sign --yes "${IMAGE}@${DIGEST}" 2>&1 | tee cosign-output.log
+          # 2. ログから Rekor の logIndex を抽出（"tlog entry created with index: <N>"）
+          LOG_INDEX=$(grep -oE 'index: [0-9]+' cosign-output.log | head -1 | awk '{print $2}')
+          if [ -z "$LOG_INDEX" ]; then
+            echo "::error::Failed to extract Rekor log index from cosign output"
+            exit 1
+          fi
+          echo "Rekor log index: $LOG_INDEX"
+          # 3. Rekor API で entry を取得（canonicalizedBody + inclusionProof + certificate を含む完全な情報）
           mkdir -p artifacts
-          cosign sign --yes \
-            --bundle "artifacts/signaling-${{ steps.meta.outputs.tag }}.cosign-bundle.json" \
-            "${IMAGE}@${DIGEST}"
-          # メタ情報も同梱
-          cat > "artifacts/signaling-${{ steps.meta.outputs.tag }}.meta.json" <<EOF
+          curl -sf "https://rekor.sigstore.dev/api/v1/log/entries?logIndex=${LOG_INDEX}" \
+            -o "artifacts/signaling-${TAG}.rekor-entry.json"
+          # 4. メタ情報を同梱
+          cat > "artifacts/signaling-${TAG}.meta.json" <<EOF
           {
-            "tag": "${{ steps.meta.outputs.tag }}",
+            "tag": "${TAG}",
             "image": "${IMAGE}",
             "digest": "${DIGEST}",
             "commit": "${{ steps.meta.outputs.git_commit }}",
             "builtAt": "${{ steps.meta.outputs.build_timestamp }}",
+            "rekorLogIndex": ${LOG_INDEX},
             "certificateIdentityRegexp": "https://github.com/${{ github.repository }}",
             "certificateOidcIssuer": "https://token.actions.githubusercontent.com"
           }
           EOF
           ls -la artifacts/
+          echo "--- rekor entry preview ---"
+          head -c 500 "artifacts/signaling-${TAG}.rekor-entry.json"
 
       - name: Upload Sigstore Bundle to GitHub Release
         env:

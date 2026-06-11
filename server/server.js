@@ -217,7 +217,8 @@ app.get('/api/cosign/bundle', async (req, res) => {
     return res.type(cached.contentType).send(cached.payload);
   }
   try {
-    const url = `https://github.com/paps-jp/passist/releases/download/${encodeURIComponent(tag)}/signaling-${encodeURIComponent(tag)}.cosign-bundle.json`;
+    // GitHub Release asset 名: signaling-<tag>.rekor-entry.json （workflowが Rekor API から取得して保存）
+    const url = `https://github.com/paps-jp/passist/releases/download/${encodeURIComponent(tag)}/signaling-${encodeURIComponent(tag)}.rekor-entry.json`;
     const r = await fetch(url, { redirect: 'follow' });
     if (!r.ok) return res.status(r.status).json({ error: 'bundle fetch failed', status: r.status });
     const text = await r.text();
