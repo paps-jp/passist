@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#78b3f7" />
+    <title>PAssist 運用統計 — paps-jp.github.io/passist</title>
+    <meta name="description" content="PAssist の匿名利用統計（リアルタイム接続数、24時間サマリ、日次推移）。個人を特定する情報は含まれません。" />
+    <link rel="icon" href="passist_min.svg" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="PAssist 運用統計" />
+    <meta property="og:description" content="リアルタイム接続数と24時間・日次の匿名サマリ。" />
+    <meta property="og:url" content="https://paps-jp.github.io/passist/stats.html" />
+    <style>
+      /* index.html と揃えたパレット・装飾。stats固有のKPI/表は新規。 */
+      :root{
+        --p:#78b3f7; --acc:#3776e6; --acc-d:#2f63cf; --teal:#43c0bd;
+        --ink:#1f2733; --mut:#5b6b80; --bg:#f7f9fc; --card:#fff; --line:#e9eef5;
+        --maxw:1000px;
+      }
+      *{box-sizing:border-box}
+      html{scroll-behavior:smooth}
+      body{margin:0;font-family:system-ui,"Segoe UI","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;color:var(--ink);background:var(--bg);line-height:1.75;-webkit-font-smoothing:antialiased}
+      a{color:var(--acc)}
+      .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+      .ic{width:1.1em;height:1.1em;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-.18em}
+
+      /* スリムなヒーロー（トップへの戻り導線） */
+      .hero{position:relative;overflow:hidden;background:linear-gradient(150deg,#5278e8 0%,#4a9de6 55%,#3599a8 100%);color:#fff;padding:38px 24px 44px}
+      .hero::after{content:"";position:absolute;inset:0;pointer-events:none;background:
+        radial-gradient(540px 380px at 50% -12%, rgba(255,255,255,.30), transparent 62%),
+        radial-gradient(420px 320px at 86% 16%, rgba(255,255,255,.14), transparent 60%)}
+      .hero>*{position:relative;z-index:1}
+      .crumbs{display:flex;align-items:center;gap:10px;font-size:13px;color:rgba(255,255,255,.85);margin-bottom:8px}
+      .crumbs a{color:#fff;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.4)}
+      .hero h1{margin:6px 0 4px;font-size:clamp(22px,3.2vw,28px);font-weight:800;letter-spacing:.2px}
+      .hero .sub{color:rgba(255,255,255,.92);font-size:14px;margin:0}
+      .hero .asof{display:inline-flex;align-items:center;gap:8px;margin-top:14px;padding:6px 12px;background:rgba(255,255,255,.16);border-radius:999px;font-size:13px}
+      .hero .asof .dot{width:8px;height:8px;border-radius:50%;background:#86efac;box-shadow:0 0 0 4px rgba(134,239,172,.25);animation:pulse 2.4s ease-in-out infinite}
+      @keyframes pulse{0%,100%{opacity:.9}50%{opacity:.45}}
+
+      /* セクション */
+      section.block{padding:36px 0}
+      h2.title{font-size:20px;font-weight:800;margin:0 0 14px}
+      .note{color:var(--mut);font-size:13px}
+
+      /* KPIカード */
+      .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px}
+      .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px;box-shadow:0 4px 12px rgba(40,80,160,.04)}
+      .kpi.live{border-left:3px solid var(--p)}
+      .kpi .label{color:var(--mut);font-size:12px;letter-spacing:.05em;text-transform:uppercase;font-weight:600}
+      .kpi .value{font-size:30px;font-weight:800;letter-spacing:-.02em;line-height:1.05;margin-top:6px;color:var(--ink)}
+      .kpi .unit{font-size:13px;color:var(--mut);margin-left:4px;font-weight:600}
+      .kpi.skel .value{color:var(--line)}
+
+      /* 表 */
+      .panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px;box-shadow:0 4px 12px rgba(40,80,160,.04)}
+      table.simple{width:100%;border-collapse:collapse;font-size:13.5px}
+      table.simple th,table.simple td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left}
+      table.simple th{color:var(--mut);font-weight:600;font-size:12px;letter-spacing:.04em;text-transform:uppercase}
+      table.simple td.num{text-align:right;font-variant-numeric:tabular-nums}
+      table.simple tbody tr:last-child td{border-bottom:0}
+      .scroll-x{overflow-x:auto}
+
+      /* エラー/状態バー */
+      .state{display:flex;align-items:center;gap:10px;margin:0 0 14px;padding:10px 14px;border-radius:10px;font-size:13.5px}
+      .state.err{background:#fff5f3;border:1px solid #ffd4cb;color:#a8421d}
+      .state.warn{background:#fff8e6;border:1px solid #f4e0a0;color:#7a5a14}
+      .state.ok{background:#eef9f1;border:1px solid #cfead6;color:#1f6a3a}
+      .state.hidden{display:none}
+
+      footer{border-top:1px solid var(--line);color:var(--mut);font-size:13px;text-align:center;padding:26px 24px 44px}
+      footer a{color:var(--mut)}
+    </style>
+  </head>
+  <body>
+    <header class="hero">
+      <div class="wrap">
+        <div class="crumbs">
+          <a href="./">トップ</a>
+          <span>›</span>
+          <span>運用統計</span>
+        </div>
+        <h1>PAssist 運用統計</h1>
+        <p class="sub">リアルタイム接続数と直近の利用サマリ（匿名集計）。10秒ごとに自動更新します。</p>
+        <span class="asof"><span class="dot"></span><span id="asOf">読み込み中…</span></span>
+      </div>
+    </header>
+
+    <main>
+      <section class="block">
+        <div class="wrap">
+          <div id="errState" class="state err hidden"></div>
+
+          <h2 class="title">いま</h2>
+          <div class="kpis">
+            <div class="kpi live skel"><div class="label">共有中セッション</div><div class="value" id="liveSessions">—</div></div>
+            <div class="kpi live skel"><div class="label">接続中ビューア</div><div class="value" id="liveViewers">—</div></div>
+            <div class="kpi live skel"><div class="label">TURN中継中</div><div class="value" id="liveRelays">—</div></div>
+            <div class="kpi skel"><div class="label">サーバ稼働</div><div class="value" id="uptime" style="font-size:18px;margin-top:14px">—</div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="block" style="padding-top:0">
+        <div class="wrap">
+          <h2 class="title">直近24時間</h2>
+          <div class="kpis">
+            <div class="kpi skel"><div class="label">セッション数</div><div class="value" id="d24Sessions">—</div></div>
+            <div class="kpi skel"><div class="label">ビューア参加</div><div class="value" id="d24Accepted">—</div></div>
+            <div class="kpi skel"><div class="label">承認率</div><div class="value"><span id="d24Accept">—</span><span class="unit">%</span></div></div>
+            <div class="kpi skel"><div class="label">TURN利用率</div><div class="value"><span id="d24Turn">—</span><span class="unit">%</span></div></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="block" style="padding-top:0">
+        <div class="wrap">
+          <div class="panel">
+            <h2 class="title">日次推移（最大30日）</h2>
+            <div class="scroll-x">
+              <table class="simple">
+                <thead>
+                  <tr>
+                    <th>日付</th>
+                    <th class="num">セッション</th>
+                    <th class="num">承認</th>
+                    <th class="num">拒否</th>
+                    <th class="num">P2P</th>
+                    <th class="num">TURN</th>
+                    <th class="num">合計時間</th>
+                  </tr>
+                </thead>
+                <tbody id="dailyBody"><tr><td colspan="7" class="note">読み込み中…</td></tr></tbody>
+              </table>
+            </div>
+            <p class="note" style="margin-top:14px">「合計時間」はその日のすべてのセッション時間の合計。「P2P / TURN」はその日に確立された接続経路の数。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="block" style="padding-top:0">
+        <div class="wrap">
+          <p class="note">
+            <strong>プライバシー:</strong> 個人を特定する情報（IPアドレス、トークン、ユーザー名等）は一切記録していません。接続イベントの数のみを匿名で集計しています。
+            生データ: <a id="apiLink" href="https://passist.paps.jp/api/stats" target="_blank" rel="noopener">https://passist.paps.jp/api/stats</a>（CORS 全許可で公開）。
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      PAssist — 単一ウィンドウ・ブラウザ完結・アカウント不要のリモート操作 ／
+      <a href="https://github.com/paps-jp/passist">github.com/paps-jp/passist</a>
+    </footer>
+
+    <script>
+    // 非同期で passist.paps.jp/api/stats を取得して描画。CORS は server.js が * で許可済み。
+    // ?api=https://example.com で API のベースを差し替え可能（テスト用）。
+    const API = (() => {
+      const q = new URLSearchParams(location.search).get('api');
+      if (q) try { return new URL(q).origin + '/api/stats'; } catch {}
+      return 'https://passist.paps.jp/api/stats';
+    })();
+    document.getElementById('apiLink').href = API;
+    document.getElementById('apiLink').textContent = API;
+
+    const $ = (id) => document.getElementById(id);
+    const fmtPct = (v) => Number.isFinite(v) ? v.toFixed(1) : '—';
+    function fmtDuration(sec) {
+      sec = Math.max(0, Math.floor(sec || 0));
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = sec % 60;
+      if (h) return h + '時間' + m + '分';
+      if (m) return m + '分' + s + '秒';
+      return s + '秒';
+    }
+    function fmtDateTime(ms) {
+      const d = new Date(ms);
+      const p = (n) => String(n).padStart(2, '0');
+      return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+    }
+    function setErr(msg) {
+      const el = $('errState');
+      if (!msg) { el.classList.add('hidden'); el.textContent = ''; return; }
+      el.classList.remove('hidden'); el.textContent = msg;
+    }
+    function clearSkel() {
+      for (const el of document.querySelectorAll('.kpi.skel')) el.classList.remove('skel');
+    }
+    let timer = null;
+    async function refresh() {
+      try {
+        const r = await fetch(API, { cache: 'no-store', mode: 'cors' });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const j = await r.json();
+        setErr(null);
+        clearSkel();
+        $('asOf').textContent = '最終更新: ' + fmtDateTime(j.asOf);
+        $('liveSessions').textContent = j.live.sessions;
+        $('liveViewers').textContent = j.live.viewers;
+        $('liveRelays').textContent = j.live.relays;
+        $('uptime').textContent = fmtDuration(j.uptimeSec);
+        $('d24Sessions').textContent = j.last24h.sessions;
+        $('d24Accepted').textContent = j.last24h.viewersAccepted;
+        $('d24Accept').textContent = fmtPct(j.last24h.acceptRatio);
+        $('d24Turn').textContent = fmtPct(j.last24h.turnRatio);
+
+        const tbody = $('dailyBody');
+        const days = Object.keys(j.daily || {}).sort().reverse();
+        if (!days.length) {
+          tbody.innerHTML = '<tr><td colspan="7" class="note">まだデータがありません。最初のセッションを開始すると記録が始まります。</td></tr>';
+        } else {
+          tbody.innerHTML = '';
+          for (const k of days) {
+            const d = j.daily[k];
+            const tr = document.createElement('tr');
+            const cells = [k, d.sessions, d.viewersAccepted, d.viewersDenied, d.p2pPeers, d.relayPeers, fmtDuration(d.totalSeconds)];
+            for (let i = 0; i < cells.length; i++) {
+              const td = document.createElement('td');
+              td.textContent = cells[i];
+              if (i > 0) td.className = 'num';
+              tr.appendChild(td);
+            }
+            tbody.appendChild(tr);
+          }
+        }
+      } catch (e) {
+        setErr('統計サーバから取得できませんでした（' + e.message + '）。サーバが起動していないか、ネットワーク・CORSの問題かもしれません。');
+        $('asOf').textContent = '取得に失敗しました';
+      }
+    }
+    // ページが非表示の間はポーリング停止（負荷削減）
+    function start() { if (timer) return; refresh(); timer = setInterval(refresh, 10_000); }
+    function stop() { if (timer) { clearInterval(timer); timer = null; } }
+    document.addEventListener('visibilitychange', () => document.hidden ? stop() : start());
+    start();
+    </script>
+  </body>
+</html>
