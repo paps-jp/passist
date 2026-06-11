@@ -110,6 +110,17 @@
             <button id="reissue" class="ghost">URLを再発行</button>
           </div>
           <p id="publicBaseHint" class="hint"></p>
+
+          <label style="margin-top:14px">TURNサーバ（任意・NAT越え失敗時の中継）</label>
+          <p class="hint">設定するとP2P不可な相手も接続できます。中継はサーバ帯域を消費するため、利用人数に応じて自動的に画質を分け合います。例: <code>turn:turn.example.com:3478</code></p>
+          <div class="urlrow">
+            <input id="turnUrl" placeholder="turn:turn.example.com:3478（空欄でTURN不使用）" />
+          </div>
+          <div class="urlrow">
+            <input id="turnUser" placeholder="ユーザ名" />
+            <input id="turnPass" type="password" placeholder="パスワード" />
+          </div>
+          <p id="turnHint" class="hint"></p>
           <div class="trust">
             <button id="trustLink" class="ghost">信頼リンクを発行（事前承認）</button>
             <span id="trustManage" class="hint"></span>

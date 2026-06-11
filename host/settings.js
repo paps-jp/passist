@@ -12,6 +12,11 @@ const DEFAULTS = {
   sessionTtlMinutes: Math.round(parseInt(process.env.SESSION_TTL_MS || String(30 * 60 * 1000), 10) / 60000),
   language: 'auto', // i18n 用（将来）
   activeShareName: '', // 共有中ウィンドウ名（再起動時の自動再開用。終了ボタンで空に）
+  // TURN サーバ（任意）。NAT が厳しい相手向けの中継。設定があるピアのみ relay 経由になり、
+  // サーバ側の動的ガバナで他の relay 接続と帯域を分け合う（bitrate-policy）。
+  turnUrl: '',  // 例: turn:turn.example.com:3478 ・ turns:turn.example.com:5349 ・ turn:host:port?transport=tcp
+  turnUser: '', // long-term credential のユーザ名
+  turnPass: '', // long-term credential のパスワード
 };
 
 let filePath = null;

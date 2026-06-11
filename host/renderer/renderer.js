@@ -50,6 +50,31 @@
     );
     $('publicBase').addEventListener('input', validatePublicBase); // 入力中に書式の正否を表示
     validatePublicBase();
+
+    // TURN サーバ（任意）。空欄なら未使用＝従来通り全員 P2P 試行。
+    if (cfg.settings) {
+      $('turnUrl').value = cfg.settings.turnUrl || '';
+      $('turnUser').value = cfg.settings.turnUser || '';
+      $('turnPass').value = cfg.settings.turnPass || '';
+    }
+    const saveTurn = () => {
+      window.host.settingsSet({
+        turnUrl: $('turnUrl').value.trim(),
+        turnUser: $('turnUser').value.trim(),
+        turnPass: $('turnPass').value, // パスワードは trim しない（先頭/末尾の空白を意図する場合あり）
+      });
+      if (cfg.settings) {
+        cfg.settings.turnUrl = $('turnUrl').value.trim();
+        cfg.settings.turnUser = $('turnUser').value.trim();
+        cfg.settings.turnPass = $('turnPass').value;
+      }
+      renderTurnHint();
+    };
+    $('turnUrl').addEventListener('change', saveTurn);
+    $('turnUser').addEventListener('change', saveTurn);
+    $('turnPass').addEventListener('change', saveTurn);
+    $('turnUrl').addEventListener('input', renderTurnHint);
+    renderTurnHint();
     // 閲覧のみモード（グローバル設定）。ON の間は接続相手の操作をホスト側で全て無視する。
     $('readonlyChk').checked = !!(cfg.settings && cfg.settings.readonly);
     $('readonlyChk').addEventListener('change', () => {
@@ -464,6 +489,36 @@
     startSignaling();
   }
 
+  // TURN URL の書式チェック（turn:host:port / turns:host:port / ?transport=tcp 等を許容）
+  function validateTurnUrl(u) {
+    if (!u) return { ok: false, reason: 'empty' };
+    try {
+      const m = /^(turn|turns):([^:?#\s]+)(?::(\d+))?(?:\?transport=(udp|tcp))?$/i.exec(u.trim());
+      if (!m) return { ok: false, reason: 'format' };
+      return { ok: true, scheme: m[1].toLowerCase(), host: m[2], port: m[3] || (m[1].toLowerCase() === 'turns' ? '5349' : '3478'), transport: m[4] || (m[1].toLowerCase() === 'turns' ? 'tcp' : 'udp') };
+    } catch { return { ok: false, reason: 'format' }; }
+  }
+  function renderTurnHint() {
+    const hint = $('turnHint'); if (!hint) return;
+    const u = ($('turnUrl').value || '').trim();
+    if (!u) { hint.textContent = 'TURN未設定。NAT越えに失敗した相手とは接続できません。'; hint.classList.remove('danger-hint'); return; }
+    const v = validateTurnUrl(u);
+    if (!v.ok) { hint.textContent = '⚠ URL書式が不正です。例: turn:turn.example.com:3478 または turns:turn.example.com:5349?transport=tcp'; hint.classList.add('danger-hint'); return; }
+    hint.textContent = `✓ ${v.scheme.toUpperCase()} ${v.host}:${v.port} (${v.transport.toUpperCase()}) を使います`;
+    hint.classList.remove('danger-hint');
+  }
+
+  // RTCPeerConnection 用 iceServers を構築。STUN は常に。TURN は設定時のみ。
+  function buildIceServers() {
+    const list = [{ urls: 'stun:stun.l.google.com:19302' }];
+    const s = cfg.settings || {};
+    const v = validateTurnUrl(s.turnUrl || '');
+    if (v.ok && s.turnUser && s.turnPass) {
+      list.push({ urls: s.turnUrl.trim(), username: s.turnUser, credential: s.turnPass });
+    }
+    return list;
+  }
+
   // 承認キューを1件ずつ処理（信頼済みは自動承認、それ以外はダイアログ）
   function processReqQueue() {
     if (activeReq || !reqQueue.length) return;
@@ -531,7 +586,7 @@
   // ビューアごとに peer 接続を張る（同じキャプチャ stream を各接続へ送る＝メッシュ）
   async function startPeerFor(viewerId) {
     closePeerFor(viewerId); // 再接続時の取りこぼし防止
-    const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    const pc = new RTCPeerConnection({ iceServers: buildIceServers() });
     const entry = { pc, dc: null, viaRelay: false, routeReported: null };
     peers.set(viewerId, entry);
     for (const track of stream.getTracks()) pc.addTrack(track, stream);
