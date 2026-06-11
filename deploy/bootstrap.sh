@@ -72,6 +72,11 @@ cd "$DEPLOY"
 if [ ! -f .env ]; then
   echo "[bootstrap] generating .env"
   TURN_PASSWORD=$(openssl rand -hex 16)
+  # マスタ secret（signaling のみ保持・全 TURN の credential を生成可能）
+  TURN_AUTH_SECRET=$(openssl rand -hex 32)
+  # この VPS の coturn 用の派生鍵 = HMAC-SHA256(master, turn:DOMAIN_TURN:3478)
+  THIS_TURN_URL=turn:$DOMAIN_TURN:3478
+  THIS_TURN_AUTH_SECRET=$(printf '%s' "$THIS_TURN_URL" | openssl dgst -sha256 -hmac "$TURN_AUTH_SECRET" -hex | awk '{print $NF}')
   cat > .env <<EOF
 DOMAIN_SIGNALING=$DOMAIN_SIGNALING
 DOMAIN_TURN=$DOMAIN_TURN
@@ -85,9 +90,9 @@ RELAY_MIN_BPS=100000
 RELAY_MAX_BPS=1500000
 REALM=paps.jp
 TURN_PASSWORD=$TURN_PASSWORD
-SIGN_TURN_URL=turn:$DOMAIN_TURN:3478
-SIGN_TURN_USERNAME=passist
-SIGN_TURN_PASSWORD=$TURN_PASSWORD
+TURN_AUTH_SECRET=$TURN_AUTH_SECRET
+THIS_TURN_AUTH_SECRET=$THIS_TURN_AUTH_SECRET
+SIGN_TURN_URLS=$THIS_TURN_URL
 EOF
   chown "$WWW_USER":"$WWW_USER" .env
   chmod 600 .env

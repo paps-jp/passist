@@ -20,15 +20,40 @@ const ACCESS_MODE = process.env.ACCESS_MODE || 'approve'; // 'approve' | 'pin' |
 const SESSION_TTL_MS = parseInt(process.env.SESSION_TTL_MS || String(30 * 60 * 1000), 10);
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || ''; // 例: https://xxxx.trycloudflare.com
 
-// viewer に自動配布する TURN サーバ（accepted メッセージで渡す）。
-// 設定があれば viewer はホスト個別設定が無くてもこの TURN を iceServers に含めて接続する。
-// 空欄なら配布しない（=従来通り viewer は STUN のみ／ホストUI設定にのみ依存）。
-const SIGN_TURN_URL = process.env.SIGN_TURN_URL || '';
-const SIGN_TURN_USERNAME = process.env.SIGN_TURN_USERNAME || '';
-const SIGN_TURN_PASSWORD = process.env.SIGN_TURN_PASSWORD || '';
-const turnForViewer = () => (SIGN_TURN_URL && SIGN_TURN_USERNAME && SIGN_TURN_PASSWORD)
-  ? { urls: SIGN_TURN_URL, username: SIGN_TURN_USERNAME, credential: SIGN_TURN_PASSWORD }
-  : null;
+// viewer に自動配布する TURN サーバ。REST API ephemeral credential 方式。
+// - SIGN_TURN_URLS: 候補 URL のカンマ区切り。接続ごとにラウンドロビン選択
+// - TURN_AUTH_SECRET: signaling だけが持つマスタ。各 TURN URL の派生鍵を HMAC-SHA256 で導出
+// - 各 TURN VPS は対応する派生鍵だけを保持する（マスタは渡さない）
+//   → マスタ漏洩=全TURN危険、派生鍵漏洩=その1台のみ
+// - 配布する credential は username=`${expiry}:${user}` / password=HMAC-SHA1(派生鍵, username)
+//   24時間で expire。漏洩しても短時間で無効化
+const SIGN_TURN_URLS = (process.env.SIGN_TURN_URLS || '').split(',').map((s) => s.trim()).filter(Boolean);
+const TURN_AUTH_SECRET = process.env.TURN_AUTH_SECRET || '';
+const SIGN_TURN_USERNAME = process.env.SIGN_TURN_USERNAME || 'passist';
+const SIGN_TURN_TTL_SEC = parseInt(process.env.SIGN_TURN_TTL_SEC || String(24 * 3600), 10);
+let turnRrIndex = 0;
+
+// URL→派生鍵 のキャッシュ（マスタ から HMAC で都度計算するのは無駄なので）
+const derivedKeyCache = new Map();
+function deriveSecretFor(url) {
+  if (!TURN_AUTH_SECRET) return '';
+  let k = derivedKeyCache.get(url);
+  if (!k) {
+    k = crypto.createHmac('sha256', TURN_AUTH_SECRET).update(url).digest('hex');
+    derivedKeyCache.set(url, k);
+  }
+  return k;
+}
+
+function turnForViewer() {
+  if (!SIGN_TURN_URLS.length || !TURN_AUTH_SECRET) return null;
+  const url = SIGN_TURN_URLS[turnRrIndex++ % SIGN_TURN_URLS.length]; // ラウンドロビン
+  const derived = deriveSecretFor(url);
+  const expiry = Math.floor(Date.now() / 1000) + SIGN_TURN_TTL_SEC;
+  const username = `${expiry}:${SIGN_TURN_USERNAME}`;
+  const credential = crypto.createHmac('sha1', derived).update(username).digest('base64');
+  return { urls: url, username, credential };
+}
 
 // ホスト Electron へ自動配布する WebRTC iceServers。
 // 環境変数を設定すれば、ユーザーが手動入力しなくても TURN が使われる。

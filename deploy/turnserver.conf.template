@@ -1,6 +1,10 @@
 # coturn 設定。bootstrap.sh から envsubst でこのテンプレートを turnserver.conf に展開する。
-# 変数: ${EXTERNAL_IP} ${TURN_PASSWORD} ${REALM}
-# realm は paps.jp ドメインの汎用ラベル。ホスト名はDNSで複数指定可（turn.paps.jp / passist-turn.paps.jp など同じIPに向ければOK）
+# 変数: ${EXTERNAL_IP} ${THIS_TURN_AUTH_SECRET} ${TURN_PASSWORD} ${REALM}
+# realm は paps.jp ドメインの汎用ラベル。
+# 認証は REST API mode（時限credential） + long-term credential の併用。
+# - REST API: マスタ TURN_AUTH_SECRET から HMAC で派生した THIS_TURN_AUTH_SECRET で検証。
+#   マスタは signaling サーバだけが知る。各 TURN VPS は自分の派生鍵のみ保持。
+# - long-term: 既存ホストUIの手動設定との互換（user=passist:TURN_PASSWORD）。残しても無害。
 
 listening-port=3478
 tls-listening-port=5349
@@ -11,10 +15,14 @@ external-ip=${EXTERNAL_IP}
 min-port=49152
 max-port=65535
 
-# 認証（long-term credential）。複数アプリで共有するなら user= 行を追加していく。
+# 認証: REST API mode（時限credential・推奨）
+use-auth-secret
+static-auth-secret=${THIS_TURN_AUTH_SECRET}
+realm=${REALM}
+
+# 認証: long-term credential（既存ホストUI手動設定の互換のため残す。不要なら user= 行ごと削除可）
 lt-cred-mech
 user=passist:${TURN_PASSWORD}
-realm=${REALM}
 
 # === 帯域ガバナ（さくらVPS OUT 10Mbps制限内に収める） ===
 # 1接続あたり最大 1.5Mbps（PAssist 側の RELAY_MAX_BPS と一致）

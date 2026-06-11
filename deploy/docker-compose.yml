@@ -15,10 +15,13 @@ services:
       RELAY_BUDGET_BPS: ${RELAY_BUDGET_BPS:-4000000}
       RELAY_MIN_BPS: ${RELAY_MIN_BPS:-100000}
       RELAY_MAX_BPS: ${RELAY_MAX_BPS:-1500000}
-      # viewerへ自動配布する TURN（accepted時に渡る）。空欄ならホスト側UIの設定のみ有効。
-      SIGN_TURN_URL: ${SIGN_TURN_URL:-}
-      SIGN_TURN_USERNAME: ${SIGN_TURN_USERNAME:-}
-      SIGN_TURN_PASSWORD: ${SIGN_TURN_PASSWORD:-}
+      # viewerへ自動配布する TURN（accepted時に渡る）。signaling は MASTER secret から
+      # 接続ごとにラウンドロビンで URL を選び、その URL に対する派生鍵で時限credentialを生成する。
+      # 空欄ならホスト側UIの設定のみ有効。
+      SIGN_TURN_URLS: ${SIGN_TURN_URLS:-}
+      TURN_AUTH_SECRET: ${TURN_AUTH_SECRET:-}
+      SIGN_TURN_USERNAME: ${SIGN_TURN_USERNAME:-passist}
+      SIGN_TURN_TTL_SEC: ${SIGN_TURN_TTL_SEC:-86400}
     expose:
       - "8443"
     networks:
