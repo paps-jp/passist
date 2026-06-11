@@ -20,6 +20,22 @@ const ACCESS_MODE = process.env.ACCESS_MODE || 'approve'; // 'approve' | 'pin' |
 const SESSION_TTL_MS = parseInt(process.env.SESSION_TTL_MS || String(30 * 60 * 1000), 10);
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || ''; // 例: https://xxxx.trycloudflare.com
 
+// ホスト Electron へ自動配布する WebRTC iceServers。
+// 環境変数を設定すれば、ユーザーが手動入力しなくても TURN が使われる。
+// 未設定なら STUN(Google) のみ＝従来通り。
+const ICE_STUN_URL = process.env.ICE_STUN_URL || 'stun:stun.l.google.com:19302';
+const ICE_TURN_URL = process.env.ICE_TURN_URL || '';
+const ICE_TURN_USER = process.env.ICE_TURN_USER || '';
+const ICE_TURN_PASS = process.env.ICE_TURN_PASS || '';
+function buildServerIceServers() {
+  const list = [];
+  if (ICE_STUN_URL) list.push({ urls: ICE_STUN_URL });
+  if (ICE_TURN_URL && ICE_TURN_USER && ICE_TURN_PASS) {
+    list.push({ urls: ICE_TURN_URL, username: ICE_TURN_USER, credential: ICE_TURN_PASS });
+  }
+  return list;
+}
+
 // TLS（https/wss）: 証明書と鍵のパスを渡すと有効化。例: Tailscale の `tailscale cert` で取得した証明書。
 const TLS_CERT = process.env.TLS_CERT || '';
 const TLS_KEY = process.env.TLS_KEY || '';
@@ -176,6 +192,7 @@ function hostCreate(ws, msg) {
     pin: s.pin,
     accessMode: s.accessMode,
     expiresAt: s.expiresAt,
+    iceServers: buildServerIceServers(), // ホストはこれを優先採用＝手動設定不要でTURN自動
   });
   // 動的 bitrate ガバナの初期値を共有（TURN経由が0人なら上限値）
   send(ws, { type: 'bitrate-policy', maxBpsRelay: calcRelayBitrate(), relayCount: relayCount() });

@@ -239,3 +239,28 @@ h2 .step {
 @media (max-width: 720px) {
   .set-row { flex-direction: column; gap: 6px; }
 }
+
+/* 設定モーダル（オーバーレイ + 中央パネル + 閉じるボタン） */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  animation: modal-fade .12s ease-out;
+}
+.modal {
+  background: var(--surface); color: var(--fg);
+  border: 1px solid var(--border); border-radius: 14px;
+  padding: 8px 22px 18px; width: min(640px, 100%);
+  max-height: calc(100vh - 48px); overflow-y: auto;
+  box-shadow: var(--shadow);
+  animation: modal-pop .14s ease-out;
+}
+.modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 0 2px; position: sticky; top: 0; background: var(--surface);
+  border-bottom: 1px solid var(--border); margin-bottom: 6px; z-index: 1;
+}
+.modal-head h3 { margin: 0; font-size: 17px; font-weight: 650; }
+@keyframes modal-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modal-pop  { from { transform: translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }

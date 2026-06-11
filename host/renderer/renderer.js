@@ -8,6 +8,7 @@
   const $ = (id) => document.getElementById(id);
 
   let cfg, ws, stream;
+  let serverIceServers = null; // サーバ host:create レスポンスで配布される iceServers（STUN/TURN）
   const peers = new Map(); // viewerId -> { pc, dc, viaRelay, routeReported }
   let controllerId = null; // 操作権を持つビューアID（1人）。null=全員閲覧のみ
   let cursorStarted = false; // ホストのカーソル形状追跡を一度だけ開始するためのフラグ
@@ -44,6 +45,7 @@
     window.host.onThemePalette(applyPalette); // テーマ/アクセント変更に追従
     if (!cfg.inputEnabled) $('inputWarn').classList.remove('hidden');
     // 保存済み設定を反映 + 変更を保存
+    // 公開URLは未設定なら passist.paps.jp を既定として扱う（入力欄は空のまま＝この既定を採用の意）。
     if (cfg.settings && cfg.settings.publicBaseUrl) $('publicBase').value = cfg.settings.publicBaseUrl;
     $('publicBase').addEventListener('change', () =>
       window.host.settingsSet({ publicBaseUrl: $('publicBase').value.trim() }),
@@ -114,7 +116,13 @@
       window.host.settingsSet({ sessionTtlMinutes: v });
       renderChips();
     });
-    $('settingsBtn').onclick = () => $('settingsPanel').classList.toggle('hidden'); // ⚙ 設定の開閉
+    // ⚙ 設定モーダル: 開く/閉じる（×ボタン・背景クリック・ESC）
+    const openSettings = () => $('settingsModal').classList.remove('hidden');
+    const closeSettings = () => $('settingsModal').classList.add('hidden');
+    $('settingsBtn').onclick = openSettings;
+    $('settingsClose').onclick = closeSettings;
+    $('settingsModal').addEventListener('click', (e) => { if (e.target.id === 'settingsModal') closeSettings(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('settingsModal').classList.contains('hidden')) closeSettings(); });
     // QRコードの開閉（既定は開）。相手はスマホのカメラで読み取って接続できる。
     $('qrToggle').onclick = () => {
       const shown = $('qrPanel').classList.toggle('hidden') === false;
@@ -316,13 +324,19 @@
     b.classList.remove('hidden');
   }
 
+  // 公開URLが空欄なら passist.paps.jp を既定として使う（ユーザーは何も入力しなくてもこのドメインのURLが発行される）
+  const DEFAULT_PUBLIC_BASE = 'https://passist.paps.jp';
+  function effectivePublicBase() {
+    return ($('publicBase').value || '').trim() || DEFAULT_PUBLIC_BASE;
+  }
+
   function startSignaling() {
     if (ws) { try { ws.onclose = null; ws.onerror = null; ws.close(); } catch {} } // 旧接続を確実に閉じてから張り直す
     ws = new WebSocket(cfg.signalWs);
     ws.onopen = () =>
       sendWs({
         type: 'host:create',
-        publicBaseUrl: $('publicBase').value.trim() || undefined,
+        publicBaseUrl: effectivePublicBase(),
         maxViewers: (cfg.settings && cfg.settings.maxViewers) || 1,
         accessMode: (cfg.settings && cfg.settings.accessMode) || 'approve',
         ttlMinutes: cfg.settings && Number.isFinite(cfg.settings.sessionTtlMinutes) ? cfg.settings.sessionTtlMinutes : 30,
@@ -368,6 +382,7 @@
   function onMsg(msg) {
     switch (msg.type) {
       case 'session':
+        serverIceServers = Array.isArray(msg.iceServers) ? msg.iceServers : null; // サーバ配布の STUN/TURN を採用
         $('url').value = msg.viewerUrl;
         verifyAppliedBase(msg.viewerUrl); // 入力した公開URLが実際に反映されたか確認
         if (!$('qrPanel').classList.contains('hidden')) showQr(); // URL確定時にQRを更新
@@ -460,7 +475,7 @@
     const el = $('publicBase'), hint = $('publicBaseHint');
     if (!el || !hint) return '';
     const raw = el.value.trim();
-    if (!raw) { hint.textContent = '未入力なら社内LAN内のアドレスになります（外部からは接続できません）。'; hint.classList.remove('danger-hint'); return ''; }
+    if (!raw) { hint.textContent = '✓ 未入力なら既定の ' + DEFAULT_PUBLIC_BASE + ' を使います（インターネット公開）。'; hint.classList.remove('danger-hint'); return DEFAULT_PUBLIC_BASE; }
     const norm = normBase(raw);
     if (!norm) {
       hint.textContent = '⚠ URLの書式が正しくありません。例: https://usagi.paps.jp（「:」でなく「.」、余分な空白・全角に注意）。このままでは社内LANのアドレスになります。';
@@ -471,12 +486,13 @@
     hint.classList.remove('danger-hint');
     return norm;
   }
-  // 発行後、入力した公開URLが実際に使われたか確認（不正ならサーバが捨てて LAN/IP になっている）。
+  // 発行後、希望した公開URL（入力 or 既定）が実際に使われたか確認。
+  // ※ 既定 passist.paps.jp を希望していたのに LAN/IP になっていた場合も警告する。
   function verifyAppliedBase(viewerUrl) {
     const hint = $('publicBaseHint'); if (!hint) return;
-    const want = normBase(($('publicBase').value || '').trim());
-    if (want && viewerUrl && viewerUrl.indexOf(want) !== 0) {
-      hint.textContent = '⚠ 入力した公開URLが使われていません（書式が不正のため LAN に戻りました）。発行: ' + viewerUrl;
+    const want = normBase(($('publicBase').value || '').trim()) || DEFAULT_PUBLIC_BASE;
+    if (viewerUrl && viewerUrl.indexOf(want) !== 0) {
+      hint.textContent = '⚠ 希望した公開URL (' + want + ') が使われていません。発行: ' + viewerUrl;
       hint.classList.add('danger-hint');
     }
   }
@@ -508,15 +524,17 @@
     hint.classList.remove('danger-hint');
   }
 
-  // RTCPeerConnection 用 iceServers を構築。STUN は常に。TURN は設定時のみ。
+  // RTCPeerConnection 用 iceServers を構築。
+  // 優先順: ユーザー手動設定（自前TURN）> サーバ配布（passist.paps.jp の既定TURN/STUN）> フォールバック(Google STUN)。
   function buildIceServers() {
-    const list = [{ urls: 'stun:stun.l.google.com:19302' }];
     const s = cfg.settings || {};
     const v = validateTurnUrl(s.turnUrl || '');
     if (v.ok && s.turnUser && s.turnPass) {
-      list.push({ urls: s.turnUrl.trim(), username: s.turnUser, credential: s.turnPass });
+      // ユーザーが自前 TURN を入れている＝それを優先。STUN も付ける（NAT越え補助）。
+      return [{ urls: 'stun:stun.l.google.com:19302' }, { urls: s.turnUrl.trim(), username: s.turnUser, credential: s.turnPass }];
     }
-    return list;
+    if (serverIceServers && serverIceServers.length) return serverIceServers; // サーバ配布
+    return [{ urls: 'stun:stun.l.google.com:19302' }]; // フォールバック
   }
 
   // 承認キューを1件ずつ処理（信頼済みは自動承認、それ以外はダイアログ）
