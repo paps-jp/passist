@@ -25,14 +25,15 @@ total-quota=200
 user-quota=50
 
 # === セキュリティ ===
-# プライベートIP宛のリレーを禁止（リフレクション攻撃防止）
-no-loopback-peers
-no-multicast-peers
+# プライベートIP宛のリレーを禁止（リフレクション攻撃防止）。
+# 注: 旧版にあった no-loopback-peers / no-multicast-peers は最新の coturn で削除されたので使わない。
+# 代わりに denied-peer-ip で同等の制限をする。
 denied-peer-ip=10.0.0.0-10.255.255.255
 denied-peer-ip=192.168.0.0-192.168.255.255
 denied-peer-ip=172.16.0.0-172.31.255.255
 denied-peer-ip=169.254.0.0-169.254.255.255
 denied-peer-ip=127.0.0.0-127.255.255.255
+denied-peer-ip=224.0.0.0-239.255.255.255
 
 # === ログ（Docker のため stdout） ===
 no-cli
