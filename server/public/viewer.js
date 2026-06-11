@@ -759,7 +759,7 @@
             <b>log index</b><code>${vr.logIndex || ''}</code>
             <b>root hash</b><code>${vr.rootHash || ''}</code>
           </div>`
-        + `<div style="margin-top:8px"><a href="https://search.sigstore.dev/?logIndex=${vr.logIndex}" target="_blank" rel="noopener">🔍 Sigstore でこのエントリを開く →</a></div>`;
+        + `<div style="margin-top:8px"><a href="https://search.sigstore.dev/?hash=sha256:${vr.checks?.payloadHashMatch?.got || ''}" target="_blank" rel="noopener">🔍 Sigstore で署名を検索 →</a> ・ <a href="${src}/releases/tag/${tag}" target="_blank" rel="noopener">GitHub Release</a> ・ <a href="${src}/actions" target="_blank" rel="noopener">ビルドログ</a></div>`;
     }
     if (v.state === 'verify-fail') {
       const vr = v.verify || {};
