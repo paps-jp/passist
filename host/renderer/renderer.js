@@ -324,19 +324,13 @@
     b.classList.remove('hidden');
   }
 
-  // 公開URLが空欄なら passist.paps.jp を既定として使う（ユーザーは何も入力しなくてもこのドメインのURLが発行される）
-  const DEFAULT_PUBLIC_BASE = 'https://passist.paps.jp';
-  function effectivePublicBase() {
-    return ($('publicBase').value || '').trim() || DEFAULT_PUBLIC_BASE;
-  }
-
   function startSignaling() {
     if (ws) { try { ws.onclose = null; ws.onerror = null; ws.close(); } catch {} } // 旧接続を確実に閉じてから張り直す
     ws = new WebSocket(cfg.signalWs);
     ws.onopen = () =>
       sendWs({
         type: 'host:create',
-        publicBaseUrl: effectivePublicBase(),
+        publicBaseUrl: $('publicBase').value.trim() || undefined, // 空欄なら server 側で LAN/環境変数にフォールバック
         maxViewers: (cfg.settings && cfg.settings.maxViewers) || 1,
         accessMode: (cfg.settings && cfg.settings.accessMode) || 'approve',
         ttlMinutes: cfg.settings && Number.isFinite(cfg.settings.sessionTtlMinutes) ? cfg.settings.sessionTtlMinutes : 30,
@@ -475,7 +469,7 @@
     const el = $('publicBase'), hint = $('publicBaseHint');
     if (!el || !hint) return '';
     const raw = el.value.trim();
-    if (!raw) { hint.textContent = '✓ 未入力なら既定の ' + DEFAULT_PUBLIC_BASE + ' を使います（インターネット公開）。'; hint.classList.remove('danger-hint'); return DEFAULT_PUBLIC_BASE; }
+    if (!raw) { hint.textContent = '未入力なら社内LAN内のアドレスになります（外部からは接続できません）。cloudflared 等のトンネルURLを入れて「URLを再発行」してください。'; hint.classList.remove('danger-hint'); return ''; }
     const norm = normBase(raw);
     if (!norm) {
       hint.textContent = '⚠ URLの書式が正しくありません。例: https://usagi.paps.jp（「:」でなく「.」、余分な空白・全角に注意）。このままでは社内LANのアドレスになります。';
@@ -486,13 +480,12 @@
     hint.classList.remove('danger-hint');
     return norm;
   }
-  // 発行後、希望した公開URL（入力 or 既定）が実際に使われたか確認。
-  // ※ 既定 passist.paps.jp を希望していたのに LAN/IP になっていた場合も警告する。
+  // 発行後、入力した公開URLが実際に使われたか確認（不正ならサーバが捨てて LAN/IP になっている）。
   function verifyAppliedBase(viewerUrl) {
     const hint = $('publicBaseHint'); if (!hint) return;
-    const want = normBase(($('publicBase').value || '').trim()) || DEFAULT_PUBLIC_BASE;
-    if (viewerUrl && viewerUrl.indexOf(want) !== 0) {
-      hint.textContent = '⚠ 希望した公開URL (' + want + ') が使われていません。発行: ' + viewerUrl;
+    const want = normBase(($('publicBase').value || '').trim());
+    if (want && viewerUrl && viewerUrl.indexOf(want) !== 0) {
+      hint.textContent = '⚠ 入力した公開URLが使われていません（書式が不正のため LAN に戻りました）。発行: ' + viewerUrl;
       hint.classList.add('danger-hint');
     }
   }

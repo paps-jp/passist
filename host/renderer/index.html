@@ -108,23 +108,23 @@
           <video id="preview" autoplay playsinline muted></video>
         </details>
         <details class="adv">
-          <summary>くわしい設定（公開URLの変更・信頼リンク）</summary>
-          <label>公開URL（既定: <code>https://passist.paps.jp</code>）</label>
-          <p class="hint">既定では <code>passist.paps.jp</code> 経由のURLが発行されます。自前のトンネル（cloudflared 等）を使う場合のみ書き換えて「URLを再発行」してください。</p>
+          <summary>くわしい設定（外部公開・信頼リンク）</summary>
+          <label>外部公開（トンネル）の公開URL</label>
+          <p class="hint">cloudflared 等の公開URL（例 https://xxx.trycloudflare.com）を入れて「URLを再発行」。</p>
           <div class="urlrow">
-            <input id="publicBase" placeholder="https://passist.paps.jp（空欄でこの既定値）" />
+            <input id="publicBase" placeholder="https://xxxx.trycloudflare.com" />
             <button id="reissue" class="ghost">URLを再発行</button>
           </div>
           <p id="publicBaseHint" class="hint"></p>
 
-          <label style="margin-top:14px">TURNサーバ（NAT越え失敗時の中継）</label>
-          <p class="hint">既定では <code>passist.paps.jp</code> の TURN サーバを自動的に使用します。利用人数に応じてサーバが自動で画質を分け合います。下のフィールドは自前の TURN を使う上級者向けです（空欄なら既定の自動設定）。</p>
+          <label style="margin-top:14px">TURNサーバ（任意・NAT越え失敗時の中継）</label>
+          <p class="hint">設定するとP2P不可な相手も接続できます。中継はサーバ帯域を消費するため、利用人数に応じて自動的に画質を分け合います。例: <code>turn:turn.example.com:3478</code></p>
           <div class="urlrow">
-            <input id="turnUrl" placeholder="turn:turn.example.com:3478（空欄=自動）" />
+            <input id="turnUrl" placeholder="turn:turn.example.com:3478（空欄でTURN不使用）" />
           </div>
           <div class="urlrow">
-            <input id="turnUser" placeholder="ユーザ名（自動時は不要）" />
-            <input id="turnPass" type="password" placeholder="パスワード（自動時は不要）" />
+            <input id="turnUser" placeholder="ユーザ名" />
+            <input id="turnPass" type="password" placeholder="パスワード" />
           </div>
           <p id="turnHint" class="hint"></p>
           <div class="trust">
