@@ -1,0 +1,19 @@
+# Caddy: 自動TLS（Let's Encrypt）+ リバプロ。
+# 環境変数 DOMAIN_SIGNALING で公開ドメインを切替。WebSocket は reverse_proxy が自動透過。
+
+{
+    email {$ACME_EMAIL}
+}
+
+{$DOMAIN_SIGNALING} {
+    encode gzip
+
+    # /ws はそのまま reverse_proxy。他のパス（/, /s/<token>, 静的ファイル）も同じく内部の signaling へ。
+    reverse_proxy signaling:8443
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        Referrer-Policy "no-referrer"
+    }
+}

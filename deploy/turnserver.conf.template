@@ -1,0 +1,41 @@
+# coturn 設定。bootstrap.sh から envsubst でこのテンプレートを turnserver.conf に展開する。
+# 変数: ${EXTERNAL_IP} ${TURN_PASSWORD} ${DOMAIN_TURN}
+
+listening-port=3478
+tls-listening-port=5349
+listening-ip=0.0.0.0
+external-ip=${EXTERNAL_IP}
+
+# UDP relay レンジ（ファイアウォール開放と一致させる）
+min-port=49152
+max-port=65535
+
+# 認証（long-term credential）
+lt-cred-mech
+user=passist:${TURN_PASSWORD}
+realm=${DOMAIN_TURN}
+
+# === 帯域ガバナ（さくらVPS OUT 10Mbps制限内に収める） ===
+# 1接続あたり最大 1.5Mbps（PAssist 側の RELAY_MAX_BPS と一致）
+max-bps=1500000
+# サーバ全体 8Mbps（OUT 10Mbps の8割。残りはシグナリング/SSH/その他に温存）
+bps-capacity=8000000
+# allocation 数の絶対上限（暴走時の保険）
+total-quota=200
+user-quota=50
+
+# === セキュリティ ===
+# プライベートIP宛のリレーを禁止（リフレクション攻撃防止）
+no-loopback-peers
+no-multicast-peers
+denied-peer-ip=10.0.0.0-10.255.255.255
+denied-peer-ip=192.168.0.0-192.168.255.255
+denied-peer-ip=172.16.0.0-172.31.255.255
+denied-peer-ip=169.254.0.0-169.254.255.255
+denied-peer-ip=127.0.0.0-127.255.255.255
+
+# === ログ（Docker のため stdout） ===
+no-cli
+syslog
+verbose
+fingerprint

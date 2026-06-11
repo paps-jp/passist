@@ -1,0 +1,56 @@
+name: passist
+
+# シグナリング(Node) + Caddy(自動TLS+リバプロ) + coturn(TURN中継)
+# .env で公開ドメイン・TURNパスワード・帯域上限を指定する。
+services:
+  signaling:
+    build: ../server
+    restart: unless-stopped
+    environment:
+      PORT: 8443
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
+      ACCESS_MODE: ${ACCESS_MODE:-approve}
+      SESSION_TTL_MS: ${SESSION_TTL_MS:-1800000}
+      # TURN(relay)経由ピアの動的ガバナ。サーバOUT帯域に合わせて配分上限を絞る。
+      RELAY_BUDGET_BPS: ${RELAY_BUDGET_BPS:-4000000}
+      RELAY_MIN_BPS: ${RELAY_MIN_BPS:-100000}
+      RELAY_MAX_BPS: ${RELAY_MAX_BPS:-1500000}
+    expose:
+      - "8443"
+    networks:
+      - pn
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN_SIGNALING: ${DOMAIN_SIGNALING}
+      ACME_EMAIL: ${ACME_EMAIL:-paps@paps.jp}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data       # ACME 証明書（永続化）
+      - caddy_config:/config
+    networks:
+      - pn
+    depends_on:
+      - signaling
+
+  # TURN は UDP relay レンジ(49152-65535)を扱うため host network で動かす。
+  # （Docker のポートマッピングだと大量UDPポートの公開でNAT処理が重く非実用。）
+  coturn:
+    image: coturn/coturn:latest
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - ./turnserver.conf:/etc/turnserver.conf:ro
+
+networks:
+  pn:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
