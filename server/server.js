@@ -180,8 +180,15 @@ const BUILD_INFO = Object.freeze({
   commit: process.env.GIT_COMMIT || '',
   imageDigest: process.env.IMAGE_DIGEST || '',
   builtAt: process.env.BUILD_TIMESTAMP || '',
+  tag: process.env.GIT_TAG || '',
   sourceUrl: 'https://github.com/paps-jp/passist',
   registry: 'ghcr.io/paps-jp/passist-signaling',
+  // ブラウザ単独で完全検証する場合の入口（@sigstore/verify + /api/cosign/bundle?tag=...）
+  bundleUrl: process.env.GIT_TAG
+    ? `/api/cosign/bundle?tag=${encodeURIComponent(process.env.GIT_TAG)}`
+    : '',
+  certificateIdentityRegexp: 'https://github.com/paps-jp/passist',
+  certificateOidcIssuer: 'https://token.actions.githubusercontent.com',
   cosignVerifyHint:
     "cosign verify <image> --certificate-identity-regexp 'https://github.com/paps-jp/passist' --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'",
 });
@@ -189,6 +196,43 @@ app.get('/api/build', (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.json(BUILD_INFO);
+});
+
+// /api/cosign/bundle: GitHub Release から Sigstore Bundle (cosign sign --bundle 出力)を中継。
+// ブラウザは @sigstore/verify でこの bundle を完全検証する：
+//   - 証明書チェーン (Fulcio root → 短期証明書)
+//   - SCT (Sigstore CT log inclusion proof)
+//   - signature (payload を certificate の公開鍵で verify)
+//   - Rekor entry の inclusion proof（Merkle tree）
+//   - certificate の subject = "github.com/paps-jp/passist の release ワークフロー" 確認
+// サーバが bundle を改ざんしても、上記いずれかが必ず破綻して検証失敗するため数学的に安全。
+const BUNDLE_CACHE_TTL_MS = 60 * 60 * 1000; // 1時間キャッシュ（リリースタグは不変なので長め）
+const bundleCache = new Map(); // tag -> { fetchedAt, payload, contentType }
+app.get('/api/cosign/bundle', async (req, res) => {
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const tag = typeof req.query.tag === 'string' && /^v[0-9.]+$/.test(req.query.tag)
+    ? req.query.tag
+    : process.env.GIT_COMMIT && BUILD_INFO.commit ? null : null;
+  // 既定: BUILD_INFO のタグを使うが、TAG envが無いので tag パラメータ必須にする
+  if (!tag) return res.status(400).json({ error: 'tag query parameter required (e.g. ?tag=v0.2.1)' });
+
+  const now = Date.now();
+  const cached = bundleCache.get(tag);
+  if (cached && now - cached.fetchedAt < BUNDLE_CACHE_TTL_MS) {
+    return res.type(cached.contentType).send(cached.payload);
+  }
+  try {
+    // GitHub Release asset 名は workflow が `signaling-<tag>.cosign-bundle.json` で保存
+    const url = `https://github.com/paps-jp/passist/releases/download/${encodeURIComponent(tag)}/signaling-${encodeURIComponent(tag)}.cosign-bundle.json`;
+    const r = await fetch(url, { redirect: 'follow' });
+    if (!r.ok) return res.status(r.status).json({ error: 'fetch failed', status: r.status });
+    const text = await r.text();
+    bundleCache.set(tag, { fetchedAt: now, payload: text, contentType: 'application/json' });
+    res.type('application/json').send(text);
+  } catch (e) {
+    res.status(502).json({ error: 'upstream error', message: e.message });
+  }
 });
 
 // 公開統計 API（個人情報なし。リアルタイム値と24h/日次サマリのみ）。

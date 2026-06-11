@@ -3,8 +3,19 @@
 #   - npm ci で package-lock.json から厳格な依存ツリー再現
 #   - SOURCE_DATE_EPOCH で全ファイル mtime を統一
 # CI で生成した GIT_COMMIT / IMAGE_DIGEST / BUILD_TIMESTAMP を image に焼き込む（/api/build で公開）。
-FROM node:22-alpine
 
+# === ステージ1: ブラウザ向け Sigstore 検証バンドルの生成 ===
+# @sigstore/verify を esbuild で 1 ファイル化し、 viewer/about から動的 import して使う。
+# 本番 image には dev 依存を含めないので、ここでだけ devDependencies を入れて bundle を作る。
+FROM node:22-alpine AS sigstore-builder
+WORKDIR /build
+COPY package*.json ./
+RUN npm ci --no-audit --no-fund
+COPY tools ./tools
+RUN mkdir -p public && node tools/build-sigstore.mjs
+
+# === ステージ2: 本番 image ===
+FROM node:22-alpine
 WORKDIR /app
 
 # 依存だけ先に入れてレイヤキャッシュを効かせる
@@ -13,6 +24,9 @@ RUN npm ci --omit=dev && npm cache clean --force
 
 # アプリ本体
 COPY . .
+
+# Sigstore 検証バンドルをコピー（ブラウザから配信）
+COPY --from=sigstore-builder /build/public/sigstore-verifier.bundle.js ./public/sigstore-verifier.bundle.js
 
 # === Reproducible Build: タイムスタンプを SOURCE_DATE_EPOCH に統一 ===
 # 同じ commit から make すると mtime も同じ → docker image の digest が決定的になる。
@@ -25,9 +39,11 @@ RUN find /app -exec touch -h -d "@${SOURCE_DATE_EPOCH}" {} +
 ARG GIT_COMMIT=""
 ARG IMAGE_DIGEST=""
 ARG BUILD_TIMESTAMP=""
+ARG GIT_TAG=""
 ENV GIT_COMMIT=${GIT_COMMIT}
 ENV IMAGE_DIGEST=${IMAGE_DIGEST}
 ENV BUILD_TIMESTAMP=${BUILD_TIMESTAMP}
+ENV GIT_TAG=${GIT_TAG}
 
 ENV NODE_ENV=production
 ENV PORT=8443
