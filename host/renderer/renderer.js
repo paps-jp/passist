@@ -15,6 +15,7 @@
   const reqQueue = []; // 承認待ちリクエストのキュー [{ viewerId, auth }]
   let activeReq = null; // 現在ダイアログ表示中のリクエスト
   let sessionStarted = false; // セッション確立済みか（別画面選択で「新規発行」か「映像差し替え」かを分岐）
+  let lastSharedWindow = null; // 「共有を終了」 後の「▶ もう一度共有」 用に直前のウィンドウを保持
   // サーバから配布される TURN(relay) 経由ピア向けの帯域上限。P2P 直接接続には適用しない。
   let bitratePolicy = { maxBpsRelay: 1500_000, relayCount: 0 };
 
@@ -197,13 +198,19 @@
     $('copyTrust').onclick = () => copyField('trustUrl', 'copyTrust');
     refreshTrustInfo();
     $('end').onclick = () => {
+      // 終了後の「再開」モード: 同じウィンドウで新規 URL を発行して再開（直前の lastSharedWindow を使う）
+      if ($('end').dataset.mode === 'resume') {
+        $('end').dataset.mode = '';
+        if (lastSharedWindow) choose(lastSharedWindow);
+        return;
+      }
       sendWs({ type: 'host:end' });
       window.host.settingsSet({ activeShareName: '' }); // 終了＝次回からの自動再開を解除
       stopWatch();
       closeAllPeers();
       sessionStarted = false; // 次に画面を選ぶと新しいURLで開始
-      setStatus('✓ 共有を終了しました（このリンクはもう使えません）');
-      endShareUi(); // 終了ボタンを無効化して「終了済み」を明示
+      setStatus('✓ 共有を終了しました（「▶ もう一度共有」で同じウィンドウを再開できます）');
+      endShareUi(); // 終了ボタンを「再開」へ
     };
     $('pauseToggle').onclick = togglePause; // ⏸ 共有を停止 / ▶ 共有を再開（URL・接続・承認は維持）
     await loadWindows();
@@ -258,6 +265,7 @@
 
   async function choose(w, opts) {
     opts = opts || {};
+    lastSharedWindow = w; // 終了後の「▶ もう一度共有」用に記録
     stopWatch();
     await window.host.selectSource(w.id, w.name);
     window.host.settingsSet({ activeShareName: w.name }); // 共有対象を保存（終了ボタンまで保持＝再起動で自動再開）
@@ -766,11 +774,14 @@
     reqQueue.length = 0;
   }
 
-  // 共有終了：終了ボタンを無効化＋文言変更し、終わったことをひと目で分かるようにする
+  // 共有終了：終了ボタンを「▶ もう一度共有」 に切り替え、同じウィンドウで再開できる状態にする
   function endShareUi() {
     const e = $('end');
-    e.disabled = true;
-    e.textContent = '■ 共有を終了しました';
+    e.disabled = false; // 再クリックで再開できるよう有効のまま
+    e.textContent = '▶ もう一度共有';
+    e.dataset.mode = 'resume';
+    e.classList.remove('danger');
+    e.classList.add('primary');
     $('copy').disabled = true; // 死んだURLをコピーさせない
     $('qrToggle').disabled = true;
     const p = $('pauseToggle'); if (p) { p.classList.add('hidden'); p.disabled = true; }
@@ -780,6 +791,9 @@
     const e = $('end');
     e.disabled = false;
     e.textContent = '■ 共有を終了';
+    e.dataset.mode = '';
+    e.classList.remove('primary');
+    e.classList.add('danger');
     $('copy').disabled = false;
     $('qrToggle').disabled = false;
     const p = $('pauseToggle'); if (p) { p.classList.remove('hidden'); p.disabled = false; }
