@@ -2,7 +2,8 @@ name: test
 
 # プッシュ/PRごとに「動くか」を確認する軽量CI。
 # - 全 JS の構文チェック（node --check）
-# - signaling の入出力テスト（server/test-signaling.js）
+# - util.js / stats.js のピュア関数を node:test で単体テスト
+# - signaling の入出力結合テスト（server/test-signaling.js）
 # - 既知脆弱性の audit（continue-on-error: アドバイザリ通知）
 # host 側(Electron/Win32 ネイティブ依存)のテストは Win 上での実機検証が必要なため、
 # ここでは構文と純JSロジックだけを対象にする。
@@ -17,7 +18,7 @@ permissions:
   contents: read
 
 jobs:
-  syntax-and-signaling:
+  syntax-and-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -45,9 +46,32 @@ jobs:
             node --check "$f"
           done
 
-      - name: Signaling self-test (in-process)
-        run: node test-signaling.js
+      # util / stats の純粋関数を node 標準テストランナーで（追加依存なし）
+      - name: Unit tests (node --test)
+        run: node --test test-util.js test-stats.js
         working-directory: server
+
+      # signaling は外部プロセスとして起動 → test-signaling.js が WebSocket で接続して結合検証
+      - name: Start signaling for integration test
+        run: |
+          PORT=8990 ACCESS_MODE=approve node server.js &
+          echo "SIGNAL_PID=$!" >> $GITHUB_ENV
+          # サーバ起動を待つ（最大 5 秒）
+          for i in 1 2 3 4 5; do
+            if (echo > /dev/tcp/127.0.0.1/8990) >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+        working-directory: server
+        shell: bash
+
+      - name: Integration test (test-signaling.js)
+        run: TEST_PORT=8990 node test-signaling.js
+        working-directory: server
+
+      - name: Stop signaling
+        if: always()
+        run: kill ${SIGNAL_PID} 2>/dev/null || true
+        shell: bash
 
       - name: npm audit (server, production only)
         run: npm audit --omit=dev --audit-level=high

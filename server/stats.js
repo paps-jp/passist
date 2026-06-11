@@ -7,7 +7,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const DATA_DIR = path.join(__dirname, '..', 'data');
+// テスト時は PASSIST_STATS_DIR で独立ディレクトリを指定できる（本番では未設定＝既定の <repo>/data）
+const DATA_DIR = process.env.PASSIST_STATS_DIR || path.join(__dirname, '..', 'data');
 const FILE = path.join(DATA_DIR, 'stats.json');
 const WINDOW_MS = 24 * 60 * 60 * 1000;       // 直近24時間のローリング窓
 const FLUSH_MS = 60 * 1000;                  // 1分ごとに永続化

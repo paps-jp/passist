@@ -14,6 +14,7 @@ const crypto = require('crypto');
 const express = require('express');
 const { WebSocketServer } = require('ws');
 const stats = require('./stats'); // 匿名集計（個人情報は記録しない）。snapshot は /api/stats で公開
+const { sanitizeBase, clampMaxViewers, calcBitrate } = require('./util'); // 純粋関数（test-util.js でテスト）
 
 const PORT = parseInt(process.env.PORT || '8443', 10);
 const ACCESS_MODE = process.env.ACCESS_MODE || 'approve'; // 'approve' | 'pin' | 'token'
@@ -103,7 +104,7 @@ const SCHEME = useTls ? 'https' : 'http';
 /** token -> session */
 const sessions = new Map();
 let viewerSeq = 0; // ビューアの一意ID採番（複数同時接続のルーティング用）
-const clampMaxViewers = (n) => { const v = parseInt(n, 10); return Number.isFinite(v) ? Math.min(8, Math.max(1, v)) : 1; };
+// clampMaxViewers / sanitizeBase / calcBitrate は util.js から取り込み（テスト容易化のため切り出し）
 
 // --- TURN(relay) 経由ピアの動的 bitrate ガバナ ---
 // サーバ OUT 帯域 cap（例: さくらVPSはOUT 10Mbps制限、安全側で 4Mbps を分配上限）。
@@ -126,10 +127,7 @@ function totalBudgetBps() {
   return total || RELAY_BUDGET_BPS; // フォールバック：静的1台分
 }
 function calcRelayBitrate() {
-  const n = relayCount();
-  if (n === 0) return RELAY_MAX_BPS; // 0人なら上限値（実害なし）
-  const v = Math.floor(totalBudgetBps() / n);
-  return Math.max(RELAY_MIN_BPS, Math.min(RELAY_MAX_BPS, v));
+  return calcBitrate(relayCount(), totalBudgetBps(), RELAY_MIN_BPS, RELAY_MAX_BPS);
 }
 let lastPolicy = { maxBpsRelay: 0, relayCount: -1 };
 function broadcastBitratePolicy() {
@@ -147,16 +145,6 @@ function lanIp() {
     }
   }
   return '127.0.0.1';
-}
-
-function sanitizeBase(u) {
-  try {
-    const url = new URL(u);
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') return '';
-    return u.replace(/\/+$/, '');
-  } catch {
-    return '';
-  }
 }
 
 function baseUrl(override) {
