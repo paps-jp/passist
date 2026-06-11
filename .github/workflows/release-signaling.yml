@@ -1,0 +1,123 @@
+name: release-signaling
+
+# v* タグを切ると、signaling コンテナを Reproducible Build してGHCRに公開し、
+# Cosign keyless でSigstore Rekorに署名を記録する。
+# 利用者は cosign verify で「サーバが動かしている image は GitHub の公開ソースから作られた」を
+# 暗号学的に検証できる。
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (e.g. v0.2.0)'
+        required: true
+
+permissions:
+  contents: read
+  packages: write       # GHCR push
+  id-token: write       # cosign keyless: GitHub OIDC で短期証明書を取得
+  attestations: write   # SLSA provenance attestation
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      # 全ファイル mtime を固定値（git commit時刻）にして決定的ビルドを保証
+      - name: Determine SOURCE_DATE_EPOCH and metadata
+        id: meta
+        run: |
+          SDE=$(git log -1 --format=%ct)
+          echo "source_date_epoch=$SDE" >> $GITHUB_OUTPUT
+          echo "git_commit=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+          echo "build_timestamp=$(date -u -d "@$SDE" '+%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+          TAG="${{ inputs.tag || github.ref_name }}"
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "image=ghcr.io/$OWNER/passist-signaling" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # provenance=max + sbom=true で SLSA Build Level 3 相当のattestationを image に添付
+      - name: Build & push (reproducible)
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: ./server
+          file: ./server/Dockerfile
+          push: true
+          provenance: mode=max
+          sbom: true
+          build-args: |
+            SOURCE_DATE_EPOCH=${{ steps.meta.outputs.source_date_epoch }}
+            GIT_COMMIT=${{ steps.meta.outputs.git_commit }}
+            BUILD_TIMESTAMP=${{ steps.meta.outputs.build_timestamp }}
+          tags: |
+            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
+            ${{ steps.meta.outputs.image }}:latest
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ steps.meta.outputs.git_commit }}
+            org.opencontainers.image.version=${{ steps.meta.outputs.tag }}
+            org.opencontainers.image.created=${{ steps.meta.outputs.build_timestamp }}
+
+      # GitHub OIDC を使って keyless で署名 → Sigstore Rekor の transparency log に公開記録
+      # 誰でも cosign verify で検証できる（秘密鍵を運営者が管理しない＝鍵漏洩リスクなし）
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Cosign sign (keyless)
+        env:
+          COSIGN_EXPERIMENTAL: '1'
+          IMAGE: ${{ steps.meta.outputs.image }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          cosign sign --yes "${IMAGE}@${DIGEST}"
+
+      - name: Summary
+        run: |
+          {
+            echo "## ✅ Signaling image published & signed"
+            echo ""
+            echo "**Image:** \`${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}\`"
+            echo ""
+            echo "**Digest:** \`${{ steps.build.outputs.digest }}\`"
+            echo ""
+            echo "**Commit:** \`${{ steps.meta.outputs.git_commit }}\`"
+            echo ""
+            echo "**Built at (UTC, deterministic):** \`${{ steps.meta.outputs.build_timestamp }}\`"
+            echo ""
+            echo "### Verify (anyone can run)"
+            echo '```sh'
+            echo "cosign verify ${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }} \\"
+            echo "  --certificate-identity-regexp 'https://github.com/${{ github.repository }}' \\"
+            echo "  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'"
+            echo '```'
+            echo ""
+            echo "### Independently reproduce the build"
+            echo '```sh'
+            echo "git clone https://github.com/${{ github.repository }} && cd \$(basename ${{ github.repository }})"
+            echo "git checkout ${{ steps.meta.outputs.tag }}"
+            echo "docker buildx build server \\"
+            echo "  --build-arg SOURCE_DATE_EPOCH=${{ steps.meta.outputs.source_date_epoch }} \\"
+            echo "  --build-arg GIT_COMMIT=${{ steps.meta.outputs.git_commit }} \\"
+            echo "  --build-arg BUILD_TIMESTAMP='${{ steps.meta.outputs.build_timestamp }}' \\"
+            echo "  --provenance=mode=max --sbom=true -t local-rebuild"
+            echo "# digest が ${{ steps.build.outputs.digest }} と一致すれば同一のバイト列"
+            echo '```'
+          } >> $GITHUB_STEP_SUMMARY

@@ -181,6 +181,28 @@ const PAGES_BASE = 'https://paps-jp.github.io/passist';
 app.get('/', (_req, res) => res.redirect(301, PAGES_BASE + '/'));
 app.get('/stats', (_req, res) => res.redirect(301, PAGES_BASE + '/stats.html'));
 
+// 透明性 API: 動作中サーバの自己申告（commit / image digest / build時刻）。
+// ★ これ自体は嘘がつける（運営者がコード改ざんすれば偽値を返せる）。
+// 真の保証は GHCR の image digest を cosign で検証すること。次のように：
+//   cosign verify ghcr.io/paps-jp/passist-signaling@<digest> \
+//     --certificate-identity-regexp 'https://github.com/paps-jp/passist' \
+//     --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'
+// /api/build はサーバ運営者がオープンに自己申告するためのもので、cosign 検証の入口として使う。
+const BUILD_INFO = Object.freeze({
+  commit: process.env.GIT_COMMIT || '',
+  imageDigest: process.env.IMAGE_DIGEST || '',
+  builtAt: process.env.BUILD_TIMESTAMP || '',
+  sourceUrl: 'https://github.com/paps-jp/passist',
+  registry: 'ghcr.io/paps-jp/passist-signaling',
+  cosignVerifyHint:
+    "cosign verify <image> --certificate-identity-regexp 'https://github.com/paps-jp/passist' --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'",
+});
+app.get('/api/build', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.json(BUILD_INFO);
+});
+
 // 公開統計 API（個人情報なし。リアルタイム値と24h/日次サマリのみ）。
 app.get('/api/stats', (_req, res) => {
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
