@@ -184,15 +184,29 @@ docker inspect local-rebuild --format='{{.Id}}'
 
     <section style="background:#fff4ea">
       <div class="wrap">
-        <h2><span class="num">5</span>残る課題と私たちの姿勢</h2>
-        <div class="card warn">
-          <p><strong>絶対の保証はありません。</strong>運営者が「別の image をこっそり動かす」ことは技術的には可能で、これを完全に防ぐには TPM や Intel TDX/SGX、AMD SEV-SNP などのハードウェア・リモート証明（remote attestation）が必要です。</p>
-          <p>ただし、この攻撃は<strong>「PAssist の運営者が悪意を持ち、組織的に証拠を消す」必要があります</strong>。すべてのコード・ワークフロー・依存関係が公開されている以上、改ざんがあれば技術的に検証可能（=露見する）状態です。</p>
-        </div>
+        <h2><span class="num">5</span>ライセンス</h2>
+        <p class="lead">PAssist のコードは、上記のような <strong>安全性の検証を可能にするため</strong>に公開しています。</p>
 
         <div class="card success">
-          <p>究極の安心が必要な場合は、<strong>自分のサーバで PAssist を立てる</strong>こともできます（コードは MIT などのOSSライセンスで完全公開）。私たちはこの<strong>「他人を信用しなくても済む選択肢」</strong>を維持することを大切にしています。</p>
+          <h3>✅ 自由にできること</h3>
+          <ul>
+            <li><strong>使う</strong>こと — 個人・法人を問わず、商用・非商用を問わず、PAssist を動かして自分の業務や支援活動、サービス提供に使うことは自由です。</li>
+            <li>自分のサーバで PAssist を立てて、社内・組織内・自社サービスとして運用すること。</li>
+            <li>コードを読んで監査・検証すること、安全性を確認するために自分でビルドして再現性を確かめること。</li>
+          </ul>
         </div>
+
+        <div class="card warn">
+          <h3>⚠ ご遠慮いただいていること</h3>
+          <ul>
+            <li>コードや改変版を<strong>第三者に再頒布・販売</strong>すること。</li>
+            <li>PAssist の派生物（フォーク・改造版）を<strong>独自の製品として商用提供</strong>すること。</li>
+            <li>コードの一部・全部を別ソフトウェアに組み込んで販売すること。</li>
+          </ul>
+          <p style="margin-top:10px">これは「サービスとしての利用は自由」「コードそのものの商業化は控えていただく」という方針です。技術的な検証のためにコードを公開しつつ、開発の継続性と品質を保つためのものです。</p>
+        </div>
+
+        <p style="margin-top:16px;color:var(--mut);font-size:14px">詳細は <a href="https://github.com/paps-jp/passist/blob/main/LICENSE" target="_blank" rel="noopener">LICENSE ファイル</a> を参照してください。</p>
       </div>
     </section>
 
