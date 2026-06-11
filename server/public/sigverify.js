@@ -99,17 +99,25 @@
     }
     return -1;
   }
-  // DER バイナリの中から「prefix で始まる ASCII 印字可能文字列」を取り出す。
-  // ASN.1 IA5String / PrintableString として埋め込まれた URI を確実に拾うためにバイト単位でスキャン
-  // （TextDecoder().decode() だと invalid UTF-8 が � に置換されて regex が壊れる）。
+  // DER バイナリから「prefix で始まる ASN.1 文字列」を取り出す。
+  // URL の直前バイトは ASN.1 length (DER short form) であることが多いので、 これを使って
+  // 正確な長さで切り取る。 そうしないと URL の末尾に次の ASN.1 SEQUENCE タグ (0x30='0') が
+  // 取り込まれてしまう（例: ".yml@refs/tags/v0.2.6" → ".yml@refs/tags/v0.2.609" になる）。
   function findUriInDer(der, prefix) {
     const pb = new TextEncoder().encode(prefix);
     const i = bytesIndexOf(der, pb);
     if (i < 0) return '';
+    // ASN.1 short-form length: prefix の直前 1 バイトが URL 全体の長さ。
+    if (i >= 1) {
+      const len = der[i - 1];
+      if (len >= pb.length && len <= 0x7f && i + len <= der.length) {
+        return new TextDecoder().decode(der.slice(i, i + len));
+      }
+    }
+    // フォールバック: ASCII printable 範囲で停止（精度は落ちる）
     let end = i + pb.length;
     while (end < der.length) {
       const c = der[end];
-      // ASCII printable 範囲 (0x20-0x7e) のみ URL 文字とみなす
       if (c < 0x20 || c > 0x7e) break;
       end++;
     }
@@ -209,8 +217,13 @@
 
       // 3. certificate (base64 encoded PEM) を取り出して identity を抽出
       let certInput = null;
-      if (sigObj?.Cert) {
+      // cosign 出力の Cert は cosign バージョンにより形式が異なる:
+      //   旧: PEM 文字列
+      //   新: Go の x509.Certificate を marshal したオブジェクト → Raw に DER の base64 が入る
+      if (typeof sigObj?.Cert === 'string') {
         certInput = sigObj.Cert;
+      } else if (sigObj?.Cert?.Raw) {
+        certInput = base64ToBytes(sigObj.Cert.Raw);
       } else if (bodyJson.spec?.signature?.publicKey?.content) {
         // hashedrekord: publicKey.content は base64-encoded PEM
         certInput = atob(bodyJson.spec.signature.publicKey.content);
