@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja">
+<html lang="ja" data-i18n-title="docs.docTitle">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -29,6 +29,12 @@
       .crumbs{display:flex;gap:14px;margin-bottom:12px;font-size:14px}
       .crumbs a{color:rgba(255,255,255,.92);text-decoration:none}
       .crumbs a:hover{color:#fff;text-decoration:underline}
+
+      /* 言語切替 (右上の小チップ) */
+      .lang-switch{position:absolute;top:14px;right:16px;display:flex;gap:5px;z-index:3}
+      .lang-btn{background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.45);font-size:12px;font-weight:600;padding:5px 11px;border-radius:999px;cursor:pointer;font-family:inherit;transition:.15s}
+      .lang-btn:hover{background:rgba(255,255,255,.28)}
+      .lang-btn.active{background:#fff;color:#2f6df0;border-color:#fff;cursor:default}
 
       .layout{max-width:1000px;margin:0 auto;display:grid;grid-template-columns:232px 1fr;gap:34px;padding:30px 24px 70px}
       nav.toc{position:sticky;top:16px;align-self:start;font-size:13.5px}
@@ -63,59 +69,63 @@
   </head>
   <body>
     <header class="hero">
+      <div class="lang-switch">
+        <button class="lang-btn" data-lang-btn="ja" onclick="setLang('ja')">日本語</button>
+        <button class="lang-btn" data-lang-btn="en" onclick="setLang('en')">English</button>
+      </div>
       <div class="wrap">
         <div class="crumbs">
-          <a href="index.html">← ホーム</a>
-          <a href="index.html#download">⬇ ダウンロード</a>
-          <a href="verification.html">🔐 検証に基づく安全性</a>
+          <a href="index.html" data-i18n="docs.crumbs.home">← ホーム</a>
+          <a href="index.html#download" data-i18n="docs.crumbs.dl">⬇ ダウンロード</a>
+          <a href="verification.html" data-i18n="docs.crumbs.ver">🔐 検証に基づく安全性</a>
         </div>
-        <h1>PAssist ドキュメント</h1>
-        <p>このPCの「1つのウィンドウだけ」を、ブラウザだけ・アカウント不要で、離れた相手に一時的にリモート操作してもらうツール。デスクトップ全体は決して映りません。</p>
+        <h1 data-i18n="docs.h1">PAssist ドキュメント</h1>
+        <p data-i18n="docs.lead">このPCの「1つのウィンドウだけ」を、ブラウザだけ・アカウント不要で、離れた相手に一時的にリモート操作してもらうツール。デスクトップ全体は決して映りません。</p>
       </div>
     </header>
 
     <div class="layout">
       <nav class="toc">
-        <a href="#overview">1. 概要</a>
-        <a href="#features">2. できること</a>
-        <a href="#arch">3. アーキテクチャ</a>
-        <a href="#usage">4. 使い方</a>
-        <a href="#access">5. アクセス制御と信頼</a>
-        <a href="#public">6. インターネット公開</a>
-        <a href="#security">7. セキュリティ</a>
-        <a href="#verify">8. 検証・署名</a>
-        <a href="#config">9. 設定（環境変数）</a>
-        <a href="#selfhost">10. セルフホスト・運用</a>
-        <a href="#build">11. ビルドと配布</a>
-        <a href="#iframe">12. iframe 埋め込み</a>
-        <a href="#limits">13. 制限と今後</a>
-        <a href="#license">14. ライセンス</a>
+        <a href="#overview" data-i18n="docs.toc.1">1. 概要</a>
+        <a href="#features" data-i18n="docs.toc.2">2. できること</a>
+        <a href="#arch" data-i18n="docs.toc.3">3. アーキテクチャ</a>
+        <a href="#usage" data-i18n="docs.toc.4">4. 使い方</a>
+        <a href="#access" data-i18n="docs.toc.5">5. アクセス制御と信頼</a>
+        <a href="#public" data-i18n="docs.toc.6">6. インターネット公開</a>
+        <a href="#security" data-i18n="docs.toc.7">7. セキュリティ</a>
+        <a href="#verify" data-i18n="docs.toc.8">8. 検証・署名</a>
+        <a href="#config" data-i18n="docs.toc.9">9. 設定（環境変数）</a>
+        <a href="#selfhost" data-i18n="docs.toc.10">10. セルフホスト・運用</a>
+        <a href="#build" data-i18n="docs.toc.11">11. ビルドと配布</a>
+        <a href="#iframe" data-i18n="docs.toc.12">12. iframe 埋め込み</a>
+        <a href="#limits" data-i18n="docs.toc.13">13. 制限と今後</a>
+        <a href="#license" data-i18n="docs.toc.14">14. ライセンス</a>
       </nav>
 
       <main>
         <section id="overview">
-          <h2><span class="e">📘</span>1. 概要</h2>
-          <p>PAssist は Windows 向けのリモート操作ツールです。共有するのは<strong>選んだ 1 つのウィンドウだけ</strong>。操作する相手は<strong>ブラウザを開くだけ</strong>（インストール・アカウント不要）。映像と操作は WebRTC で暗号化されて流れ、デスクトップ全体は構造的に映りません。</p>
-          <div class="note">ねらい：① 開いている任意のウィンドウを1つ選ぶ → ② 共有URL／QRを発行 → ③ 相手がブラウザだけで一時操作 → ④ デスクトップ全体は絶対に見せない → ⑤ アカウント作成なしで入れる。</div>
+          <h2><span class="e">📘</span><span data-i18n="docs.s1.title">1. 概要</span></h2>
+          <p data-i18n-html="docs.s1.p">PAssist は Windows 向けのリモート操作ツールです。共有するのは<strong>選んだ 1 つのウィンドウだけ</strong>。操作する相手は<strong>ブラウザを開くだけ</strong>（インストール・アカウント不要）。映像と操作は WebRTC で暗号化されて流れ、デスクトップ全体は構造的に映りません。</p>
+          <div class="note" data-i18n="docs.s1.note">ねらい：① 開いている任意のウィンドウを1つ選ぶ → ② 共有URL／QRを発行 → ③ 相手がブラウザだけで一時操作 → ④ デスクトップ全体は絶対に見せない → ⑤ アカウント作成なしで入れる。</div>
         </section>
 
         <section id="features">
-          <h2><span class="e">✨</span>2. できること</h2>
+          <h2><span class="e">✨</span><span data-i18n="docs.s2.title">2. できること</span></h2>
           <table>
-            <tr><th>要件</th><th>実装</th></tr>
-            <tr><td>任意のウィンドウを1つだけ選ぶ</td><td>開いているウィンドウ一覧から選択。キャプチャ元は <code>window</code> のみ列挙し <code>screen</code> は一切扱わない。</td></tr>
-            <tr><td>URL／QRを発行</td><td>選択すると共有URL（<code>…/s/&lt;token&gt;</code>）を自動発行。スマホ用にQRコードも表示。</td></tr>
-            <tr><td>ブラウザだけで一時操作</td><td>WebRTC で映像、DataChannel でマウス/キー操作。相手はブラウザのみ。</td></tr>
-            <tr><td>複数人で同時に</td><td>同時接続を設定可能。<strong>操作できるのは常に1人</strong>（最初の接続者）、ほかは閲覧。全員「閲覧のみ」にも切替可。</td></tr>
-            <tr><td>デスクトップ全体は出さない</td><td>選んだ1ウィンドウの映像のみ。構造的に画面全体を渡せない設計。</td></tr>
-            <tr><td>アカウント不要</td><td>URLのトークンだけで接続。ログインなし。</td></tr>
-            <tr><td>一時利用</td><td>セッションに有効期限（既定30分、変更可・無期限も可）。期限切れで自動失効。</td></tr>
-            <tr><td>検証できる</td><td>サーバが「公開コードと同一」であることをブラウザが自動で暗号学的に検証（<a href="verification.html">詳細</a>）。</td></tr>
+            <tr><th data-i18n="docs.s2.th.req">要件</th><th data-i18n="docs.s2.th.impl">実装</th></tr>
+            <tr><td data-i18n="docs.s2.r1.req">任意のウィンドウを1つだけ選ぶ</td><td data-i18n-html="docs.s2.r1.impl">開いているウィンドウ一覧から選択。キャプチャ元は <code>window</code> のみ列挙し <code>screen</code> は一切扱わない。</td></tr>
+            <tr><td data-i18n="docs.s2.r2.req">URL／QRを発行</td><td data-i18n-html="docs.s2.r2.impl">選択すると共有URL（<code>…/s/&lt;token&gt;</code>）を自動発行。スマホ用にQRコードも表示。</td></tr>
+            <tr><td data-i18n="docs.s2.r3.req">ブラウザだけで一時操作</td><td data-i18n="docs.s2.r3.impl">WebRTC で映像、DataChannel でマウス/キー操作。相手はブラウザのみ。</td></tr>
+            <tr><td data-i18n="docs.s2.r4.req">複数人で同時に</td><td data-i18n-html="docs.s2.r4.impl">同時接続を設定可能。<strong>操作できるのは常に1人</strong>（最初の接続者）、ほかは閲覧。全員「閲覧のみ」にも切替可。</td></tr>
+            <tr><td data-i18n="docs.s2.r5.req">デスクトップ全体は出さない</td><td data-i18n="docs.s2.r5.impl">選んだ1ウィンドウの映像のみ。構造的に画面全体を渡せない設計。</td></tr>
+            <tr><td data-i18n="docs.s2.r6.req">アカウント不要</td><td data-i18n="docs.s2.r6.impl">URLのトークンだけで接続。ログインなし。</td></tr>
+            <tr><td data-i18n="docs.s2.r7.req">一時利用</td><td data-i18n="docs.s2.r7.impl">セッションに有効期限（既定30分、変更可・無期限も可）。期限切れで自動失効。</td></tr>
+            <tr><td data-i18n="docs.s2.r8.req">検証できる</td><td data-i18n-html="docs.s2.r8.impl">サーバが「公開コードと同一」であることをブラウザが自動で暗号学的に検証（<a href="verification.html">詳細</a>）。</td></tr>
           </table>
         </section>
 
         <section id="arch">
-          <h2><span class="e">🧩</span>3. アーキテクチャ</h2>
+          <h2><span class="e">🧩</span><span data-i18n="docs.s3.title">3. アーキテクチャ</span></h2>
           <pre class="diagram">
   ┌──────────────────────── ホストPC (PAssist) ────────────────────────┐
   │  Electron アプリ（タスクトレイ常駐）                                 │
@@ -132,123 +142,123 @@
         └──────────────┘
           </pre>
           <ul>
-            <li><strong>ホスト</strong>（<code>host/</code>・Electron）：ウィンドウのキャプチャ（<code>getDisplayMedia</code> ＋ <code>setDisplayMediaRequestHandler</code>）、WebRTC の offer、入力注入。シグナリングサーバを内部で起動。</li>
-            <li><strong>サーバ</strong>（<code>server/</code>・Node express + ws）：セッション/トークン管理、SDP/ICE 中継、ビューア配信、TURN クレデンシャル発行。ホスト内蔵のほか、独立サーバとしても運用可（Docker image を配布）。</li>
-            <li><strong>ビューア</strong>（<code>server/public/viewer.html</code>）：ブラウザの素のページ（WebRTC の answer 側）。映像表示・入力送信・サーバ検証。</li>
-            <li><strong>暗号化</strong>：映像・操作は WebRTC（DTLS-SRTP）で常に暗号化。シグナリング/ページは https/wss 化可能。</li>
+            <li data-i18n-html="docs.s3.li1"><strong>ホスト</strong>（<code>host/</code>・Electron）：ウィンドウのキャプチャ（<code>getDisplayMedia</code> ＋ <code>setDisplayMediaRequestHandler</code>）、WebRTC の offer、入力注入。シグナリングサーバを内部で起動。</li>
+            <li data-i18n-html="docs.s3.li2"><strong>サーバ</strong>（<code>server/</code>・Node express + ws）：セッション/トークン管理、SDP/ICE 中継、ビューア配信、TURN クレデンシャル発行。ホスト内蔵のほか、独立サーバとしても運用可（Docker image を配布）。</li>
+            <li data-i18n-html="docs.s3.li3"><strong>ビューア</strong>（<code>server/public/viewer.html</code>）：ブラウザの素のページ（WebRTC の answer 側）。映像表示・入力送信・サーバ検証。</li>
+            <li data-i18n-html="docs.s3.li4"><strong>暗号化</strong>：映像・操作は WebRTC（DTLS-SRTP）で常に暗号化。シグナリング/ページは https/wss 化可能。</li>
           </ul>
         </section>
 
         <section id="usage">
-          <h2><span class="e">🚀</span>4. 使い方</h2>
-          <h3>ホスト（共有する人）</h3>
+          <h2><span class="e">🚀</span><span data-i18n="docs.s4.title">4. 使い方</span></h2>
+          <h3 data-i18n="docs.s4.host.h">ホスト（共有する人）</h3>
           <ol>
-            <li><code>PAssist.exe</code> をダブルクリック（開発時は <code>npm start</code>）</li>
-            <li>共有したいウィンドウをクリックして選択</li>
-            <li>表示された<strong>共有URL</strong>をコピー、または<strong>QRコード</strong>を相手に見せる</li>
-            <li>接続リクエストが来たら<strong>「許可」</strong>（「この端末を信頼」で次回から自動承認）</li>
+            <li data-i18n-html="docs.s4.host.o1"><code>PAssist.exe</code> をダブルクリック（開発時は <code>npm start</code>）</li>
+            <li data-i18n="docs.s4.host.o2">共有したいウィンドウをクリックして選択</li>
+            <li data-i18n-html="docs.s4.host.o3">表示された<strong>共有URL</strong>をコピー、または<strong>QRコード</strong>を相手に見せる</li>
+            <li data-i18n-html="docs.s4.host.o4">接続リクエストが来たら<strong>「許可」</strong>（「この端末を信頼」で次回から自動承認）</li>
           </ol>
-          <h3>ゲスト（操作する人）</h3>
+          <h3 data-i18n="docs.s4.guest.h">ゲスト（操作する人）</h3>
           <ol>
-            <li>送られたURLを<strong>ブラウザで開く</strong>（スマホはQRを読み取るだけ）</li>
-            <li>「クリックして操作を開始」→ マウス／キーボードで対象ウィンドウを操作。終了はブラウザを閉じるだけ。</li>
+            <li data-i18n-html="docs.s4.guest.o1">送られたURLを<strong>ブラウザで開く</strong>（スマホはQRを読み取るだけ）</li>
+            <li data-i18n="docs.s4.guest.o2">「クリックして操作を開始」→ マウス／キーボードで対象ウィンドウを操作。終了はブラウザを閉じるだけ。</li>
           </ol>
-          <h3>タスクトレイ常駐</h3>
+          <h3 data-i18n="docs.s4.tray.h">タスクトレイ常駐</h3>
           <ul>
-            <li>ウィンドウの「×」は<strong>終了せずトレイに格納</strong>。トレイアイコンのクリックで再表示。</li>
-            <li>トレイ右クリック →「管理画面を開く」「ログイン時に自動起動」「終了」。</li>
+            <li data-i18n-html="docs.s4.tray.li1">ウィンドウの「×」は<strong>終了せずトレイに格納</strong>。トレイアイコンのクリックで再表示。</li>
+            <li data-i18n="docs.s4.tray.li2">トレイ右クリック →「管理画面を開く」「ログイン時に自動起動」「終了」。</li>
           </ul>
-          <div class="warn">未署名のため、初回は SmartScreen 警告が出ることがあります（「詳細情報 → 実行」）。常用ならコード署名を推奨。</div>
+          <div class="warn" data-i18n="docs.s4.warn">未署名のため、初回は SmartScreen 警告が出ることがあります（「詳細情報 → 実行」）。常用ならコード署名を推奨。</div>
         </section>
 
         <section id="access">
-          <h2><span class="e">🔑</span>5. アクセス制御と信頼</h2>
-          <p>「誰が繋げるか」をセッションごと（または既定値 <code>ACCESS_MODE</code>）で選べます。</p>
+          <h2><span class="e">🔑</span><span data-i18n="docs.s5.title">5. アクセス制御と信頼</span></h2>
+          <p data-i18n-html="docs.s5.p">「誰が繋げるか」をセッションごと（または既定値 <code>ACCESS_MODE</code>）で選べます。</p>
           <table>
-            <tr><th>モード</th><th>挙動</th><th>強さ</th></tr>
-            <tr><td><code>approve</code>（既定）</td><td>ホストが「許可」するまで接続不可。映像も流れない。</td><td>最も安全</td></tr>
-            <tr><td><code>pin</code></td><td>セッションごとに発行される6桁ワンタイムPINが一致すれば接続（ホスト承認なし）。</td><td>中</td></tr>
-            <tr><td><code>invite</code></td><td>招待リンク（信頼クレデンシャル付きURL）を持つ相手のみ。リンクが無いと接続不可。</td><td>中〜高</td></tr>
-            <tr><td><code>token</code></td><td>URLのトークンだけで即接続（承認なし）。手軽だが最も緩い。</td><td>緩い</td></tr>
+            <tr><th data-i18n="docs.s5.th.mode">モード</th><th data-i18n="docs.s5.th.act">挙動</th><th data-i18n="docs.s5.th.strength">強さ</th></tr>
+            <tr><td data-i18n-html="docs.s5.r1.mode"><code>approve</code>（既定）</td><td data-i18n="docs.s5.r1.act">ホストが「許可」するまで接続不可。映像も流れない。</td><td data-i18n="docs.s5.r1.strength">最も安全</td></tr>
+            <tr><td data-i18n-html="docs.s5.r2.mode"><code>pin</code></td><td data-i18n="docs.s5.r2.act">セッションごとに発行される6桁ワンタイムPINが一致すれば接続（ホスト承認なし）。</td><td data-i18n="docs.s5.r2.strength">中</td></tr>
+            <tr><td data-i18n-html="docs.s5.r3.mode"><code>invite</code></td><td data-i18n="docs.s5.r3.act">招待リンク（信頼クレデンシャル付きURL）を持つ相手のみ。リンクが無いと接続不可。</td><td data-i18n="docs.s5.r3.strength">中〜高</td></tr>
+            <tr><td data-i18n-html="docs.s5.r4.mode"><code>token</code></td><td data-i18n="docs.s5.r4.act">URLのトークンだけで即接続（承認なし）。手軽だが最も緩い。</td><td data-i18n="docs.s5.r4.strength">緩い</td></tr>
           </table>
 
-          <h3>信頼済み端末（事前承認）</h3>
-          <p>初回に「この端末を信頼」、または「招待リンク」を渡すと、その端末は次回から自動承認されます。仕組みは端末ごとの <code>clientId ＋ secret</code>。<strong>ホストは secret のハッシュ（SHA-256）だけを保存</strong>し（<code>userData/passist-trust.json</code>）、平文はビューアの <code>localStorage</code> のみに置かれます。招待リンクは <code>…/s/&lt;token&gt;#k=&lt;clientId&gt;.&lt;secret&gt;</code> の形。</p>
+          <h3 data-i18n="docs.s5.trust.h">信頼済み端末（事前承認）</h3>
+          <p data-i18n-html="docs.s5.trust.p">初回に「この端末を信頼」、または「招待リンク」を渡すと、その端末は次回から自動承認されます。仕組みは端末ごとの <code>clientId ＋ secret</code>。<strong>ホストは secret のハッシュ（SHA-256）だけを保存</strong>し（<code>userData/passist-trust.json</code>）、平文はビューアの <code>localStorage</code> のみに置かれます。招待リンクは <code>…/s/&lt;token&gt;#k=&lt;clientId&gt;.&lt;secret&gt;</code> の形。</p>
 
-          <h3>同時接続・閲覧のみ・有効期限</h3>
+          <h3 data-i18n="docs.s5.multi.h">同時接続・閲覧のみ・有効期限</h3>
           <ul>
-            <li><strong>同時接続</strong>：人数を設定可能。操作できるのは常に1人（最初の接続者）、ほかは自動的に閲覧のみ。</li>
-            <li><strong>閲覧のみ</strong>：全員を操作不可（画面共有だけ）に切替可能。</li>
-            <li><strong>有効期限</strong>：既定30分。30分／1時間／3時間／6時間／無期限から選択。期限切れで全接続を自動切断。</li>
+            <li data-i18n-html="docs.s5.multi.li1"><strong>同時接続</strong>：人数を設定可能。操作できるのは常に1人（最初の接続者）、ほかは自動的に閲覧のみ。</li>
+            <li data-i18n-html="docs.s5.multi.li2"><strong>閲覧のみ</strong>：全員を操作不可（画面共有だけ）に切替可能。</li>
+            <li data-i18n-html="docs.s5.multi.li3"><strong>有効期限</strong>：既定30分。30分／1時間／3時間／6時間／無期限から選択。期限切れで全接続を自動切断。</li>
           </ul>
         </section>
 
         <section id="public">
-          <h2><span class="e">🌍</span>6. インターネット公開</h2>
-          <h3>方法A：UPnP 自動公開（公開IP＋UPnP有効が前提）</h3>
-          <p>起動時にアプリが <strong>Webポート(TCP 8443)を UPnP で自動開放</strong>し、共有URLを <code>http://&lt;公開IP&gt;:8443/s/…</code> に自動設定します。</p>
+          <h2><span class="e">🌍</span><span data-i18n="docs.s6.title">6. インターネット公開</span></h2>
+          <h3 data-i18n="docs.s6.aH">方法A：UPnP 自動公開（公開IP＋UPnP有効が前提）</h3>
+          <p data-i18n-html="docs.s6.aP">起動時にアプリが <strong>Webポート(TCP 8443)を UPnP で自動開放</strong>し、共有URLを <code>http://&lt;公開IP&gt;:8443/s/…</code> に自動設定します。</p>
           <pre>npm start
 # ログに「[host] インターネット公開: http://&lt;公開IP&gt;:8443 …」が出れば成功
 # 同一LAN内のみにしたい場合: $env:PASSIST_PUBLIC="0"; npm start</pre>
-          <h3>方法B：Cloudflare トンネル（https・ポート開け不要・推奨）</h3>
-          <p>独自ドメイン（例 <code>passist.example.com</code>）で正規の https URL になります。Cloudflare 側の公開ホスト名は <strong>タイプ=HTTP / URL=localhost:8443 / パス=空</strong>。</p>
+          <h3 data-i18n="docs.s6.bH">方法B：Cloudflare トンネル（https・ポート開け不要・推奨）</h3>
+          <p data-i18n-html="docs.s6.bP">独自ドメイン（例 <code>passist.example.com</code>）で正規の https URL になります。Cloudflare 側の公開ホスト名は <strong>タイプ=HTTP / URL=localhost:8443 / パス=空</strong>。</p>
           <pre>$env:PASSIST_PUBLIC="0"; $env:PUBLIC_BASE_URL="https://passist.example.com"; npm start
 # 共有URL = https://passist.example.com/s/…（ブラウザで開くだけ）</pre>
-          <div class="note">映像/操作は WebRTC の P2P（STUN）で流れ、トンネルは通りません。厳しい NAT の相手とは TURN サーバが必要になることがあります（→ <a href="#selfhost">セルフホスト・運用</a>）。</div>
+          <div class="note" data-i18n-html="docs.s6.note">映像/操作は WebRTC の P2P（STUN）で流れ、トンネルは通りません。厳しい NAT の相手とは TURN サーバが必要になることがあります（→ <a href="#selfhost">セルフホスト・運用</a>）。</div>
         </section>
 
         <section id="security">
-          <h2><span class="e">🛡️</span>7. セキュリティ</h2>
+          <h2><span class="e">🛡️</span><span data-i18n="docs.s7.title">7. セキュリティ</span></h2>
           <table>
-            <tr><th>観点</th><th>対策</th></tr>
-            <tr><td>1ウィンドウ限定</td><td>キャプチャ元に <code>screen</code> を列挙せず、選択IDに固定。デスクトップ・他ウィンドウは映らない。</td></tr>
-            <tr><td>一時利用</td><td>セッションに有効期限（既定30分）。期限切れで自動失効。</td></tr>
-            <tr><td>勝手に繋がせない</td><td>既定でホスト承認制。許可するまで映像は流れない。PIN／招待リンクのモードも有り。</td></tr>
-            <tr><td>事前承認（信頼端末）</td><td>端末ごとのクレデンシャル。ホストはハッシュ（SHA-256）のみ保存。</td></tr>
-            <tr><td>操作範囲の限定</td><td>入力座標を対象ウィンドウの矩形にクランプ。窓外には出さない。</td></tr>
-            <tr><td>デスクトップへの脱出防止</td><td>Win / Alt+Tab / Alt+F4 / Ctrl+Esc / タスクマネージャ 等のキーをブロック。</td></tr>
-            <tr><td>暗号化</td><td>映像・操作は常に <span class="alg">DTLS-SRTP</span>（<span class="alg">AES-128-GCM</span> / <span class="alg">ECDHE</span>）。鍵はホストと相手だけが持ち、サーバ・TURN は中身を見られない。</td></tr>
-            <tr><td>サーバの真正性</td><td>稼働中サーバが公開コードと同一であることを暗号学的に検証可能（次節）。</td></tr>
+            <tr><th data-i18n="docs.s7.th.aspect">観点</th><th data-i18n="docs.s7.th.measure">対策</th></tr>
+            <tr><td data-i18n="docs.s7.r1.aspect">1ウィンドウ限定</td><td data-i18n-html="docs.s7.r1.measure">キャプチャ元に <code>screen</code> を列挙せず、選択IDに固定。デスクトップ・他ウィンドウは映らない。</td></tr>
+            <tr><td data-i18n="docs.s7.r2.aspect">一時利用</td><td data-i18n="docs.s7.r2.measure">セッションに有効期限（既定30分）。期限切れで自動失効。</td></tr>
+            <tr><td data-i18n="docs.s7.r3.aspect">勝手に繋がせない</td><td data-i18n="docs.s7.r3.measure">既定でホスト承認制。許可するまで映像は流れない。PIN／招待リンクのモードも有り。</td></tr>
+            <tr><td data-i18n="docs.s7.r4.aspect">事前承認（信頼端末）</td><td data-i18n="docs.s7.r4.measure">端末ごとのクレデンシャル。ホストはハッシュ（SHA-256）のみ保存。</td></tr>
+            <tr><td data-i18n="docs.s7.r5.aspect">操作範囲の限定</td><td data-i18n="docs.s7.r5.measure">入力座標を対象ウィンドウの矩形にクランプ。窓外には出さない。</td></tr>
+            <tr><td data-i18n="docs.s7.r6.aspect">デスクトップへの脱出防止</td><td data-i18n="docs.s7.r6.measure">Win / Alt+Tab / Alt+F4 / Ctrl+Esc / タスクマネージャ 等のキーをブロック。</td></tr>
+            <tr><td data-i18n="docs.s7.r7.aspect">暗号化</td><td data-i18n-html="docs.s7.r7.measure">映像・操作は常に <span class="alg">DTLS-SRTP</span>（<span class="alg">AES-128-GCM</span> / <span class="alg">ECDHE</span>）。鍵はホストと相手だけが持ち、サーバ・TURN は中身を見られない。</td></tr>
+            <tr><td data-i18n="docs.s7.r8.aspect">サーバの真正性</td><td data-i18n="docs.s7.r8.measure">稼働中サーバが公開コードと同一であることを暗号学的に検証可能（次節）。</td></tr>
           </table>
         </section>
 
         <section id="verify">
-          <h2><span class="e">🔐</span>8. 検証・署名</h2>
-          <p>signaling サーバの Docker image は、GitHub Actions で <strong>Reproducible Build</strong>（再現可能ビルド）され、<strong>Cosign keyless 署名</strong>（GitHub OIDC → Sigstore Fulcio の短期証明書 → Rekor 透明性ログ）と <strong>SLSA provenance ＋ SBOM</strong> が付きます。秘密鍵は運営者が保持しません。</p>
-          <p>ビューア／ホストの「PAssist について」を開くと、<strong>ブラウザ自身がその場で</strong> Rekor の Merkle 証明・署名・イメージ digest・証明書の発行元を検証し、<strong>✓</strong> を表示します（専門知識・追加インストール不要）。CLI でフル検証する場合：</p>
+          <h2><span class="e">🔐</span><span data-i18n="docs.s8.title">8. 検証・署名</span></h2>
+          <p data-i18n-html="docs.s8.p1">signaling サーバの Docker image は、GitHub Actions で <strong>Reproducible Build</strong>（再現可能ビルド）され、<strong>Cosign keyless 署名</strong>（GitHub OIDC → Sigstore Fulcio の短期証明書 → Rekor 透明性ログ）と <strong>SLSA provenance ＋ SBOM</strong> が付きます。秘密鍵は運営者が保持しません。</p>
+          <p data-i18n-html="docs.s8.p2">ビューア／ホストの「PAssist について」を開くと、<strong>ブラウザ自身がその場で</strong> Rekor の Merkle 証明・署名・イメージ digest・証明書の発行元を検証し、<strong>✓</strong> を表示します（専門知識・追加インストール不要）。CLI でフル検証する場合：</p>
           <pre><code>cosign verify ghcr.io/paps-jp/passist-signaling@&lt;digest&gt; \
   --certificate-identity-regexp 'https://github.com/paps-jp/passist' \
   --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'</code></pre>
-          <div class="ok">仕組みと「なぜ数学的に安全か」の初心者向け解説は <a href="verification.html"><strong>🔐 検証に基づく安全性</strong></a> を参照してください。</div>
+          <div class="ok" data-i18n-html="docs.s8.ok">仕組みと「なぜ数学的に安全か」の初心者向け解説は <a href="verification.html"><strong>🔐 検証に基づく安全性</strong></a> を参照してください。</div>
         </section>
 
         <section id="config">
-          <h2><span class="e">⚙️</span>9. 設定（環境変数）</h2>
-          <h3>ホスト側</h3>
+          <h2><span class="e">⚙️</span><span data-i18n="docs.s9.title">9. 設定（環境変数）</span></h2>
+          <h3 data-i18n="docs.s9.host.h">ホスト側</h3>
           <table>
-            <tr><th>変数</th><th>既定</th><th>説明</th></tr>
-            <tr><td><code>PASSIST_PUBLIC</code></td><td>有効</td><td><code>0</code> で UPnP 公開を無効（同一LAN内のみ）</td></tr>
-            <tr><td><code>PUBLIC_BASE_URL</code></td><td>—</td><td>共有URLのベース（トンネル使用時に指定）</td></tr>
-            <tr><td><code>REMOTE_SERVER_URL</code></td><td>—</td><td>外部シグナリングを使う場合の接続先（内部起動を無効化）</td></tr>
+            <tr><th data-i18n="docs.s9.th.var">変数</th><th data-i18n="docs.s9.th.default">既定</th><th data-i18n="docs.s9.th.desc">説明</th></tr>
+            <tr><td><code>PASSIST_PUBLIC</code></td><td data-i18n="docs.s9.h.r1.def">有効</td><td data-i18n-html="docs.s9.h.r1.desc"><code>0</code> で UPnP 公開を無効（同一LAN内のみ）</td></tr>
+            <tr><td><code>PUBLIC_BASE_URL</code></td><td data-i18n="docs.s9.h.r2.def">—</td><td data-i18n="docs.s9.h.r2.desc">共有URLのベース（トンネル使用時に指定）</td></tr>
+            <tr><td><code>REMOTE_SERVER_URL</code></td><td data-i18n="docs.s9.h.r3.def">—</td><td data-i18n="docs.s9.h.r3.desc">外部シグナリングを使う場合の接続先（内部起動を無効化）</td></tr>
           </table>
-          <h3>サーバ側</h3>
+          <h3 data-i18n="docs.s9.server.h">サーバ側</h3>
           <table>
-            <tr><th>変数</th><th>既定</th><th>説明</th></tr>
-            <tr><td><code>PORT</code></td><td>8443</td><td>サーバの待受ポート</td></tr>
-            <tr><td><code>ACCESS_MODE</code></td><td>approve</td><td>既定アクセスモード：approve / pin / invite / token</td></tr>
-            <tr><td><code>SESSION_TTL_MS</code></td><td>1800000</td><td>セッション有効期限(ms)。<code>0</code> で無期限</td></tr>
-            <tr><td><code>TLS_CERT</code> / <code>TLS_KEY</code></td><td>—</td><td>指定すると https/wss で待受</td></tr>
-            <tr><td><code>ICE_STUN_URL</code></td><td>Google STUN</td><td>配布する STUN サーバ</td></tr>
-            <tr><td><code>ICE_TURN_URL</code> / <code>ICE_TURN_USER</code> / <code>ICE_TURN_PASS</code></td><td>—</td><td>静的（固定認証）TURN</td></tr>
-            <tr><td><code>SIGN_TURN_URLS</code> / <code>TURN_AUTH_SECRET</code> / <code>SIGN_TURN_USERNAME</code> / <code>SIGN_TURN_TTL_SEC</code></td><td>—</td><td>短期認証TURN（HMAC で期限付きクレデンシャルを発行・自動失効）</td></tr>
-            <tr><td><code>RELAY_BUDGET_BPS</code> / <code>RELAY_MIN_BPS</code> / <code>RELAY_MAX_BPS</code></td><td>—</td><td>TURN 中継時の送信ビットレート上限（コスト管理）</td></tr>
+            <tr><th data-i18n="docs.s9.th.var">変数</th><th data-i18n="docs.s9.th.default">既定</th><th data-i18n="docs.s9.th.desc">説明</th></tr>
+            <tr><td><code>PORT</code></td><td>8443</td><td data-i18n="docs.s9.s.r1.desc">サーバの待受ポート</td></tr>
+            <tr><td><code>ACCESS_MODE</code></td><td>approve</td><td data-i18n="docs.s9.s.r2.desc">既定アクセスモード：approve / pin / invite / token</td></tr>
+            <tr><td><code>SESSION_TTL_MS</code></td><td>1800000</td><td data-i18n-html="docs.s9.s.r3.desc">セッション有効期限(ms)。<code>0</code> で無期限</td></tr>
+            <tr><td><code>TLS_CERT</code> / <code>TLS_KEY</code></td><td data-i18n="docs.s9.s.r4.def">—</td><td data-i18n="docs.s9.s.r4.desc">指定すると https/wss で待受</td></tr>
+            <tr><td><code>ICE_STUN_URL</code></td><td data-i18n="docs.s9.s.r5.def">Google STUN</td><td data-i18n="docs.s9.s.r5.desc">配布する STUN サーバ</td></tr>
+            <tr><td><code>ICE_TURN_URL</code> / <code>ICE_TURN_USER</code> / <code>ICE_TURN_PASS</code></td><td data-i18n="docs.s9.s.r6.def">—</td><td data-i18n="docs.s9.s.r6.desc">静的（固定認証）TURN</td></tr>
+            <tr><td><code>SIGN_TURN_URLS</code> / <code>TURN_AUTH_SECRET</code> / <code>SIGN_TURN_USERNAME</code> / <code>SIGN_TURN_TTL_SEC</code></td><td data-i18n="docs.s9.s.r7.def">—</td><td data-i18n="docs.s9.s.r7.desc">短期認証TURN（HMAC で期限付きクレデンシャルを発行・自動失効）</td></tr>
+            <tr><td><code>RELAY_BUDGET_BPS</code> / <code>RELAY_MIN_BPS</code> / <code>RELAY_MAX_BPS</code></td><td data-i18n="docs.s9.s.r8.def">—</td><td data-i18n="docs.s9.s.r8.desc">TURN 中継時の送信ビットレート上限（コスト管理）</td></tr>
           </table>
-          <p class="note" style="margin-top:8px"><code>GIT_COMMIT</code> / <code>IMAGE_DIGEST</code> / <code>BUILD_TIMESTAMP</code> / <code>GIT_TAG</code> はビルド時に自動で注入されるビルド情報で、<code>/api/build</code> から参照できます（手動設定不要）。</p>
+          <p class="note" style="margin-top:8px" data-i18n-html="docs.s9.buildNote"><code>GIT_COMMIT</code> / <code>IMAGE_DIGEST</code> / <code>BUILD_TIMESTAMP</code> / <code>GIT_TAG</code> はビルド時に自動で注入されるビルド情報で、<code>/api/build</code> から参照できます（手動設定不要）。</p>
         </section>
 
         <section id="selfhost">
-          <h2><span class="e">🐳</span>10. セルフホスト・運用</h2>
-          <p>signaling サーバは独立運用できます。<code>deploy/docker-compose.yml</code> が <strong>Caddy（自動TLS）＋ signaling（GHCR から pull）＋ coturn（TURN・同居）</strong>を立ち上げます。</p>
+          <h2><span class="e">🐳</span><span data-i18n="docs.s10.title">10. セルフホスト・運用</span></h2>
+          <p data-i18n-html="docs.s10.p">signaling サーバは独立運用できます。<code>deploy/docker-compose.yml</code> が <strong>Caddy（自動TLS）＋ signaling（GHCR から pull）＋ coturn（TURN・同居）</strong>を立ち上げます。</p>
           <pre><code># VPS 初期化（UFW・Docker 導入・.env 雛形生成）
 bash deploy/bootstrap.sh
 
@@ -259,78 +269,89 @@ bash deploy/bootstrap.sh
 docker compose -f deploy/docker-compose.yml up -d
 # 更新: docker compose pull &amp;&amp; docker compose up -d</code></pre>
           <ul>
-            <li><strong>image の真正性</strong>は pull 前後に <code>cosign verify</code> で確認できます（→ <a href="#verify">検証・署名</a>）。</li>
-            <li>TURN だけ別ホストに分離したい場合は <code>deploy/coturn-only/</code> を使用。</li>
-            <li><strong>統計</strong>：稼働サーバは <code>/api/stats</code>（CORS 許可）で匿名の利用統計を公開。ダッシュボードは <a href="stats.html">stats.html</a>。</li>
+            <li data-i18n-html="docs.s10.li1"><strong>image の真正性</strong>は pull 前後に <code>cosign verify</code> で確認できます（→ <a href="#verify">検証・署名</a>）。</li>
+            <li data-i18n-html="docs.s10.li2">TURN だけ別ホストに分離したい場合は <code>deploy/coturn-only/</code> を使用。</li>
+            <li data-i18n-html="docs.s10.li3"><strong>統計</strong>：稼働サーバは <code>/api/stats</code>（CORS 許可）で匿名の利用統計を公開。ダッシュボードは <a href="stats.html">stats.html</a>。</li>
           </ul>
         </section>
 
         <section id="build">
-          <h2><span class="e">🔨</span>11. ビルドと配布</h2>
-          <h3>ホスト（PAssist.exe）</h3>
+          <h2><span class="e">🔨</span><span data-i18n="docs.s11.title">11. ビルドと配布</span></h2>
+          <h3 data-i18n="docs.s11.host.h">ホスト（PAssist.exe）</h3>
           <pre>npm install                 # host/server の依存を一括導入
 npm start                   # 開発起動（Electron）
 npm test                    # 信頼ロジックの単体テスト
 npm --prefix host run dist  # 配布用 PAssist.exe（portable）を生成</pre>
           <ul>
-            <li>成果物：<code>dist\PAssist.exe</code>（単一実行ファイル・portable）。サーバ一式は <code>resources\server</code> に同梱、ネイティブ(nut.js)は asar から展開。</li>
-            <li>入力注入が「閲覧のみ」になる場合は <code>npm run rebuild</code>（nut.js を Electron 用に再ビルド）。</li>
+            <li data-i18n-html="docs.s11.host.li1">成果物：<code>dist\PAssist.exe</code>（単一実行ファイル・portable）。サーバ一式は <code>resources\server</code> に同梱、ネイティブ(nut.js)は asar から展開。</li>
+            <li data-i18n-html="docs.s11.host.li2">入力注入が「閲覧のみ」になる場合は <code>npm run rebuild</code>（nut.js を Electron 用に再ビルド）。</li>
           </ul>
-          <h3>signaling サーバ（自動・署名付き）</h3>
-          <p><code>v*</code> タグを push すると <code>release-signaling.yml</code> が起動し、Reproducible Build → GHCR へ push → SLSA provenance＋SBOM 添付 → Cosign keyless 署名（Rekor 記録）まで自動実行します。</p>
+          <h3 data-i18n="docs.s11.server.h">signaling サーバ（自動・署名付き）</h3>
+          <p data-i18n-html="docs.s11.server.p"><code>v*</code> タグを push すると <code>release-signaling.yml</code> が起動し、Reproducible Build → GHCR へ push → SLSA provenance＋SBOM 添付 → Cosign keyless 署名（Rekor 記録）まで自動実行します。</p>
           <pre><code>git tag vX.Y.Z &amp;&amp; git push origin vX.Y.Z   # あとは CI が全部やる</code></pre>
         </section>
 
         <section id="iframe">
-          <h2><span class="e">🖼️</span>12. iframe 埋め込み</h2>
-          <p>ビューアは普通の Web ページなので iframe に埋め込めます。</p>
+          <h2><span class="e">🖼️</span><span data-i18n="docs.s12.title">12. iframe 埋め込み</span></h2>
+          <p data-i18n="docs.s12.p">ビューアは普通の Web ページなので iframe に埋め込めます。</p>
           <pre>&lt;iframe
   src="https://passist.example.com/s/&lt;token&gt;"
   allow="fullscreen; autoplay"
   style="width:100%;height:600px;border:0"
   title="PAssist"&gt;&lt;/iframe&gt;</pre>
           <ul>
-            <li>親ページは https 推奨。<code>allow="fullscreen"</code> は全画面ボタン用。</li>
-            <li>埋め込み元を限定するなら CSP <code>frame-ancestors</code> を返す。</li>
-            <li><code>sandbox</code> を付けるなら <code>allow-scripts allow-same-origin allow-fullscreen</code> が必要。</li>
+            <li data-i18n-html="docs.s12.li1">親ページは https 推奨。<code>allow="fullscreen"</code> は全画面ボタン用。</li>
+            <li data-i18n-html="docs.s12.li2">埋め込み元を限定するなら CSP <code>frame-ancestors</code> を返す。</li>
+            <li data-i18n-html="docs.s12.li3"><code>sandbox</code> を付けるなら <code>allow-scripts allow-same-origin allow-fullscreen</code> が必要。</li>
           </ul>
         </section>
 
         <section id="limits">
-          <h2><span class="e">📌</span>13. 制限と今後</h2>
+          <h2><span class="e">📌</span><span data-i18n="docs.s13.title">13. 制限と今後</span></h2>
           <div class="grid2">
             <div class="card">
-              <h3>現在の制限</h3>
+              <h3 data-i18n="docs.s13.now.h">現在の制限</h3>
               <ul>
-                <li>ホストは Windows のみ（nut.js / Windows Graphics Capture）。</li>
-                <li>厳しい NAT の相手は TURN が必要な場合あり。</li>
-                <li>exe は未署名（SmartScreen 警告）。</li>
-                <li>操作は OS レベルの実入力（ホストの実カーソルが動く）。</li>
+                <li data-i18n="docs.s13.now.li1">ホストは Windows のみ（nut.js / Windows Graphics Capture）。</li>
+                <li data-i18n="docs.s13.now.li2">厳しい NAT の相手は TURN が必要な場合あり。</li>
+                <li data-i18n="docs.s13.now.li3">exe は未署名（SmartScreen 警告）。</li>
+                <li data-i18n="docs.s13.now.li4">操作は OS レベルの実入力（ホストの実カーソルが動く）。</li>
               </ul>
             </div>
             <div class="card">
-              <h3>今後の候補</h3>
+              <h3 data-i18n="docs.s13.future.h">今後の候補</h3>
               <ul>
-                <li>exe の SHA256SUMS を cosign sign-blob で署名し release に添付。</li>
-                <li>コード署名（EV / Azure Trusted Signing 等）で SmartScreen 通過。</li>
-                <li>送信ビットレートの自動調整・自動更新。</li>
+                <li data-i18n="docs.s13.future.li1">exe の SHA256SUMS を cosign sign-blob で署名し release に添付。</li>
+                <li data-i18n="docs.s13.future.li2">コード署名（EV / Azure Trusted Signing 等）で SmartScreen 通過。</li>
+                <li data-i18n="docs.s13.future.li3">送信ビットレートの自動調整・自動更新。</li>
               </ul>
             </div>
           </div>
         </section>
 
         <section id="license">
-          <h2><span class="e">📄</span>14. ライセンス</h2>
-          <p>PAssist は <a href="https://opensource.org/license/mit" target="_blank" rel="noopener"><strong>MIT License</strong></a> で公開しています。OSI 認定の最もシンプルな許諾型 OSS ライセンスで、商用利用を含むほぼすべての利用が自由です。</p>
-          <div class="ok">使う・自社運用する・改変する・監査する・再現ビルドで検証する・再配布する——いずれも自由（商用・派生物への独自ライセンス付与も含む）。必須の条件は<strong>再配布時に著作権表示と MIT ライセンス全文を含めること</strong>のみです。詳細は <a href="https://github.com/paps-jp/passist/blob/main/LICENSE" target="_blank" rel="noopener">LICENSE</a> または <a href="verification.html">検証に基づく安全性</a> のライセンス節を参照。</div>
+          <h2><span class="e">📄</span><span data-i18n="docs.s14.title">14. ライセンス</span></h2>
+          <p data-i18n-html="docs.s14.p">PAssist は <a href="https://opensource.org/license/mit" target="_blank" rel="noopener"><strong>MIT License</strong></a> で公開しています。OSI 認定の最もシンプルな許諾型 OSS ライセンスで、商用利用を含むほぼすべての利用が自由です。</p>
+          <div class="ok" data-i18n-html="docs.s14.ok">使う・自社運用する・改変する・監査する・再現ビルドで検証する・再配布する——いずれも自由（商用・派生物への独自ライセンス付与も含む）。必須の条件は<strong>再配布時に著作権表示と MIT ライセンス全文を含めること</strong>のみです。詳細は <a href="https://github.com/paps-jp/passist/blob/main/LICENSE" target="_blank" rel="noopener">LICENSE</a> または <a href="verification.html">検証に基づく安全性</a> のライセンス節を参照。</div>
         </section>
       </main>
     </div>
 
     <footer>
-      PAssist — 単一ウィンドウ・ブラウザ完結・アカウント不要のリモート操作 ／
-      <a href="index.html">トップ</a> ／ <a href="verification.html">検証に基づく安全性</a> ／
+      <span data-i18n="docs.footer.1">PAssist — 単一ウィンドウ・ブラウザ完結・アカウント不要のリモート操作</span> ／
+      <a href="index.html" data-i18n="docs.footer.top">トップ</a> ／ <a href="verification.html" data-i18n="docs.footer.ver">検証に基づく安全性</a> ／
       <a href="https://github.com/paps-jp/passist">github.com/paps-jp/passist</a>
     </footer>
+
+    <script src="i18n.js?v=2"></script>
+    <script>
+      (function () {
+        if (!window.getLang) return;
+        const cur = window.getLang();
+        document.querySelectorAll('[data-lang-btn]').forEach(function (b) {
+          b.classList.toggle('active', b.dataset.langBtn === cur);
+        });
+      })();
+    </script>
   </body>
 </html>
