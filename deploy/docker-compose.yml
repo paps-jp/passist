@@ -15,6 +15,10 @@ services:
       RELAY_BUDGET_BPS: ${RELAY_BUDGET_BPS:-4000000}
       RELAY_MIN_BPS: ${RELAY_MIN_BPS:-100000}
       RELAY_MAX_BPS: ${RELAY_MAX_BPS:-1500000}
+      # viewerへ自動配布する TURN（accepted時に渡る）。空欄ならホスト側UIの設定のみ有効。
+      SIGN_TURN_URL: ${SIGN_TURN_URL:-}
+      SIGN_TURN_USERNAME: ${SIGN_TURN_USERNAME:-}
+      SIGN_TURN_PASSWORD: ${SIGN_TURN_PASSWORD:-}
     expose:
       - "8443"
     networks:

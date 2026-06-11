@@ -22,6 +22,9 @@
 
   let ws, pc, dc;
   let controlEnabled = true; // ホストが「閲覧のみ」を通知したら false（操作入力を一切送らない）
+  // accepted で signaling から受け取る TURN サーバ（NAT越え失敗時の中継用）。
+  // 形式: { urls, username, credential }。なければ null＝STUN のみで P2P を試みる。
+  let turnFromServer = null;
   const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
   const wsUrl = `${wsProto}://${location.host}/ws`;
 
@@ -67,6 +70,8 @@
             cred = msg.issue;
           } catch {}
         }
+        // signaling から TURN credentials が配布されていれば iceServers に追加（NAT越え強化）
+        if (msg.turn && msg.turn.urls && msg.turn.username && msg.turn.credential) turnFromServer = msg.turn;
         setStatus('接続中… 映像を待っています');
         startPeer();
         break;
@@ -90,8 +95,15 @@
     join(pinInput.value.trim());
   };
 
+  // iceServers を動的に構築。STUNは常時、TURNは accepted で配布があれば追加。
+  function buildIceServers() {
+    const list = [{ urls: 'stun:stun.l.google.com:19302' }];
+    if (turnFromServer) list.push(turnFromServer);
+    return list;
+  }
+
   function startPeer() {
-    pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    pc = new RTCPeerConnection({ iceServers: buildIceServers() });
     pc.ontrack = (e) => {
       video.srcObject = e.streams[0];
       stage.classList.remove('hidden');

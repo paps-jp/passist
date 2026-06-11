@@ -20,6 +20,16 @@ const ACCESS_MODE = process.env.ACCESS_MODE || 'approve'; // 'approve' | 'pin' |
 const SESSION_TTL_MS = parseInt(process.env.SESSION_TTL_MS || String(30 * 60 * 1000), 10);
 const PUBLIC_BASE_URL = process.env.PUBLIC_BASE_URL || ''; // 例: https://xxxx.trycloudflare.com
 
+// viewer に自動配布する TURN サーバ（accepted メッセージで渡す）。
+// 設定があれば viewer はホスト個別設定が無くてもこの TURN を iceServers に含めて接続する。
+// 空欄なら配布しない（=従来通り viewer は STUN のみ／ホストUI設定にのみ依存）。
+const SIGN_TURN_URL = process.env.SIGN_TURN_URL || '';
+const SIGN_TURN_USERNAME = process.env.SIGN_TURN_USERNAME || '';
+const SIGN_TURN_PASSWORD = process.env.SIGN_TURN_PASSWORD || '';
+const turnForViewer = () => (SIGN_TURN_URL && SIGN_TURN_USERNAME && SIGN_TURN_PASSWORD)
+  ? { urls: SIGN_TURN_URL, username: SIGN_TURN_USERNAME, credential: SIGN_TURN_PASSWORD }
+  : null;
+
 // ホスト Electron へ自動配布する WebRTC iceServers。
 // 環境変数を設定すれば、ユーザーが手動入力しなくても TURN が使われる。
 // 未設定なら STUN(Google) のみ＝従来通り。
@@ -252,7 +262,8 @@ function acceptViewer(s, v, issue) {
   s.viewers.set(v.viewerId, v);
   s.status = 'connected';
   // issue があれば、ホストが新規発行した信頼クレデンシャルをビューアへ渡す（localStorage 保存用）
-  send(v, { type: 'accepted', issue: issue || null });
+  // turn があれば viewer は STUN だけでなく TURN にも relay candidate を提示できる（NAT越え強化）
+  send(v, { type: 'accepted', issue: issue || null, turn: turnForViewer() });
   send(s.host, { type: 'viewer:joined', viewerId: v.viewerId }); // 当該ビューア向けにホストがオファー作成
   stats.event('viewer_accepted', { accessMode: s.accessMode });
 }
