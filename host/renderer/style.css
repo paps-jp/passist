@@ -264,3 +264,20 @@ h2 .step {
 .modal-head h3 { margin: 0; font-size: 17px; font-weight: 650; }
 @keyframes modal-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes modal-pop  { from { transform: translateY(6px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+/* 設定モーダル内のタブUI（基本 / くわしい設定） */
+.tabs {
+  display: flex; gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin: 4px -22px 12px; padding: 0 22px;
+}
+.tabs .tab {
+  background: transparent; border: 0; border-radius: 0;
+  padding: 9px 16px; cursor: pointer;
+  color: var(--muted); font-size: 13.5px; font-weight: 600;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.tabs .tab:hover { background: var(--btn-hover); color: var(--fg); }
+.tabs .tab.active { color: var(--fg); border-bottom-color: var(--primary); }
+.tab-content { padding-top: 2px; }

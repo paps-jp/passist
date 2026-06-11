@@ -20,65 +20,102 @@
       <div id="inputWarn" class="warn hidden">⚠ 入力注入が無効（閲覧のみ）。<code>npm run rebuild</code> で有効化できます。</div>
       <div id="watchBar" class="warn hidden"></div>
 
-      <!-- 設定モーダル（普段は隠す。⚙ 設定で開閉・ESC/背景クリックで閉じる） -->
+      <!-- 設定モーダル（基本/くわしい設定 のタブ切替）。⚙ 設定で開閉・ESC/背景クリックで閉じる -->
       <div id="settingsModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
         <div class="modal">
           <div class="modal-head">
             <h3 id="settingsTitle">⚙ 設定</h3>
             <button id="settingsClose" class="ghost small" aria-label="閉じる">✕</button>
           </div>
-          <div class="set-row">
-            <span class="set-label">サーバ</span>
-            <div class="set-field">
-              <label class="radio"><input type="radio" name="serverMode" value="central" /> 中央サーバ（推奨）</label>
-              <label class="radio"><input type="radio" name="serverMode" value="self" /> 自分のPC（cloudflared 等を併用）</label>
-              <p id="serverModeHint" class="hint"></p>
-              <div id="centralUrlRow" class="urlrow" style="margin-top:6px;display:none">
-                <input id="centralServerUrl" placeholder="wss://passist.paps.jp/ws" />
+          <div class="tabs" role="tablist">
+            <button class="tab active" role="tab" data-tab="basic">基本</button>
+            <button class="tab" role="tab" data-tab="advanced">くわしい設定</button>
+          </div>
+
+          <!-- タブ1: 基本 -->
+          <div class="tab-content" id="tab-basic" role="tabpanel">
+            <div class="set-row">
+              <span class="set-label">サーバ</span>
+              <div class="set-field">
+                <label class="radio"><input type="radio" name="serverMode" value="central" /> 中央サーバ（推奨）</label>
+                <label class="radio"><input type="radio" name="serverMode" value="self" /> 自分のPC（cloudflared 等を併用）</label>
+                <p id="serverModeHint" class="hint"></p>
+                <div id="centralUrlRow" class="urlrow" style="margin-top:6px;display:none">
+                  <input id="centralServerUrl" placeholder="wss://passist.paps.jp/ws" />
+                </div>
+                <p id="serverRestartHint" class="hint danger-hint hidden">⟳ 変更を反映するにはアプリの再起動が必要です。</p>
               </div>
-              <p id="serverRestartHint" class="hint danger-hint hidden">⟳ 変更を反映するにはアプリの再起動が必要です。</p>
+            </div>
+            <div class="set-row">
+              <span class="set-label">接続方法</span>
+              <div class="set-field">
+                <label class="radio"><input type="radio" name="access" value="approve" /> 承認制（おすすめ）</label>
+                <label class="radio"><input type="radio" name="access" value="pin" /> PIN番号</label>
+                <label class="radio"><input type="radio" name="access" value="invite" /> 招待リンク（事前許可者のみ）</label>
+                <label class="radio"><input type="radio" name="access" value="token" /> だれでも（URLのみ）</label>
+                <p id="accessHint" class="hint"></p>
+              </div>
+            </div>
+            <div class="set-row">
+              <span class="set-label">同時接続</span>
+              <div class="set-field">
+                <select id="maxViewers">
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                </select>
+                人
+                <span class="hint">操作できるのは1人だけ・他は閲覧（変更は次の共有から）</span>
+              </div>
+            </div>
+            <div class="set-row">
+              <span class="set-label">有効期限</span>
+              <div class="set-field">
+                <select id="ttlSel">
+                  <option value="30">30分</option>
+                  <option value="60">1時間</option>
+                  <option value="180">3時間</option>
+                  <option value="360">6時間</option>
+                  <option value="0">無期限</option>
+                </select>
+                <span class="hint">共有URLが使える時間。過ぎると自動で切断（変更は次の共有から）</span>
+              </div>
+            </div>
+            <div class="set-row">
+              <span class="set-label">閲覧のみ</span>
+              <div class="set-field">
+                <label class="chk"><input type="checkbox" id="readonlyChk" /> ONにすると全員が操作できません（画面共有だけ）</label>
+              </div>
             </div>
           </div>
-          <div class="set-row">
-            <span class="set-label">接続方法</span>
-            <div class="set-field">
-              <label class="radio"><input type="radio" name="access" value="approve" /> 承認制（おすすめ）</label>
-              <label class="radio"><input type="radio" name="access" value="pin" /> PIN番号</label>
-              <label class="radio"><input type="radio" name="access" value="invite" /> 招待リンク（事前許可者のみ）</label>
-              <label class="radio"><input type="radio" name="access" value="token" /> だれでも（URLのみ）</label>
-              <p id="accessHint" class="hint"></p>
+
+          <!-- タブ2: くわしい設定（旧 advancedModal の中身を統合） -->
+          <div class="tab-content hidden" id="tab-advanced" role="tabpanel">
+            <div class="set-row">
+              <span class="set-label">公開URL</span>
+              <div class="set-field" style="flex:1">
+                <p class="hint" style="margin:0 0 6px">cloudflared 等の公開URL（例 https://xxx.trycloudflare.com）を入れて「URLを再発行」。中央サーバを使う場合は空欄でOK。</p>
+                <div class="urlrow">
+                  <input id="publicBase" placeholder="https://xxxx.trycloudflare.com" />
+                  <button id="reissue" class="ghost">URLを再発行</button>
+                </div>
+                <p id="publicBaseHint" class="hint"></p>
+              </div>
             </div>
-          </div>
-          <div class="set-row">
-            <span class="set-label">同時接続</span>
-            <div class="set-field">
-              <select id="maxViewers">
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-                <option value="4">4</option>
-              </select>
-              人
-              <span class="hint">操作できるのは1人だけ・他は閲覧（変更は次の共有から）</span>
-            </div>
-          </div>
-          <div class="set-row">
-            <span class="set-label">有効期限</span>
-            <div class="set-field">
-              <select id="ttlSel">
-                <option value="30">30分</option>
-                <option value="60">1時間</option>
-                <option value="180">3時間</option>
-                <option value="360">6時間</option>
-                <option value="0">無期限</option>
-              </select>
-              <span class="hint">共有URLが使える時間。過ぎると自動で切断（変更は次の共有から）</span>
-            </div>
-          </div>
-          <div class="set-row">
-            <span class="set-label">閲覧のみ</span>
-            <div class="set-field">
-              <label class="chk"><input type="checkbox" id="readonlyChk" /> ONにすると全員が操作できません（画面共有だけ）</label>
+            <div class="set-row">
+              <span class="set-label">TURN</span>
+              <div class="set-field" style="flex:1">
+                <p class="hint" style="margin:0 0 6px">NAT越え失敗時の中継（任意）。設定するとP2P不可な相手も接続でき、利用人数に応じて自動で画質を分け合います。例: <code>turn:turn.example.com:3478</code></p>
+                <div class="urlrow">
+                  <input id="turnUrl" placeholder="turn:turn.example.com:3478（空欄でTURN不使用）" />
+                </div>
+                <div class="urlrow" style="margin-top:6px">
+                  <input id="turnUser" placeholder="ユーザ名" />
+                  <input id="turnPass" type="password" placeholder="パスワード" />
+                </div>
+                <p id="turnHint" class="hint"></p>
+              </div>
             </div>
           </div>
         </div>
@@ -138,36 +175,7 @@
           <summary>共有中のプレビューを見る</summary>
           <video id="preview" autoplay playsinline muted></video>
         </details>
-        <p class="hint" style="margin-top:10px"><button id="openAdvanced" class="ghost small">⋯ くわしい設定（外部公開・信頼リンク）</button></p>
       </section>
-
-      <!-- くわしい設定モーダル（外部公開URL/TURN/信頼リンク。普段は閉じる） -->
-      <div id="advancedModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="advTitle">
-        <div class="modal">
-          <div class="modal-head">
-            <h3 id="advTitle">⋯ くわしい設定</h3>
-            <button id="advancedClose" class="ghost small" aria-label="閉じる">✕</button>
-          </div>
-          <label>外部公開（トンネル）の公開URL</label>
-          <p class="hint">cloudflared 等の公開URL（例 https://xxx.trycloudflare.com）を入れて「URLを再発行」。中央サーバを使う場合は空欄でOK。</p>
-          <div class="urlrow">
-            <input id="publicBase" placeholder="https://xxxx.trycloudflare.com" />
-            <button id="reissue" class="ghost">URLを再発行</button>
-          </div>
-          <p id="publicBaseHint" class="hint"></p>
-
-          <label style="margin-top:14px">TURNサーバ（任意・NAT越え失敗時の中継）</label>
-          <p class="hint">設定するとP2P不可な相手も接続できます。中継はサーバ帯域を消費するため、利用人数に応じて自動的に画質を分け合います。例: <code>turn:turn.example.com:3478</code></p>
-          <div class="urlrow">
-            <input id="turnUrl" placeholder="turn:turn.example.com:3478（空欄でTURN不使用）" />
-          </div>
-          <div class="urlrow">
-            <input id="turnUser" placeholder="ユーザ名" />
-            <input id="turnPass" type="password" placeholder="パスワード" />
-          </div>
-          <p id="turnHint" class="hint"></p>
-        </div>
-      </div>
     </main>
 
     <script src="renderer.js"></script>

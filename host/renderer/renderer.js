@@ -156,15 +156,15 @@
     $('settingsBtn').onclick = openSettings;
     $('settingsClose').onclick = closeSettings;
     $('settingsModal').addEventListener('click', (e) => { if (e.target.id === 'settingsModal') closeSettings(); });
-    const openAdvanced = () => $('advancedModal').classList.remove('hidden');
-    const closeAdvanced = () => $('advancedModal').classList.add('hidden');
-    $('openAdvanced').onclick = openAdvanced;
-    $('advancedClose').onclick = closeAdvanced;
-    $('advancedModal').addEventListener('click', (e) => { if (e.target.id === 'advancedModal') closeAdvanced(); });
     document.addEventListener('keydown', (e) => {
-      if (e.key !== 'Escape') return;
-      if (!$('settingsModal').classList.contains('hidden')) closeSettings();
-      else if (!$('advancedModal').classList.contains('hidden')) closeAdvanced();
+      if (e.key === 'Escape' && !$('settingsModal').classList.contains('hidden')) closeSettings();
+    });
+    // 設定モーダル内のタブ切替（基本 / くわしい設定）
+    document.querySelectorAll('#settingsModal .tabs .tab').forEach((tab) => {
+      tab.onclick = () => {
+        document.querySelectorAll('#settingsModal .tabs .tab').forEach((b) => b.classList.toggle('active', b === tab));
+        document.querySelectorAll('#settingsModal .tab-content').forEach((c) => c.classList.toggle('hidden', c.id !== 'tab-' + tab.dataset.tab));
+      };
     });
     // QRコードの開閉（既定は開）。相手はスマホのカメラで読み取って接続できる。
     $('qrToggle').onclick = () => {
