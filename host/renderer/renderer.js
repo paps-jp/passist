@@ -668,10 +668,19 @@
       if (!cursorStarted) { cursorStarted = true; window.host.cursorTrack(true); } // 一度だけ開始
       refreshModes(); // 操作権の決定＋mode 通知
     };
-    dc.onmessage = (e) => {
+    dc.onmessage = async (e) => {
       if (viewerId !== controllerId) return; // 操作権がないビューアの入力は無視（多重防壁）
       if (isReadonlyGlobal()) return; // 閲覧のみ時は誰の入力も無視
-      try { window.host.sendInput(JSON.parse(e.data)); } catch {}
+      let m; try { m = JSON.parse(e.data); } catch { return; }
+      if (m && m.t === 'readtext') {
+        // テキスト編集モード: 現在のフィールド値をクリップボード経由で取得して返す
+        try {
+          const v = await window.host.readSelectedText();
+          if (dc.readyState === 'open') dc.send(JSON.stringify({ t: 'fieldtext', s: v || '' }));
+        } catch (err) { console.warn('readSelectedText', err); }
+        return;
+      }
+      try { window.host.sendInput(m); } catch {}
     };
     pc.onicecandidate = (e) => {
       if (e.candidate) sendWs({ type: 'signal', to: viewerId, data: { candidate: e.candidate } });

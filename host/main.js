@@ -191,6 +191,25 @@ ipcMain.handle('input:focus', () => {
   if (input) return input.focusTarget();
 });
 
+// 現在フォーカスされているテキストフィールドの値をクリップボード経由で取得して返す。
+// 用途: viewer 側でカーソルが ibeam の場所をタップ→既存値を取って編集ダイアログに表示する。
+// 副作用: 一瞬クリップボードを書き換えるが、終了時に元の値を復元する。
+ipcMain.handle('input:readSelected', async () => {
+  if (settings.get().readonly) return '';
+  if (!input || !input.selectAndCopy) return '';
+  let backup = '';
+  try { backup = clipboard.readText() || ''; } catch {}
+  try {
+    await input.selectAndCopy(); // Ctrl+A + Ctrl+C
+    await new Promise((r) => setTimeout(r, 120)); // OS のクリップボード反映待ち
+    const v = (() => { try { return clipboard.readText() || ''; } catch { return ''; } })();
+    lastClip = v; // 自分が書いたクリップ変更を「外部から来た」扱いしない（broadcast抑制）
+    return v;
+  } finally {
+    try { clipboard.writeText(backup); lastClip = backup; } catch {} // ユーザーのクリップを必ず復元
+  }
+});
+
 ipcMain.handle('config:get', () => ({ signalWs, inputEnabled: !!input && inputReady, settings: settings.get(), palette: getSystemPalette() }));
 ipcMain.handle('qr:make', async (_e, text) => {
   try { return await QRCode.toDataURL(String(text || ''), { margin: 1, width: 240 }); } catch { return null; }

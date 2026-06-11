@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('host', {
   qrMake: (text) => ipcRenderer.invoke('qr:make', text),
   sendInput: (ev) => ipcRenderer.send('input:event', ev),
   focusTarget: () => ipcRenderer.invoke('input:focus'),
+  readSelectedText: () => ipcRenderer.invoke('input:readSelected'),
   trustCheck: (auth) => ipcRenderer.invoke('trust:check', auth),
   trustIssue: (label) => ipcRenderer.invoke('trust:issue', label),
   trustList: () => ipcRenderer.invoke('trust:list'),

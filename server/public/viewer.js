@@ -141,6 +141,7 @@
           if (m && m.t === 'clip' && typeof m.s === 'string') onHostClip(m.s); // ホストのクリップボードを同期
           else if (m && m.t === 'cursor' && typeof m.s === 'string') applyHostCursor(m.s); // カーソル形状を反映
           else if (m && m.t === 'mode') applyMode(m); // 操作可否（閲覧のみ）の通知
+          else if (m && m.t === 'fieldtext') onFieldText(typeof m.s === 'string' ? m.s : ''); // テキスト編集モード: 現在値受信
         } catch {}
       };
     };
@@ -262,6 +263,8 @@
     video.addEventListener('mouseup', (e) => {
       if (e.button === 2) return;
       send({ t: 'u', b: e.button });
+      // クリック完了後、カーソルが「ibeam(テキスト入力)」ならテキスト編集ダイアログを開く
+      if (e.button === 0 && hostCursorShape === 'ibeam') setTimeout(openTextEditMode, 120);
       e.preventDefault();
     });
     // 右クリックメニューは document 全体で処理（attachClipboardMenu 参照）。
@@ -360,7 +363,11 @@
       if (longFired) { longFired = false; e.preventDefault(); return; } // メニュー表示済み
       if (!moved && controlEnabled) { // タップ=その位置を左クリック（連続タップはOSがダブルクリック判定）
         const p = norm(sx, sy);
-        if (p) { send({ t: 'm', x: p.x, y: p.y }); send({ t: 'd', b: 0 }); send({ t: 'u', b: 0 }); }
+        if (p) {
+          send({ t: 'm', x: p.x, y: p.y }); send({ t: 'd', b: 0 }); send({ t: 'u', b: 0 });
+          // タップ完了後、カーソルが「ibeam(テキスト入力)」ならテキスト編集ダイアログを開く
+          if (hostCursorShape === 'ibeam') setTimeout(openTextEditMode, 120);
+        }
       }
       e.preventDefault();
     };
@@ -382,12 +389,47 @@
   }
   function closeTextDialog() {
     if (textDialog) textDialog.classList.add('hidden');
+    textOverwriteMode = false; // どのルートで閉じてもモードをリセット
+    if (fieldReadTimer) { clearTimeout(fieldReadTimer); fieldReadTimer = null; }
   }
   function submitText() {
     const t = textInput.value;
-    if (t) send({ t: 'text', s: t });
+    if (textOverwriteMode) {
+      // テキスト編集モード: 全選択→Unicode 入力で「上書き」（空でも全削除として送る）
+      send({ t: 'replace', s: t });
+    } else if (t) {
+      send({ t: 'text', s: t });
+    }
+    textOverwriteMode = false;
     textInput.value = '';
-    closeTextDialog(); // 挿入後はダイアログを閉じる（連続入力は再度開いて行う）
+    closeTextDialog();
+  }
+
+  // ホストのカーソルが「ibeam」のときにタップ/クリック → 現在の値を取得して編集ダイアログを開く
+  let hostCursorShape = 'arrow';
+  let textOverwriteMode = false;  // true なら「挿入」は replace で送る
+  let fieldReadTimer = null;       // 値取得タイムアウト
+  function setHostCursorShape(s) { hostCursorShape = s || 'arrow'; }
+  function openTextEditMode() {
+    if (!controlEnabled) return;
+    if (textDialog && !textDialog.classList.contains('hidden')) return; // 既に開いていれば二重起動しない
+    textOverwriteMode = true;
+    openTextDialog();
+    textInput.value = '';
+    textInput.placeholder = '現在の値を取得しています…';
+    send({ t: 'readtext' }); // ホストへ値要求
+    if (fieldReadTimer) clearTimeout(fieldReadTimer);
+    fieldReadTimer = setTimeout(() => {
+      textInput.placeholder = '取得に失敗しました。新規入力 → 挿入で上書きされます。';
+      fieldReadTimer = null;
+    }, 1800);
+  }
+  function onFieldText(s) {
+    if (!textOverwriteMode) return; // 編集モードでないなら無視（誤配信対策）
+    if (fieldReadTimer) { clearTimeout(fieldReadTimer); fieldReadTimer = null; }
+    textInput.value = s;
+    textInput.placeholder = '';
+    try { textInput.focus(); textInput.select(); } catch {} // 全選択でそのまま打ち替え可能
   }
   function attachTextDialog() {
     if (!textDialog) return;
@@ -521,6 +563,7 @@
     sizeall: 'move', no: 'not-allowed', appstarting: 'progress', help: 'help', hidden: 'none',
   };
   function applyHostCursor(shape) {
+    setHostCursorShape(shape); // テキスト編集モード(ibeam検知)で利用
     setLocalCursor(false); // SVGオーバーレイをやめてネイティブカーソルを使う
     const css = CURSOR_CSS[shape] || 'default';
     stage.style.cursor = css;

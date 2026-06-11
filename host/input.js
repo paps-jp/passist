@@ -215,6 +215,27 @@ async function handle(ev) {
         }
         break;
       }
+      case 'replace': {
+        // 「現在のテキストフィールドの内容を新しい文字列で置換」。
+        // ibeam カーソル位置をクリックしてダイアログで編集→挿入したケース等で使う。
+        // 上限 ev.s.length<=2000、空文字は単に全選択削除になる（Backspace で）。
+        if (typeof ev.s !== 'string' || ev.s.length > 2000) break;
+        if (targetHandle != null) winenum.bringToFront(targetHandle);
+        // 全選択 (Ctrl+A)
+        await keyboard.pressKey(Key.LeftControl);
+        await keyboard.pressKey(Key.A);
+        await keyboard.releaseKey(Key.A);
+        await keyboard.releaseKey(Key.LeftControl);
+        await new Promise((r) => setTimeout(r, 25));
+        if (ev.s.length === 0) {
+          // 空で置換 = 全削除
+          await keyboard.pressKey(Key.Delete);
+          await keyboard.releaseKey(Key.Delete);
+        } else if (!winenum.typeUnicode(ev.s)) {
+          await keyboard.type(ev.s); // 全選択状態で typing すれば上書きになる
+        }
+        break;
+      }
       case 'edit': {
         // 右クリックメニューのコピー/切り取り/貼り付け。Ctrl+C/X/V を順序保証で送る。
         const m = { copy: Key.C, cut: Key.X, paste: Key.V };
@@ -245,4 +266,20 @@ async function handle(ev) {
   }
 }
 
-module.exports = { init, setTarget, handle, focusTarget };
+// Ctrl+A → Ctrl+C を順に送る（共有窓を前面化してから）。main 側の input:readSelected から呼ばれる。
+async function selectAndCopy() {
+  try {
+    if (targetHandle != null) winenum.bringToFront(targetHandle);
+    await keyboard.pressKey(Key.LeftControl);
+    await keyboard.pressKey(Key.A);
+    await keyboard.releaseKey(Key.A);
+    await keyboard.releaseKey(Key.LeftControl);
+    await new Promise((r) => setTimeout(r, 30));
+    await keyboard.pressKey(Key.LeftControl);
+    await keyboard.pressKey(Key.C);
+    await keyboard.releaseKey(Key.C);
+    await keyboard.releaseKey(Key.LeftControl);
+  } catch {}
+}
+
+module.exports = { init, setTarget, handle, focusTarget, selectAndCopy };
