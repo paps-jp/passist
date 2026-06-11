@@ -104,8 +104,8 @@
       $('centralUrlRow').style.display = v === 'central' ? '' : 'none';
       $('serverModeHint').textContent =
         v === 'central'
-          ? '中央サーバ ' + ($('centralServerUrl').value || 'wss://passist.paps.jp/ws') + ' に接続。共有URLは https://passist.paps.jp/s/… で発行されます。'
-          : '自分のPCで内蔵サーバを動かし、cloudflared 等のトンネルURLを「くわしい設定」で設定してください。';
+          ? tr('host.set.server.hintCentral', { url: $('centralServerUrl').value || 'wss://passist.paps.jp/ws' })
+          : tr('host.set.server.hintSelf');
     }
     for (const r of document.querySelectorAll('input[name="serverMode"]')) {
       r.checked = r.value === smVal;
@@ -213,7 +213,7 @@
       stopWatch();
       closeAllPeers();
       sessionStarted = false; // 次に画面を選ぶと新しいURLで開始
-      setStatus('✓ 共有を終了しました（「▶ もう一度共有」で同じウィンドウを再開できます）');
+      setStatus(tr('host.dyn.endShared'));
       endShareUi(); // 終了ボタンを「再開」へ
     };
     await loadWindows();
@@ -222,11 +222,11 @@
 
   async function loadWindows() {
     const grid = $('grid');
-    grid.innerHTML = '<p class="hint">読み込み中…</p>';
+    grid.innerHTML = '<p class="hint">' + tr('host.picker.loading') + '</p>';
     const wins = await window.host.listWindows();
     grid.innerHTML = '';
     if (!wins.length) {
-      grid.innerHTML = '<p class="hint">共有できるウィンドウが見つかりません。</p>';
+      grid.innerHTML = '<p class="hint">' + tr('host.picker.empty') + '</p>';
       return;
     }
     for (const w of wins) {
@@ -250,7 +250,7 @@
         // owned 窓（アプリ本体に付随する別ウィンドウ）。どの本体のものか分かるよう注記。
         const sub = document.createElement('span');
         sub.className = 'subhint';
-        sub.textContent = w.ownerName ? '↳ ' + w.ownerName : '↳ サブ画面';
+        sub.textContent = w.ownerName ? '↳ ' + w.ownerName : tr('host.picker.subWindow');
         cap.appendChild(sub);
         card.title = (w.ownerName ? w.ownerName + ' の' : '') + '付随ウィンドウ（通常は一覧に出ない別画面）';
       }
@@ -280,7 +280,7 @@
         showResume(w); // 自動再開でキャプチャ不可（ユーザー操作要求等）→ 再開ボタンを提示
         return;
       }
-      alert('キャプチャを開始できませんでした: ' + e.message);
+      alert(tr('host.dyn.captureFail', { error: e.message }));
       return;
     }
     hideWatch();
@@ -332,7 +332,7 @@
     try { window.host.settingsSet({ activeShareName: '' }); } catch {}
     // ホスト側の selectedSourceId をクリア → 無効HWND での setDisplayMediaRequestHandler 応答や入力注入を止める
     try { window.host.selectSource(null, null); } catch {}
-    setStatus('共有していたウィンドウが閉じられました。「← 別の画面を選ぶ」から別のウィンドウを選び直せます。');
+    setStatus(tr('host.dyn.windowClosed'));
   }
 
   // --- セッション自動再開 / ウィンドウ監視 ---
@@ -390,10 +390,10 @@
     const b = $('watchBar');
     if (!b) return;
     b.innerHTML = '';
-    b.append('前回共有していた「' + w.name + '」を再開できます。 ');
+    b.append(tr('host.dyn.resumePrev', { name: w.name }));
     const btn = document.createElement('button');
     btn.className = 'primary';
-    btn.textContent = '▶ 共有を再開';
+    btn.textContent = '▶ ' + tr('host.btn.resume').replace(/^▶\s*/, '');
     btn.onclick = () => choose(w, { auto: false });
     b.appendChild(btn);
     b.classList.remove('hidden');
@@ -410,12 +410,12 @@
   function scheduleReconnect() {
     if (!shouldReconnect || reconnectTimer) return;
     if (reconnectAttempt >= MAX_RECONNECT) {
-      setStatus(`✕ サーバとの接続が切れました（${MAX_RECONNECT}回再接続を試みて失敗）。「← 別の画面を選ぶ」から共有し直してください。`);
+      setStatus(tr('host.dyn.reconnectFail', { max: MAX_RECONNECT }));
       return;
     }
     const delay = Math.min(30000, 500 * Math.pow(2, reconnectAttempt));
     reconnectAttempt++;
-    setStatus(`サーバとの接続が切れました。再接続中…（${reconnectAttempt}/${MAX_RECONNECT}）`);
+    setStatus(tr('host.dyn.reconnecting', { n: reconnectAttempt, max: MAX_RECONNECT }));
     reconnectTimer = setTimeout(() => { reconnectTimer = null; startSignaling(); }, delay);
   }
 
@@ -484,7 +484,7 @@
         verifyAppliedBase(msg.viewerUrl); // 入力した公開URLが実際に反映されたか確認
         if (!$('qrPanel').classList.contains('hidden')) showQr(); // URL確定時にQRを更新
         if (msg.pin) {
-          $('pin').textContent = 'PIN: ' + msg.pin;
+          $('pin').textContent = tr('host.dyn.pinLabel', { pin: msg.pin });
           $('pin').classList.remove('hidden');
         }
         // セッション引き継ぎ用に token/secret を永続化（次回起動時に同じ URL を取り戻すため）。
@@ -493,9 +493,7 @@
           window.host.settingsSet({ lastHostToken: msg.token, lastHostSecret: msg.hostSecret });
           if (cfg.settings) { cfg.settings.lastHostToken = msg.token; cfg.settings.lastHostSecret = msg.hostSecret; }
         }
-        setStatus(msg.resumed
-          ? '✓ 前回のセッションを引き継ぎました（URL は同じ）。相手がURLを開くと、ここに表示されます。'
-          : '待機中。相手がURLを開くと、ここに表示されます。');
+        setStatus(msg.resumed ? tr('host.dyn.resumed') : tr('host.dyn.waitingViewer'));
         break;
       case 'viewer:request':
         reqQueue.push({ viewerId: msg.viewerId, auth: msg.auth || null });
@@ -511,7 +509,7 @@
         handleSignal(msg.from, msg.data);
         break;
       case 'expired':
-        setStatus('⏰ 有効期限が切れました。「← 別の画面を選ぶ」から共有し直してください');
+        setStatus(tr('host.dyn.expired'));
         // 期限切れ＝同じURLでの引き継ぎは不可。lastHostToken/Secret を破棄、再接続も停止。
         window.host.settingsSet({ lastHostToken: '', lastHostSecret: '' });
         if (cfg.settings) { cfg.settings.lastHostToken = ''; cfg.settings.lastHostSecret = ''; }
@@ -572,7 +570,7 @@
   function renderNetInfo() {
     const el = $('netInfo'); if (!el) return;
     if (!bitratePolicy.relayCount) { el.textContent = ''; return; }
-    el.textContent = `TURN中継: ${bitratePolicy.relayCount}人 / 各 ${Math.round(bitratePolicy.maxBpsRelay / 1000)} kbps`;
+    el.textContent = tr('host.dyn.turnRelay', { n: bitratePolicy.relayCount, kbps: Math.round(bitratePolicy.maxBpsRelay / 1000) });
   }
 
   // 公開URL（トンネル）の書式チェック＋見える化。サーバ側 sanitizeBase と同じ判定で、
@@ -585,14 +583,14 @@
     const el = $('publicBase'), hint = $('publicBaseHint');
     if (!el || !hint) return '';
     const raw = el.value.trim();
-    if (!raw) { hint.textContent = '未入力なら社内LAN内のアドレスになります（外部からは接続できません）。cloudflared 等のトンネルURLを入れて「URLを再発行」してください。'; hint.classList.remove('danger-hint'); return ''; }
+    if (!raw) { hint.textContent = tr('host.set.publicBase.hint.empty'); hint.classList.remove('danger-hint'); return ''; }
     const norm = normBase(raw);
     if (!norm) {
-      hint.textContent = '⚠ URLの書式が正しくありません。例: https://usagi.paps.jp（「:」でなく「.」、余分な空白・全角に注意）。このままでは社内LANのアドレスになります。';
+      hint.textContent = tr('host.set.publicBase.hint.invalid');
       hint.classList.add('danger-hint');
       return '';
     }
-    hint.textContent = '✓ この公開URLで発行します: ' + norm;
+    hint.textContent = tr('host.set.publicBase.hint.ok', { url: norm });
     hint.classList.remove('danger-hint');
     return norm;
   }
@@ -601,7 +599,7 @@
     const hint = $('publicBaseHint'); if (!hint) return;
     const want = normBase(($('publicBase').value || '').trim());
     if (want && viewerUrl && viewerUrl.indexOf(want) !== 0) {
-      hint.textContent = '⚠ 入力した公開URLが使われていません（書式が不正のため LAN に戻りました）。発行: ' + viewerUrl;
+      hint.textContent = tr('host.set.publicBase.hint.fallback', { url: viewerUrl });
       hint.classList.add('danger-hint');
     }
   }
@@ -626,10 +624,10 @@
   function renderTurnHint() {
     const hint = $('turnHint'); if (!hint) return;
     const u = ($('turnUrl').value || '').trim();
-    if (!u) { hint.textContent = 'TURN未設定。NAT越えに失敗した相手とは接続できません。'; hint.classList.remove('danger-hint'); return; }
+    if (!u) { hint.textContent = tr('host.set.turn.hint.empty'); hint.classList.remove('danger-hint'); return; }
     const v = validateTurnUrl(u);
-    if (!v.ok) { hint.textContent = '⚠ URL書式が不正です。例: turn:turn.example.com:3478 または turns:turn.example.com:5349?transport=tcp'; hint.classList.add('danger-hint'); return; }
-    hint.textContent = `✓ ${v.scheme.toUpperCase()} ${v.host}:${v.port} (${v.transport.toUpperCase()}) を使います`;
+    if (!v.ok) { hint.textContent = tr('host.set.turn.hint.invalid'); hint.classList.add('danger-hint'); return; }
+    hint.textContent = tr('host.set.turn.hint.ok', { scheme: v.scheme.toUpperCase(), host: v.host, port: v.port, transport: v.transport.toUpperCase() });
     hint.classList.remove('danger-hint');
   }
 
@@ -658,7 +656,7 @@
       const res = await window.host.trustCheck(req.auth);
       if (res && res.trusted) {
         sendWs({ type: 'host:approve', viewerId: req.viewerId });
-        setStatus('招待済み端末を自動承認しました' + (res.label ? '（' + res.label + '）' : ''));
+        setStatus(tr('host.dyn.trustedAuto', { label: res.label ? '（' + res.label + '）' : '' }));
         activeReq = null;
         processReqQueue();
         return;
@@ -668,13 +666,13 @@
     const mode = (cfg.settings && cfg.settings.accessMode) || 'approve';
     if (mode === 'invite') {
       sendWs({ type: 'host:deny', viewerId: req.viewerId });
-      setStatus('招待リンクを持たない接続を自動拒否しました');
+      setStatus(tr('host.dyn.inviteOnlyReject'));
       activeReq = null;
       processReqQueue();
       return;
     }
     $('request').classList.remove('hidden');
-    setStatus('接続リクエストがあります');
+    setStatus(tr('host.dyn.connRequest'));
   }
 
   async function onApprove() {
@@ -693,7 +691,7 @@
   // 相手に渡す“事前承認リンク”を発行（現在のセッションURL + 信頼クレデンシャル）
   async function issueTrustLink() {
     if (!$('url').value) {
-      alert('先にウィンドウを選択してURLを発行してください');
+      alert(tr('host.dyn.urlFirst'));
       return;
     }
     const cred = await window.host.trustIssue('事前承認リンク');
@@ -705,12 +703,12 @@
   async function refreshTrustInfo() {
     const list = await window.host.trustList();
     const el = $('trustManage');
-    el.textContent = '招待済み端末: ' + list.length + ' 件';
+    el.textContent = tr('host.dyn.trustedCount', { n: list.length });
     if (!list.length) return;
     el.append('　');
     const a = document.createElement('a');
     a.href = '#';
-    a.textContent = 'すべて解除';
+    a.textContent = tr('host.dyn.clearAll');
     a.onclick = async (e) => {
       e.preventDefault();
       await window.host.trustClear();
@@ -822,7 +820,7 @@
   function endShareUi() {
     const e = $('end');
     e.disabled = false; // 再クリックで再開できるよう有効のまま
-    e.textContent = '▶ もう一度共有';
+    e.textContent = tr('host.btn.resume');
     e.dataset.mode = 'resume';
     e.classList.remove('danger');
     e.classList.add('primary');
@@ -833,7 +831,7 @@
   function resetShareUi() {
     const e = $('end');
     e.disabled = false;
-    e.textContent = '■ 共有を終了';
+    e.textContent = tr('host.btn.end');
     e.dataset.mode = '';
     e.classList.remove('primary');
     e.classList.add('danger');
@@ -848,11 +846,17 @@
     navigator.clipboard.writeText($(inputId).value);
     const b = $(btnId);
     const orig = b.textContent;
-    b.textContent = 'コピー済';
+    b.textContent = tr('host.session.copied');
     setTimeout(() => (b.textContent = orig), 1500);
   }
 
-  const setStatus = (t) => ($('status').textContent = t);
+  const setStatus = (msg) => ($('status').textContent = msg);
+  // i18n ヘルパ。 vars でテンプレ {key} を置換: tr('host.dyn.pinLabel', { pin: '123456' })
+  const tr = (k, vars) => {
+    let s = window.t ? window.t(k) : k;
+    if (vars) for (const kk in vars) s = s.split('{' + kk + '}').join(vars[kk]);
+    return s;
+  };
 
   // 「接続方法」ラジオの下に出す説明（だれでも は警告色）
   function updateAccessHint() {
@@ -860,10 +864,10 @@
     if (!el) return;
     const v = (cfg.settings && cfg.settings.accessMode) || 'approve';
     el.textContent =
-      v === 'approve' ? 'つなぐたびに、あなたの「許可」が必要です（安全）。'
-      : v === 'pin' ? '相手は、表示されるPIN番号の入力が必要です。'
-      : v === 'invite' ? '事前に発行する「招待リンク」を持つ相手だけが自動接続できます。通常URLからの接続は自動拒否されます。'
-      : '⚠ URLを知っていれば誰でも即接続できます。インターネット公開時はとくに注意してください。';
+      v === 'approve' ? tr('host.set.access.hint.approve')
+      : v === 'pin' ? tr('host.set.access.hint.pin')
+      : v === 'invite' ? tr('host.set.access.hint.invite')
+      : tr('host.set.access.hint.token');
     el.classList.toggle('danger-hint', v === 'token');
   }
 
@@ -882,22 +886,33 @@
     const el = $('modeChips');
     if (!el) return;
     const s = cfg.settings || {};
-    const access = s.accessMode === 'token' ? 'だれでも' : s.accessMode === 'pin' ? 'PIN番号' : s.accessMode === 'invite' ? '招待リンク' : '承認制';
+    const access = s.accessMode === 'token' ? tr('host.dyn.chip.access.token')
+                 : s.accessMode === 'pin' ? tr('host.dyn.chip.access.pin')
+                 : s.accessMode === 'invite' ? tr('host.dyn.chip.access.invite')
+                 : tr('host.dyn.chip.access.approve');
     const max = s.maxViewers || 1;
-    const op = s.readonly ? '全員 閲覧のみ' : max > 1 ? '操作は先着1人・他は閲覧' : '操作 可';
+    const op = s.readonly ? tr('host.dyn.chip.op.viewOnly')
+             : max > 1 ? tr('host.dyn.chip.op.firstOp')
+             : tr('host.dyn.chip.op.ok');
     el.innerHTML = '';
-    for (const t of ['接続方法: ' + access, '同時接続: ' + max + '人', '操作: ' + op, '有効期限: ' + ttlLabel(s.sessionTtlMinutes)]) {
+    const chips = [
+      tr('host.dyn.chip.access', { value: access }),
+      tr('host.dyn.chip.concurrent', { n: max }),
+      tr('host.dyn.chip.op', { value: op }),
+      tr('host.dyn.chip.ttl', { value: ttlLabel(s.sessionTtlMinutes) }),
+    ];
+    for (const txt of chips) {
       const c = document.createElement('span');
       c.className = 'chip';
-      c.textContent = t;
+      c.textContent = txt;
       el.appendChild(c);
     }
   }
 
   function ttlLabel(m) {
     const n = Number.isFinite(m) ? m : 30;
-    if (n <= 0) return '無期限';
-    if (n % 60 === 0) return n / 60 + '時間';
-    return n + '分';
+    if (n <= 0) return tr('host.set.ttl.infinite');
+    if (n % 60 === 0) return tr('host.dyn.ttl.hours', { n: n / 60 });
+    return tr('host.dyn.ttl.minutes', { n: n });
   }
 })();

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ja">
+<html lang="ja" data-i18n-title="host.docTitle">
   <head>
     <meta charset="utf-8" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; media-src 'self' blob: mediastream:; style-src 'self' 'unsafe-inline'; connect-src *" />
@@ -10,53 +10,53 @@
     <header class="topbar">
       <div class="brand">PAssist</div>
       <div class="spacer"></div>
-      <button id="back" class="ghost small hidden">← 別の画面を選ぶ</button>
-      <button id="settingsBtn" class="ghost small">⚙ 設定</button>
-      <button id="end" class="danger small hidden">■ 共有を終了</button>
+      <button id="back" class="ghost small hidden" data-i18n="host.btn.back">← 別の画面を選ぶ</button>
+      <button id="settingsBtn" class="ghost small" data-i18n="host.btn.settings">⚙ 設定</button>
+      <button id="end" class="danger small hidden" data-i18n="host.btn.end">■ 共有を終了</button>
     </header>
 
     <main class="app">
-      <div id="inputWarn" class="warn hidden">⚠ 入力注入が無効（閲覧のみ）。<code>npm run rebuild</code> で有効化できます。</div>
+      <div id="inputWarn" class="warn hidden" data-i18n-html="host.inputWarn">⚠ 入力注入が無効（閲覧のみ）。<code>npm run rebuild</code> で有効化できます。</div>
       <div id="watchBar" class="warn hidden"></div>
 
       <!-- 設定モーダル（基本/くわしい設定 のタブ切替）。⚙ 設定で開閉・ESC/背景クリックで閉じる -->
       <div id="settingsModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
         <div class="modal">
           <div class="modal-head">
-            <h3 id="settingsTitle">⚙ 設定</h3>
-            <button id="settingsClose" class="ghost small" aria-label="閉じる">✕</button>
+            <h3 id="settingsTitle" data-i18n="host.set.title">⚙ 設定</h3>
+            <button id="settingsClose" class="ghost small" data-i18n-attr="aria-label:host.set.close" aria-label="閉じる">✕</button>
           </div>
           <div class="tabs" role="tablist">
-            <button class="tab active" role="tab" data-tab="basic">基本</button>
-            <button class="tab" role="tab" data-tab="advanced">くわしい設定</button>
+            <button class="tab active" role="tab" data-tab="basic" data-i18n="host.set.tab.basic">基本</button>
+            <button class="tab" role="tab" data-tab="advanced" data-i18n="host.set.tab.advanced">くわしい設定</button>
           </div>
 
           <!-- タブ1: 基本 -->
           <div class="tab-content" id="tab-basic" role="tabpanel">
             <div class="set-row">
-              <span class="set-label">サーバ</span>
+              <span class="set-label" data-i18n="host.set.server.label">サーバ</span>
               <div class="set-field">
-                <label class="radio"><input type="radio" name="serverMode" value="central" /> 中央サーバ（推奨）</label>
-                <label class="radio"><input type="radio" name="serverMode" value="self" /> 自分のPC（cloudflared 等を併用）</label>
+                <label class="radio"><input type="radio" name="serverMode" value="central" /> <span data-i18n="host.set.server.central">中央サーバ（推奨）</span></label>
+                <label class="radio"><input type="radio" name="serverMode" value="self" /> <span data-i18n="host.set.server.self">自分のPC（cloudflared 等を併用）</span></label>
                 <p id="serverModeHint" class="hint"></p>
                 <div id="centralUrlRow" class="urlrow" style="margin-top:6px;display:none">
                   <input id="centralServerUrl" placeholder="wss://passist.paps.jp/ws" />
                 </div>
-                <p id="serverRestartHint" class="hint danger-hint hidden">⟳ 変更を反映するにはアプリの再起動が必要です。</p>
+                <p id="serverRestartHint" class="hint danger-hint hidden" data-i18n="host.set.server.restartHint">⟳ 変更を反映するにはアプリの再起動が必要です。</p>
               </div>
             </div>
             <div class="set-row">
-              <span class="set-label">接続方法</span>
+              <span class="set-label" data-i18n="host.set.access.label">接続方法</span>
               <div class="set-field">
-                <label class="radio"><input type="radio" name="access" value="approve" /> 承認制（おすすめ）</label>
-                <label class="radio"><input type="radio" name="access" value="pin" /> PIN番号</label>
-                <label class="radio"><input type="radio" name="access" value="invite" /> 招待リンク（事前許可者のみ）</label>
-                <label class="radio"><input type="radio" name="access" value="token" /> だれでも（URLのみ）</label>
+                <label class="radio"><input type="radio" name="access" value="approve" /> <span data-i18n="host.set.access.approve">承認制（おすすめ）</span></label>
+                <label class="radio"><input type="radio" name="access" value="pin" /> <span data-i18n="host.set.access.pin">PIN番号</span></label>
+                <label class="radio"><input type="radio" name="access" value="invite" /> <span data-i18n="host.set.access.invite">招待リンク（事前許可者のみ）</span></label>
+                <label class="radio"><input type="radio" name="access" value="token" /> <span data-i18n="host.set.access.token">だれでも（URLのみ）</span></label>
                 <p id="accessHint" class="hint"></p>
               </div>
             </div>
             <div class="set-row">
-              <span class="set-label">同時接続</span>
+              <span class="set-label" data-i18n="host.set.maxViewers.label">同時接続</span>
               <div class="set-field">
                 <select id="maxViewers">
                   <option value="1">1</option>
@@ -64,27 +64,35 @@
                   <option value="3">3</option>
                   <option value="4">4</option>
                 </select>
-                人
-                <span class="hint">操作できるのは1人だけ・他は閲覧（変更は次の共有から）</span>
+                <span data-i18n="host.set.maxViewers.unit">人</span>
+                <span class="hint" data-i18n="host.set.maxViewers.hint">操作できるのは1人だけ・他は閲覧（変更は次の共有から）</span>
               </div>
             </div>
             <div class="set-row">
-              <span class="set-label">有効期限</span>
+              <span class="set-label" data-i18n="host.set.ttl.label">有効期限</span>
               <div class="set-field">
                 <select id="ttlSel">
-                  <option value="30">30分</option>
-                  <option value="60">1時間</option>
-                  <option value="180">3時間</option>
-                  <option value="360">6時間</option>
-                  <option value="0">無期限</option>
+                  <option value="30" data-i18n="host.set.ttl.30">30分</option>
+                  <option value="60" data-i18n="host.set.ttl.60">1時間</option>
+                  <option value="180" data-i18n="host.set.ttl.180">3時間</option>
+                  <option value="360" data-i18n="host.set.ttl.360">6時間</option>
+                  <option value="0" data-i18n="host.set.ttl.infinite">無期限</option>
                 </select>
-                <span class="hint">共有URLが使える時間。過ぎると自動で切断（変更は次の共有から）</span>
+                <span class="hint" data-i18n="host.set.ttl.hint">共有URLが使える時間。過ぎると自動で切断（変更は次の共有から）</span>
               </div>
             </div>
             <div class="set-row">
-              <span class="set-label">閲覧のみ</span>
+              <span class="set-label" data-i18n="host.set.readonly.label">閲覧のみ</span>
               <div class="set-field">
-                <label class="chk"><input type="checkbox" id="readonlyChk" /> ONにすると全員が操作できません（画面共有だけ）</label>
+                <label class="chk"><input type="checkbox" id="readonlyChk" /> <span data-i18n="host.set.readonly.desc">ONにすると全員が操作できません（画面共有だけ）</span></label>
+              </div>
+            </div>
+            <!-- 言語切替 (ja/en) -->
+            <div class="set-row">
+              <span class="set-label">Language</span>
+              <div class="set-field">
+                <button class="lang-btn" data-lang-btn="ja" onclick="setLang('ja')">日本語</button>
+                <button class="lang-btn" data-lang-btn="en" onclick="setLang('en')">English</button>
               </div>
             </div>
           </div>
@@ -92,26 +100,26 @@
           <!-- タブ2: くわしい設定（旧 advancedModal の中身を統合） -->
           <div class="tab-content hidden" id="tab-advanced" role="tabpanel">
             <div class="set-row">
-              <span class="set-label">公開URL</span>
+              <span class="set-label" data-i18n="host.set.publicBase.label">公開URL</span>
               <div class="set-field" style="flex:1">
-                <p class="hint" style="margin:0 0 6px">cloudflared 等の公開URL（例 https://xxx.trycloudflare.com）を入れて「URLを再発行」。中央サーバを使う場合は空欄でOK。</p>
+                <p class="hint" style="margin:0 0 6px" data-i18n="host.set.publicBase.hint">cloudflared 等の公開URL（例 https://xxx.trycloudflare.com）を入れて「URLを再発行」。中央サーバを使う場合は空欄でOK。</p>
                 <div class="urlrow">
                   <input id="publicBase" placeholder="https://xxxx.trycloudflare.com" />
-                  <button id="reissue" class="ghost">URLを再発行</button>
+                  <button id="reissue" class="ghost" data-i18n="host.set.publicBase.reissue">URLを再発行</button>
                 </div>
                 <p id="publicBaseHint" class="hint"></p>
               </div>
             </div>
             <div class="set-row">
-              <span class="set-label">TURN</span>
+              <span class="set-label" data-i18n="host.set.turn.label">TURN</span>
               <div class="set-field" style="flex:1">
-                <p class="hint" style="margin:0 0 6px">NAT越え失敗時の中継（任意）。設定するとP2P不可な相手も接続でき、利用人数に応じて自動で画質を分け合います。例: <code>turn:turn.example.com:3478</code></p>
+                <p class="hint" style="margin:0 0 6px" data-i18n-html="host.set.turn.hint">NAT越え失敗時の中継（任意）。設定するとP2P不可な相手も接続でき、利用人数に応じて自動で画質を分け合います。例: <code>turn:turn.example.com:3478</code></p>
                 <div class="urlrow">
-                  <input id="turnUrl" placeholder="turn:turn.example.com:3478（空欄でTURN不使用）" />
+                  <input id="turnUrl" data-i18n-attr="placeholder:host.set.turn.placeholder.url" placeholder="turn:turn.example.com:3478（空欄でTURN不使用）" />
                 </div>
                 <div class="urlrow" style="margin-top:6px">
-                  <input id="turnUser" placeholder="ユーザ名" />
-                  <input id="turnPass" type="password" placeholder="パスワード" />
+                  <input id="turnUser" data-i18n-attr="placeholder:host.set.turn.placeholder.user" placeholder="ユーザ名" />
+                  <input id="turnPass" type="password" data-i18n-attr="placeholder:host.set.turn.placeholder.pass" placeholder="パスワード" />
                 </div>
                 <p id="turnHint" class="hint"></p>
               </div>
@@ -122,61 +130,72 @@
 
       <!-- 手順1: ウィンドウ選択 -->
       <section id="picker" class="picker">
-        <h2><span class="step">1</span> 共有する画面をえらぶ</h2>
+        <h2><span class="step">1</span> <span data-i18n="host.picker.h2">共有する画面をえらぶ</span></h2>
         <p class="hint">
-          選んだ1つの画面だけが相手に見えます。デスクトップ全体は共有されません。
-          <button id="reload" class="ghost small">更新</button>
+          <span data-i18n="host.picker.hint">選んだ1つの画面だけが相手に見えます。デスクトップ全体は共有されません。</span>
+          <button id="reload" class="ghost small" data-i18n="host.picker.reload">更新</button>
         </p>
         <div id="grid" class="grid"></div>
       </section>
 
       <!-- 手順2・3: 共有中 -->
       <section id="session" class="session hidden">
-        <h2><span class="step">2</span> このリンクを相手に送る</h2>
+        <h2><span class="step">2</span> <span data-i18n="host.session.h2.step2">このリンクを相手に送る</span></h2>
         <div class="urlrow">
           <input id="url" readonly />
-          <button id="copy" class="primary">コピー</button>
+          <button id="copy" class="primary" data-i18n="host.session.copy">コピー</button>
         </div>
         <!-- 招待リンク（invite モードのみ表示）。事前に許可した相手だけが自動接続できる。 -->
         <div id="inviteBox" class="panel hidden" style="margin-top:8px">
           <div class="set-row">
-            <span class="set-label">招待リンク</span>
+            <span class="set-label" data-i18n="host.session.invite.label">招待リンク</span>
             <div class="set-field" style="flex:1">
-              <p class="hint" style="margin:0 0 6px">事前に許可した端末だけが自動接続できる専用リンクです。発行して相手に送ってください。通常URLからの接続は自動で拒否されます。</p>
+              <p class="hint" style="margin:0 0 6px" data-i18n="host.session.invite.hint">事前に許可した端末だけが自動接続できる専用リンクです。発行して相手に送ってください。通常URLからの接続は自動で拒否されます。</p>
               <div class="trust">
-                <button id="trustLink" class="ghost">招待リンクを発行</button>
+                <button id="trustLink" class="ghost" data-i18n="host.session.invite.btn">招待リンクを発行</button>
                 <span id="trustManage" class="hint"></span>
               </div>
               <div id="trustLinkRow" class="urlrow hidden" style="margin-top:6px">
                 <input id="trustUrl" readonly />
-                <button id="copyTrust">コピー</button>
+                <button id="copyTrust" data-i18n="host.session.invite.copy">コピー</button>
               </div>
             </div>
           </div>
         </div>
-        <button id="qrToggle" class="toggle open">📱 スマホで読み取る（QRコード）</button>
+        <button id="qrToggle" class="toggle open" data-i18n="host.session.qrToggle">📱 スマホで読み取る（QRコード）</button>
         <div id="qrPanel" class="qrpanel"><img id="qrImg" alt="共有URLのQRコード" /></div>
         <div id="pin" class="pin hidden"></div>
         <div id="modeChips" class="chips"></div>
 
-        <h2><span class="step">3</span> 接続</h2>
+        <h2><span class="step">3</span> <span data-i18n="host.session.h2.step3">接続</span></h2>
         <div id="request" class="request hidden">
-          <p>接続リクエストがあります。許可しますか？</p>
-          <label class="chk"><input type="checkbox" id="trustChk" /> この端末を信頼（次回から承認なしで接続）</label>
+          <p data-i18n="host.session.req.text">接続リクエストがあります。許可しますか？</p>
+          <label class="chk"><input type="checkbox" id="trustChk" /> <span data-i18n="host.session.req.trustChk">この端末を信頼（次回から承認なしで接続）</span></label>
           <div class="btnrow">
-            <button id="approve" class="primary">許可する</button>
-            <button id="deny" class="ghost">拒否</button>
+            <button id="approve" class="primary" data-i18n="host.session.req.approve">許可する</button>
+            <button id="deny" class="ghost" data-i18n="host.session.req.deny">拒否</button>
           </div>
         </div>
-        <div class="statusrow"><span id="status" class="status">待機中…</span><span id="netInfo" class="hint"></span></div>
+        <div class="statusrow"><span id="status" class="status" data-i18n="host.session.status.waiting">待機中…</span><span id="netInfo" class="hint"></span></div>
 
         <details class="adv">
-          <summary>共有中のプレビューを見る</summary>
+          <summary data-i18n="host.session.preview">共有中のプレビューを見る</summary>
           <video id="preview" autoplay playsinline muted></video>
         </details>
       </section>
     </main>
 
+    <script src="i18n.js"></script>
     <script src="renderer.js"></script>
+    <script>
+      // 現在の言語ボタンに .active を付与
+      (function () {
+        if (!window.getLang) return;
+        const cur = window.getLang();
+        document.querySelectorAll('[data-lang-btn]').forEach(function (b) {
+          b.classList.toggle('active', b.dataset.langBtn === cur);
+        });
+      })();
+    </script>
   </body>
 </html>
