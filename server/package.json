@@ -2,6 +2,7 @@
   "name": "passist-server",
   "version": "0.2.7-4",
   "private": true,
+  "license": "MIT",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

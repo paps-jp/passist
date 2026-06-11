@@ -3,51 +3,74 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#78b3f7" />
     <title>PAssist ドキュメント</title>
+    <meta name="description" content="PAssist の詳細ドキュメント。アーキテクチャ・使い方・アクセス制御・セキュリティ・検証・環境変数・セルフホスト・ビルドまで。" />
+    <link rel="icon" href="passist_min.svg" />
     <style>
-      :root { --acc: #2b6cff; --bg: #f6f8fb; --fg: #1b2330; --mut: #5b6b80; --card: #fff; --line: #e2e8f0; --code: #0b1020; }
-      * { box-sizing: border-box; }
-      html { scroll-behavior: smooth; }
-      body { margin: 0; font-family: system-ui, "Segoe UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif; color: var(--fg); background: var(--bg); line-height: 1.75; }
-      header.hero { background: linear-gradient(135deg, #0b0d10, #16263f); color: #fff; padding: 40px 24px; }
-      header.hero .wrap { max-width: 980px; margin: 0 auto; }
-      header.hero h1 { margin: 0 0 6px; font-size: 30px; letter-spacing: .5px; }
-      header.hero p { margin: 0; color: #b9c6dc; font-size: 15px; }
-      .badge { display:inline-block; background: var(--acc); color:#fff; font-size:12px; padding:2px 10px; border-radius:999px; margin-bottom:14px; }
-      .layout { max-width: 980px; margin: 0 auto; display: grid; grid-template-columns: 220px 1fr; gap: 32px; padding: 28px 24px 64px; }
-      nav.toc { position: sticky; top: 16px; align-self: start; font-size: 13.5px; }
-      nav.toc a { display:block; color: var(--mut); text-decoration: none; padding: 4px 0; border-left: 2px solid transparent; padding-left: 10px; }
-      nav.toc a:hover { color: var(--acc); border-left-color: var(--acc); }
-      main { min-width: 0; }
-      section { margin-bottom: 38px; }
-      h2 { font-size: 21px; margin: 0 0 12px; padding-bottom: 6px; border-bottom: 2px solid var(--line); }
-      h3 { font-size: 16px; margin: 20px 0 6px; }
-      p, li { font-size: 14.5px; }
-      code { background: #eef1f6; padding: 1px 6px; border-radius: 5px; font-size: 13px; }
-      pre { background: var(--code); color: #e8edf6; padding: 14px 16px; border-radius: 10px; overflow-x: auto; font-size: 12.5px; line-height: 1.6; }
-      pre.diagram { background: #0e1726; color: #cdd9ee; }
-      table { width: 100%; border-collapse: collapse; font-size: 13.5px; margin: 8px 0; background: var(--card); }
-      th, td { border: 1px solid var(--line); padding: 8px 10px; text-align: left; vertical-align: top; }
-      th { background: #eaf0fb; }
-      .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; }
-      .note { border-left: 4px solid var(--acc); background: #eef3ff; padding: 10px 14px; border-radius: 0 8px 8px 0; font-size: 13.5px; }
-      .warn { border-left: 4px solid #e0a400; background: #fff8e6; padding: 10px 14px; border-radius: 0 8px 8px 0; font-size: 13.5px; }
-      .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-      footer { max-width: 980px; margin: 0 auto; padding: 20px 24px 50px; color: var(--mut); font-size: 12.5px; border-top: 1px solid var(--line); }
-      @media (max-width: 780px) { .layout { grid-template-columns: 1fr; } nav.toc { position: static; } .grid2 { grid-template-columns: 1fr; } }
+      :root{
+        --p:#78b3f7; --acc:#3776e6; --acc-d:#2f63cf; --teal:#43c0bd; --pink:#ff8fa0;
+        --ink:#1f2733; --mut:#5b6b80; --bg:#f7f9fc; --card:#fff; --line:#e9eef5;
+      }
+      *{box-sizing:border-box}
+      html{scroll-behavior:smooth}
+      body{margin:0;font-family:system-ui,"Segoe UI","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;color:var(--ink);background:var(--bg);line-height:1.75;-webkit-font-smoothing:antialiased}
+      a{color:var(--acc)}
+      code{background:#eef2f8;color:#1e3957;padding:1px 7px;border-radius:6px;font-size:.9em;font-family:ui-monospace,"SF Mono","Consolas",monospace}
+
+      /* hero */
+      .hero{position:relative;overflow:hidden;background:linear-gradient(150deg,#5278e8 0%,#4a9de6 55%,#3599a8 100%);color:#fff;padding:42px 24px 46px}
+      .hero::after{content:"";position:absolute;inset:0;pointer-events:none;background:
+        radial-gradient(620px 380px at 50% -16%, rgba(255,255,255,.32), transparent 62%),
+        radial-gradient(520px 400px at 12% 50%, rgba(132,224,216,.30), transparent 62%)}
+      .hero .wrap{position:relative;z-index:1;max-width:1000px;margin:0 auto}
+      .hero h1{margin:0 0 6px;font-size:28px;font-weight:800;letter-spacing:.3px}
+      .hero p{margin:0;color:rgba(255,255,255,.95);font-size:15px;max-width:720px}
+      .crumbs{display:flex;gap:14px;margin-bottom:12px;font-size:14px}
+      .crumbs a{color:rgba(255,255,255,.92);text-decoration:none}
+      .crumbs a:hover{color:#fff;text-decoration:underline}
+
+      .layout{max-width:1000px;margin:0 auto;display:grid;grid-template-columns:232px 1fr;gap:34px;padding:30px 24px 70px}
+      nav.toc{position:sticky;top:16px;align-self:start;font-size:13.5px}
+      nav.toc a{display:block;color:var(--mut);text-decoration:none;padding:5px 0 5px 12px;border-left:2px solid transparent}
+      nav.toc a:hover{color:var(--acc);border-left-color:var(--p)}
+      main{min-width:0}
+      section{margin-bottom:40px;scroll-margin-top:16px}
+      h2{font-size:21px;font-weight:800;margin:0 0 14px;padding-bottom:8px;border-bottom:2px solid var(--line);display:flex;align-items:center;gap:9px}
+      h2 .e{font-size:20px}
+      h3{font-size:16px;margin:20px 0 6px;font-weight:700}
+      p,li{font-size:14.5px}
+      p{color:#2a3445}
+      ul,ol{padding-left:22px}
+
+      pre{background:#0f1d33;color:#cfe1ff;padding:14px 16px;border-radius:12px;overflow-x:auto;font-size:12.5px;line-height:1.6;font-family:ui-monospace,"SF Mono","Consolas",monospace}
+      pre.diagram{background:#102338;color:#cdd9ee}
+      pre code{background:transparent;color:inherit;padding:0;font-size:inherit}
+      table{width:100%;border-collapse:collapse;font-size:13.5px;margin:8px 0 12px;background:var(--card)}
+      th,td{border:1px solid var(--line);padding:8px 11px;text-align:left;vertical-align:top}
+      th{background:#f0f5fb;font-weight:700}
+      .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px 18px}
+      .note{border-left:4px solid var(--p);background:#eef4ff;padding:11px 14px;border-radius:0 10px 10px 0;font-size:13.5px}
+      .warn{border-left:4px solid #e0a400;background:#fff7e6;padding:11px 14px;border-radius:0 10px 10px 0;font-size:13.5px}
+      .ok{border-left:4px solid #2ba672;background:#e8f7ee;padding:11px 14px;border-radius:0 10px 10px 0;font-size:13.5px}
+      .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+      .alg{display:inline-block;background:#1e3957;color:#fff;font-size:12px;font-weight:700;padding:2px 10px;border-radius:999px;margin-right:4px}
+
+      footer{max-width:1000px;margin:0 auto;padding:22px 24px 56px;color:var(--mut);font-size:12.5px;border-top:1px solid var(--line)}
+      footer a{color:var(--mut)}
+      @media (max-width:820px){ .layout{grid-template-columns:1fr} nav.toc{position:static;border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:#fff} .grid2{grid-template-columns:1fr} }
     </style>
   </head>
   <body>
     <header class="hero">
       <div class="wrap">
-        <span class="badge">PAssist</span>
+        <div class="crumbs">
+          <a href="index.html">← ホーム</a>
+          <a href="index.html#download">⬇ ダウンロード</a>
+          <a href="verification.html">🔐 検証に基づく安全性</a>
+        </div>
         <h1>PAssist ドキュメント</h1>
         <p>このPCの「1つのウィンドウだけ」を、ブラウザだけ・アカウント不要で、離れた相手に一時的にリモート操作してもらうツール。デスクトップ全体は決して映りません。</p>
-        <p style="margin-top:16px;font-size:14px">
-          <a href="./" style="color:#9fc1ff;text-decoration:none">← ホーム</a>
-          &nbsp;・&nbsp;
-          <a href="./#download" style="color:#9fc1ff;text-decoration:none">⬇ ダウンロード</a>
-        </p>
       </div>
     </header>
 
@@ -57,41 +80,42 @@
         <a href="#features">2. できること</a>
         <a href="#arch">3. アーキテクチャ</a>
         <a href="#usage">4. 使い方</a>
-        <a href="#public">5. インターネット公開</a>
-        <a href="#security">6. セキュリティ</a>
-        <a href="#reliability">7. 信頼性・堅牢化</a>
-        <a href="#config">8. 設定（環境変数）</a>
-        <a href="#build">9. ビルドと配布</a>
-        <a href="#iframe">10. iframe 埋め込み</a>
-        <a href="#limits">11. 制限と今後</a>
+        <a href="#access">5. アクセス制御と信頼</a>
+        <a href="#public">6. インターネット公開</a>
+        <a href="#security">7. セキュリティ</a>
+        <a href="#verify">8. 検証・署名</a>
+        <a href="#config">9. 設定（環境変数）</a>
+        <a href="#selfhost">10. セルフホスト・運用</a>
+        <a href="#build">11. ビルドと配布</a>
+        <a href="#iframe">12. iframe 埋め込み</a>
+        <a href="#limits">13. 制限と今後</a>
+        <a href="#license">14. ライセンス</a>
       </nav>
 
       <main>
         <section id="overview">
-          <h2>1. 概要</h2>
-          <p>
-            PAssist は Windows 向けのリモート操作ツールです。共有するのは<strong>選んだ 1 つのウィンドウだけ</strong>。
-            操作する相手は<strong>ブラウザを開くだけ</strong>（インストール・アカウント不要）。映像と操作は WebRTC で暗号化されて流れます。
-          </p>
-          <div class="note">
-            ねらい：① 開いている任意のウィンドウを1つ選ぶ ② URLを発行 ③ 離れた第三者がブラウザだけで一時操作 ④ デスクトップ全体は絶対に見せない ⑤ アカウント作成なしで入れる。
-          </div>
+          <h2><span class="e">📘</span>1. 概要</h2>
+          <p>PAssist は Windows 向けのリモート操作ツールです。共有するのは<strong>選んだ 1 つのウィンドウだけ</strong>。操作する相手は<strong>ブラウザを開くだけ</strong>（インストール・アカウント不要）。映像と操作は WebRTC で暗号化されて流れ、デスクトップ全体は構造的に映りません。</p>
+          <div class="note">ねらい：① 開いている任意のウィンドウを1つ選ぶ → ② 共有URL／QRを発行 → ③ 相手がブラウザだけで一時操作 → ④ デスクトップ全体は絶対に見せない → ⑤ アカウント作成なしで入れる。</div>
         </section>
 
         <section id="features">
-          <h2>2. できること（要件と実装）</h2>
+          <h2><span class="e">✨</span>2. できること</h2>
           <table>
             <tr><th>要件</th><th>実装</th></tr>
-            <tr><td>任意のウィンドウを1つだけ選ぶ</td><td>起動→開いているウィンドウ一覧から選択。キャプチャ元は <code>window</code> のみ列挙し <code>screen</code> は一切扱わない。</td></tr>
-            <tr><td>URLを発行</td><td>選択すると共有URL（<code>…/s/&lt;token&gt;</code>）を自動発行・コピー。</td></tr>
+            <tr><td>任意のウィンドウを1つだけ選ぶ</td><td>開いているウィンドウ一覧から選択。キャプチャ元は <code>window</code> のみ列挙し <code>screen</code> は一切扱わない。</td></tr>
+            <tr><td>URL／QRを発行</td><td>選択すると共有URL（<code>…/s/&lt;token&gt;</code>）を自動発行。スマホ用にQRコードも表示。</td></tr>
             <tr><td>ブラウザだけで一時操作</td><td>WebRTC で映像、DataChannel でマウス/キー操作。相手はブラウザのみ。</td></tr>
+            <tr><td>複数人で同時に</td><td>同時接続を設定可能。<strong>操作できるのは常に1人</strong>（最初の接続者）、ほかは閲覧。全員「閲覧のみ」にも切替可。</td></tr>
             <tr><td>デスクトップ全体は出さない</td><td>選んだ1ウィンドウの映像のみ。構造的に画面全体を渡せない設計。</td></tr>
             <tr><td>アカウント不要</td><td>URLのトークンだけで接続。ログインなし。</td></tr>
+            <tr><td>一時利用</td><td>セッションに有効期限（既定30分、変更可・無期限も可）。期限切れで自動失効。</td></tr>
+            <tr><td>検証できる</td><td>サーバが「公開コードと同一」であることをブラウザが自動で暗号学的に検証（<a href="verification.html">詳細</a>）。</td></tr>
           </table>
         </section>
 
         <section id="arch">
-          <h2>3. アーキテクチャ</h2>
+          <h2><span class="e">🧩</span>3. アーキテクチャ</h2>
           <pre class="diagram">
   ┌──────────────────────── ホストPC (PAssist) ────────────────────────┐
   │  Electron アプリ（タスクトレイ常駐）                                 │
@@ -108,26 +132,26 @@
         └──────────────┘
           </pre>
           <ul>
-            <li><strong>ホスト</strong>：Electron 製。ウィンドウのキャプチャ（<code>getDisplayMedia</code>＋<code>setDisplayMediaRequestHandler</code>）、WebRTC の offer、入力注入を担当。</li>
-            <li><strong>サーバ</strong>：Node（express + ws）。セッション/トークン管理、SDP/ICE 中継、ビューア配信。ホストが内部で起動。</li>
-            <li><strong>ビューア</strong>：ブラウザの素のページ（WebRTC の answer 側）。映像表示と入力送信。</li>
-            <li><strong>暗号化</strong>：映像・操作は WebRTC（DTLS-SRTP）で常に暗号化。シグナリングは https/wss 化可能。</li>
+            <li><strong>ホスト</strong>（<code>host/</code>・Electron）：ウィンドウのキャプチャ（<code>getDisplayMedia</code> ＋ <code>setDisplayMediaRequestHandler</code>）、WebRTC の offer、入力注入。シグナリングサーバを内部で起動。</li>
+            <li><strong>サーバ</strong>（<code>server/</code>・Node express + ws）：セッション/トークン管理、SDP/ICE 中継、ビューア配信、TURN クレデンシャル発行。ホスト内蔵のほか、独立サーバとしても運用可（Docker image を配布）。</li>
+            <li><strong>ビューア</strong>（<code>server/public/viewer.html</code>）：ブラウザの素のページ（WebRTC の answer 側）。映像表示・入力送信・サーバ検証。</li>
+            <li><strong>暗号化</strong>：映像・操作は WebRTC（DTLS-SRTP）で常に暗号化。シグナリング/ページは https/wss 化可能。</li>
           </ul>
         </section>
 
         <section id="usage">
-          <h2>4. 使い方</h2>
+          <h2><span class="e">🚀</span>4. 使い方</h2>
           <h3>ホスト（共有する人）</h3>
           <ol>
-            <li><code>dist\PAssist.exe</code> をダブルクリック（または開発時は <code>npm start</code>）</li>
+            <li><code>PAssist.exe</code> をダブルクリック（開発時は <code>npm start</code>）</li>
             <li>共有したいウィンドウをクリックして選択</li>
-            <li>表示された<strong>共有URL</strong>をコピーして相手に送る</li>
-            <li>接続リクエストが来たら<strong>「許可」</strong>（または「この端末を信頼」で次回から自動）</li>
+            <li>表示された<strong>共有URL</strong>をコピー、または<strong>QRコード</strong>を相手に見せる</li>
+            <li>接続リクエストが来たら<strong>「許可」</strong>（「この端末を信頼」で次回から自動承認）</li>
           </ol>
           <h3>ゲスト（操作する人）</h3>
           <ol>
-            <li>送られたURLを<strong>ブラウザで開く</strong></li>
-            <li>「クリックして操作を開始」→ マウス/キーボードで対象ウィンドウを操作</li>
+            <li>送られたURLを<strong>ブラウザで開く</strong>（スマホはQRを読み取るだけ）</li>
+            <li>「クリックして操作を開始」→ マウス／キーボードで対象ウィンドウを操作。終了はブラウザを閉じるだけ。</li>
           </ol>
           <h3>タスクトレイ常駐</h3>
           <ul>
@@ -137,78 +161,128 @@
           <div class="warn">未署名のため、初回は SmartScreen 警告が出ることがあります（「詳細情報 → 実行」）。常用ならコード署名を推奨。</div>
         </section>
 
+        <section id="access">
+          <h2><span class="e">🔑</span>5. アクセス制御と信頼</h2>
+          <p>「誰が繋げるか」をセッションごと（または既定値 <code>ACCESS_MODE</code>）で選べます。</p>
+          <table>
+            <tr><th>モード</th><th>挙動</th><th>強さ</th></tr>
+            <tr><td><code>approve</code>（既定）</td><td>ホストが「許可」するまで接続不可。映像も流れない。</td><td>最も安全</td></tr>
+            <tr><td><code>pin</code></td><td>セッションごとに発行される6桁ワンタイムPINが一致すれば接続（ホスト承認なし）。</td><td>中</td></tr>
+            <tr><td><code>invite</code></td><td>招待リンク（信頼クレデンシャル付きURL）を持つ相手のみ。リンクが無いと接続不可。</td><td>中〜高</td></tr>
+            <tr><td><code>token</code></td><td>URLのトークンだけで即接続（承認なし）。手軽だが最も緩い。</td><td>緩い</td></tr>
+          </table>
+
+          <h3>信頼済み端末（事前承認）</h3>
+          <p>初回に「この端末を信頼」、または「招待リンク」を渡すと、その端末は次回から自動承認されます。仕組みは端末ごとの <code>clientId ＋ secret</code>。<strong>ホストは secret のハッシュ（SHA-256）だけを保存</strong>し（<code>userData/passist-trust.json</code>）、平文はビューアの <code>localStorage</code> のみに置かれます。招待リンクは <code>…/s/&lt;token&gt;#k=&lt;clientId&gt;.&lt;secret&gt;</code> の形。</p>
+
+          <h3>同時接続・閲覧のみ・有効期限</h3>
+          <ul>
+            <li><strong>同時接続</strong>：人数を設定可能。操作できるのは常に1人（最初の接続者）、ほかは自動的に閲覧のみ。</li>
+            <li><strong>閲覧のみ</strong>：全員を操作不可（画面共有だけ）に切替可能。</li>
+            <li><strong>有効期限</strong>：既定30分。30分／1時間／3時間／6時間／無期限から選択。期限切れで全接続を自動切断。</li>
+          </ul>
+        </section>
+
         <section id="public">
-          <h2>5. インターネット公開</h2>
+          <h2><span class="e">🌍</span>6. インターネット公開</h2>
           <h3>方法A：UPnP 自動公開（公開IP＋UPnP有効が前提）</h3>
-          <p>起動時にアプリが <strong>UPnP で Web ポート(TCP 8443)を自動開放</strong>し、共有URLを <code>http://&lt;公開IP&gt;:8443/s/…</code> に自動設定します。</p>
+          <p>起動時にアプリが <strong>Webポート(TCP 8443)を UPnP で自動開放</strong>し、共有URLを <code>http://&lt;公開IP&gt;:8443/s/…</code> に自動設定します。</p>
           <pre>npm start
 # ログに「[host] インターネット公開: http://&lt;公開IP&gt;:8443 …」が出れば成功
 # 同一LAN内のみにしたい場合: $env:PASSIST_PUBLIC="0"; npm start</pre>
           <h3>方法B：Cloudflare トンネル（https・ポート開け不要・推奨）</h3>
-          <p>独自ドメイン（例 <code>passist.example.com</code>）で正規の https URL になります。Cloudflare 側の公開ホスト名設定は <strong>タイプ=HTTP / URL=localhost:8443 / パス=空</strong>。</p>
+          <p>独自ドメイン（例 <code>passist.example.com</code>）で正規の https URL になります。Cloudflare 側の公開ホスト名は <strong>タイプ=HTTP / URL=localhost:8443 / パス=空</strong>。</p>
           <pre>$env:PASSIST_PUBLIC="0"; $env:PUBLIC_BASE_URL="https://passist.example.com"; npm start
 # 共有URL = https://passist.example.com/s/…（ブラウザで開くだけ）</pre>
-          <div class="note">
-            映像/操作は WebRTC の P2P（STUN）で流れ、トンネルは通りません。厳しい NAT の相手とは TURN サーバが必要になることがあります（多人数運用なら中継集約型を推奨）。
-          </div>
+          <div class="note">映像/操作は WebRTC の P2P（STUN）で流れ、トンネルは通りません。厳しい NAT の相手とは TURN サーバが必要になることがあります（→ <a href="#selfhost">セルフホスト・運用</a>）。</div>
         </section>
 
         <section id="security">
-          <h2>6. セキュリティ</h2>
+          <h2><span class="e">🛡️</span>7. セキュリティ</h2>
           <table>
             <tr><th>観点</th><th>対策</th></tr>
             <tr><td>1ウィンドウ限定</td><td>キャプチャ元に <code>screen</code> を列挙せず、選択IDに固定。デスクトップ・他ウィンドウは映らない。</td></tr>
             <tr><td>一時利用</td><td>セッションに有効期限（既定30分）。期限切れで自動失効。</td></tr>
-            <tr><td>勝手に繋がせない</td><td>既定でホスト承認制。許可するまで映像は流れない。PIN併用モードも有り。</td></tr>
-            <tr><td>事前承認（信頼端末）</td><td>承認時に「信頼」した端末は次回から自動接続（端末ごとのクレデンシャル、ハッシュ保存）。</td></tr>
+            <tr><td>勝手に繋がせない</td><td>既定でホスト承認制。許可するまで映像は流れない。PIN／招待リンクのモードも有り。</td></tr>
+            <tr><td>事前承認（信頼端末）</td><td>端末ごとのクレデンシャル。ホストはハッシュ（SHA-256）のみ保存。</td></tr>
             <tr><td>操作範囲の限定</td><td>入力座標を対象ウィンドウの矩形にクランプ。窓外には出さない。</td></tr>
             <tr><td>デスクトップへの脱出防止</td><td>Win / Alt+Tab / Alt+F4 / Ctrl+Esc / タスクマネージャ 等のキーをブロック。</td></tr>
-            <tr><td>暗号化</td><td>映像・操作は常に DTLS-SRTP。シグナリング/ページは https/wss 化可能。</td></tr>
+            <tr><td>暗号化</td><td>映像・操作は常に <span class="alg">DTLS-SRTP</span>（<span class="alg">AES-128-GCM</span> / <span class="alg">ECDHE</span>）。鍵はホストと相手だけが持ち、サーバ・TURN は中身を見られない。</td></tr>
+            <tr><td>サーバの真正性</td><td>稼働中サーバが公開コードと同一であることを暗号学的に検証可能（次節）。</td></tr>
           </table>
-          <h3>アクセス制御モード（<code>ACCESS_MODE</code>）</h3>
-          <p><code>approve</code>（既定・ホスト承認）／ <code>pin</code>（6桁ワンタイムPIN併用）／ <code>token</code>（URLのみで即接続）。</p>
         </section>
 
-        <section id="reliability">
-          <h2>7. 信頼性・配信向け堅牢化</h2>
-          <p>長時間稼働でフリーズ／メモリリーク／クラッシュしないための対策を実装済み。</p>
-          <table>
-            <tr><th>リスク</th><th>対策</th></tr>
-            <tr><td>常時ポーリングの負荷</td><td>対象ウィンドウ矩形の取得を<strong>操作中のみの遅延更新</strong>に（旧：700msごとに全ウィンドウ列挙 → 廃止）。アイドル時ゼロ負荷。</td></tr>
-            <tr><td>再接続でのPeerリーク</td><td>新規接続前に旧 <code>RTCPeerConnection</code> を確実に <code>close</code>＋ハンドラ解除。失敗/切断時も自動解放。</td></tr>
-            <tr><td>DataChannelのバッファ肥大</td><td>マウス移動を約60Hzに間引き＋<code>bufferedAmount</code> 上限(256KB)で破棄（バックプレッシャ対策）。</td></tr>
-            <tr><td>クラッシュ</td><td>レンダラがクラッシュしても<strong>自動リロードで復帰</strong>（ループ防止付き）。未処理例外/Promise を <code>%TEMP%\passist-crash.log</code> に記録。</td></tr>
-          </table>
+        <section id="verify">
+          <h2><span class="e">🔐</span>8. 検証・署名</h2>
+          <p>signaling サーバの Docker image は、GitHub Actions で <strong>Reproducible Build</strong>（再現可能ビルド）され、<strong>Cosign keyless 署名</strong>（GitHub OIDC → Sigstore Fulcio の短期証明書 → Rekor 透明性ログ）と <strong>SLSA provenance ＋ SBOM</strong> が付きます。秘密鍵は運営者が保持しません。</p>
+          <p>ビューア／ホストの「PAssist について」を開くと、<strong>ブラウザ自身がその場で</strong> Rekor の Merkle 証明・署名・イメージ digest・証明書の発行元を検証し、<strong>✓</strong> を表示します（専門知識・追加インストール不要）。CLI でフル検証する場合：</p>
+          <pre><code>cosign verify ghcr.io/paps-jp/passist-signaling@&lt;digest&gt; \
+  --certificate-identity-regexp 'https://github.com/paps-jp/passist' \
+  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'</code></pre>
+          <div class="ok">仕組みと「なぜ数学的に安全か」の初心者向け解説は <a href="verification.html"><strong>🔐 検証に基づく安全性</strong></a> を参照してください。</div>
         </section>
 
         <section id="config">
-          <h2>8. 設定（環境変数）</h2>
+          <h2><span class="e">⚙️</span>9. 設定（環境変数）</h2>
+          <h3>ホスト側</h3>
+          <table>
+            <tr><th>変数</th><th>既定</th><th>説明</th></tr>
+            <tr><td><code>PASSIST_PUBLIC</code></td><td>有効</td><td><code>0</code> で UPnP 公開を無効（同一LAN内のみ）</td></tr>
+            <tr><td><code>PUBLIC_BASE_URL</code></td><td>—</td><td>共有URLのベース（トンネル使用時に指定）</td></tr>
+            <tr><td><code>REMOTE_SERVER_URL</code></td><td>—</td><td>外部シグナリングを使う場合の接続先（内部起動を無効化）</td></tr>
+          </table>
+          <h3>サーバ側</h3>
           <table>
             <tr><th>変数</th><th>既定</th><th>説明</th></tr>
             <tr><td><code>PORT</code></td><td>8443</td><td>サーバの待受ポート</td></tr>
-            <tr><td><code>ACCESS_MODE</code></td><td>approve</td><td>approve / pin / token</td></tr>
-            <tr><td><code>SESSION_TTL_MS</code></td><td>1800000</td><td>セッション有効期限(ms)</td></tr>
-            <tr><td><code>PASSIST_PUBLIC</code></td><td>有効</td><td><code>0</code>で UPnP 公開を無効（同一LAN内のみ）</td></tr>
-            <tr><td><code>PUBLIC_BASE_URL</code></td><td>—</td><td>共有URLのベース（トンネル使用時に指定）</td></tr>
+            <tr><td><code>ACCESS_MODE</code></td><td>approve</td><td>既定アクセスモード：approve / pin / invite / token</td></tr>
+            <tr><td><code>SESSION_TTL_MS</code></td><td>1800000</td><td>セッション有効期限(ms)。<code>0</code> で無期限</td></tr>
             <tr><td><code>TLS_CERT</code> / <code>TLS_KEY</code></td><td>—</td><td>指定すると https/wss で待受</td></tr>
-            <tr><td><code>REMOTE_SERVER_URL</code></td><td>—</td><td>外部サーバ利用時のシグナリング先（内部起動を無効化）</td></tr>
+            <tr><td><code>ICE_STUN_URL</code></td><td>Google STUN</td><td>配布する STUN サーバ</td></tr>
+            <tr><td><code>ICE_TURN_URL</code> / <code>ICE_TURN_USER</code> / <code>ICE_TURN_PASS</code></td><td>—</td><td>静的（固定認証）TURN</td></tr>
+            <tr><td><code>SIGN_TURN_URLS</code> / <code>TURN_AUTH_SECRET</code> / <code>SIGN_TURN_USERNAME</code> / <code>SIGN_TURN_TTL_SEC</code></td><td>—</td><td>短期認証TURN（HMAC で期限付きクレデンシャルを発行・自動失効）</td></tr>
+            <tr><td><code>RELAY_BUDGET_BPS</code> / <code>RELAY_MIN_BPS</code> / <code>RELAY_MAX_BPS</code></td><td>—</td><td>TURN 中継時の送信ビットレート上限（コスト管理）</td></tr>
           </table>
+          <p class="note" style="margin-top:8px"><code>GIT_COMMIT</code> / <code>IMAGE_DIGEST</code> / <code>BUILD_TIMESTAMP</code> / <code>GIT_TAG</code> はビルド時に自動で注入されるビルド情報で、<code>/api/build</code> から参照できます（手動設定不要）。</p>
+        </section>
+
+        <section id="selfhost">
+          <h2><span class="e">🐳</span>10. セルフホスト・運用</h2>
+          <p>signaling サーバは独立運用できます。<code>deploy/docker-compose.yml</code> が <strong>Caddy（自動TLS）＋ signaling（GHCR から pull）＋ coturn（TURN・同居）</strong>を立ち上げます。</p>
+          <pre><code># VPS 初期化（UFW・Docker 導入・.env 雛形生成）
+bash deploy/bootstrap.sh
+
+# .env に最低限を設定
+#   DOMAIN=passist.example.com
+#   ICE_TURN_* / TURN 認証 など
+
+docker compose -f deploy/docker-compose.yml up -d
+# 更新: docker compose pull &amp;&amp; docker compose up -d</code></pre>
+          <ul>
+            <li><strong>image の真正性</strong>は pull 前後に <code>cosign verify</code> で確認できます（→ <a href="#verify">検証・署名</a>）。</li>
+            <li>TURN だけ別ホストに分離したい場合は <code>deploy/coturn-only/</code> を使用。</li>
+            <li><strong>統計</strong>：稼働サーバは <code>/api/stats</code>（CORS 許可）で匿名の利用統計を公開。ダッシュボードは <a href="stats.html">stats.html</a>。</li>
+          </ul>
         </section>
 
         <section id="build">
-          <h2>9. ビルドと配布</h2>
+          <h2><span class="e">🔨</span>11. ビルドと配布</h2>
+          <h3>ホスト（PAssist.exe）</h3>
           <pre>npm install                 # host/server の依存を一括導入
 npm start                   # 開発起動（Electron）
 npm test                    # 信頼ロジックの単体テスト
-npm --prefix host run dist  # 配布用 dist\PAssist.exe（portable）を生成</pre>
+npm --prefix host run dist  # 配布用 PAssist.exe（portable）を生成</pre>
           <ul>
             <li>成果物：<code>dist\PAssist.exe</code>（単一実行ファイル・portable）。サーバ一式は <code>resources\server</code> に同梱、ネイティブ(nut.js)は asar から展開。</li>
             <li>入力注入が「閲覧のみ」になる場合は <code>npm run rebuild</code>（nut.js を Electron 用に再ビルド）。</li>
           </ul>
+          <h3>signaling サーバ（自動・署名付き）</h3>
+          <p><code>v*</code> タグを push すると <code>release-signaling.yml</code> が起動し、Reproducible Build → GHCR へ push → SLSA provenance＋SBOM 添付 → Cosign keyless 署名（Rekor 記録）まで自動実行します。</p>
+          <pre><code>git tag vX.Y.Z &amp;&amp; git push origin vX.Y.Z   # あとは CI が全部やる</code></pre>
         </section>
 
         <section id="iframe">
-          <h2>10. iframe 埋め込み</h2>
+          <h2><span class="e">🖼️</span>12. iframe 埋め込み</h2>
           <p>ビューアは普通の Web ページなので iframe に埋め込めます。</p>
           <pre>&lt;iframe
   src="https://passist.example.com/s/&lt;token&gt;"
@@ -217,18 +291,18 @@ npm --prefix host run dist  # 配布用 dist\PAssist.exe（portable）を生成<
   title="PAssist"&gt;&lt;/iframe&gt;</pre>
           <ul>
             <li>親ページは https 推奨。<code>allow="fullscreen"</code> は全画面ボタン用。</li>
-            <li>埋め込み元を限定するなら CSP <code>frame-ancestors</code> を返す（実装可）。</li>
+            <li>埋め込み元を限定するなら CSP <code>frame-ancestors</code> を返す。</li>
             <li><code>sandbox</code> を付けるなら <code>allow-scripts allow-same-origin allow-fullscreen</code> が必要。</li>
           </ul>
         </section>
 
         <section id="limits">
-          <h2>11. 制限と今後</h2>
+          <h2><span class="e">📌</span>13. 制限と今後</h2>
           <div class="grid2">
             <div class="card">
               <h3>現在の制限</h3>
               <ul>
-                <li>ホストは Windows のみ（nut.js / WGC）。</li>
+                <li>ホストは Windows のみ（nut.js / Windows Graphics Capture）。</li>
                 <li>厳しい NAT の相手は TURN が必要な場合あり。</li>
                 <li>exe は未署名（SmartScreen 警告）。</li>
                 <li>操作は OS レベルの実入力（ホストの実カーソルが動く）。</li>
@@ -237,19 +311,26 @@ npm --prefix host run dist  # 配布用 dist\PAssist.exe（portable）を生成<
             <div class="card">
               <h3>今後の候補</h3>
               <ul>
-                <li>TURN（coturn / マネージド）でNAT耐性とコスト管理。</li>
-                <li>コード署名（Azure Trusted Signing 等）。</li>
-                <li>サービス化：中央シグナリング（Workers + Durable Objects）＋ TURN 集約。</li>
-                <li>送信ビットレート上限・自動更新・アイコン。</li>
+                <li>exe の SHA256SUMS を cosign sign-blob で署名し release に添付。</li>
+                <li>コード署名（EV / Azure Trusted Signing 等）で SmartScreen 通過。</li>
+                <li>送信ビットレートの自動調整・自動更新。</li>
               </ul>
             </div>
           </div>
+        </section>
+
+        <section id="license">
+          <h2><span class="e">📄</span>14. ライセンス</h2>
+          <p>PAssist は <a href="https://opensource.org/license/mit" target="_blank" rel="noopener"><strong>MIT License</strong></a> で公開しています。OSI 認定の最もシンプルな許諾型 OSS ライセンスで、商用利用を含むほぼすべての利用が自由です。</p>
+          <div class="ok">使う・自社運用する・改変する・監査する・再現ビルドで検証する・再配布する——いずれも自由（商用・派生物への独自ライセンス付与も含む）。必須の条件は<strong>再配布時に著作権表示と MIT ライセンス全文を含めること</strong>のみです。詳細は <a href="https://github.com/paps-jp/passist/blob/main/LICENSE" target="_blank" rel="noopener">LICENSE</a> または <a href="verification.html">検証に基づく安全性</a> のライセンス節を参照。</div>
         </section>
       </main>
     </div>
 
     <footer>
-      PAssist — 単一ウィンドウ・ブラウザ完結・アカウント不要のリモート操作 / ドキュメント作成日: 2026-06-09
+      PAssist — 単一ウィンドウ・ブラウザ完結・アカウント不要のリモート操作 ／
+      <a href="index.html">トップ</a> ／ <a href="verification.html">検証に基づく安全性</a> ／
+      <a href="https://github.com/paps-jp/passist">github.com/paps-jp/passist</a>
     </footer>
   </body>
 </html>
