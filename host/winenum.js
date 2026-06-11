@@ -32,6 +32,7 @@ try {
   const kernel32 = koffi.load('kernel32.dll');
   const ShowWindow = user32.func('bool __stdcall ShowWindow(intptr_t hwnd, int nCmdShow)');
   const SetForegroundWindow = user32.func('bool __stdcall SetForegroundWindow(intptr_t hwnd)');
+  const IsWindowValid = user32.func('bool __stdcall IsWindow(intptr_t hwnd)'); // 既に閉じたHWNDへのAPI呼びを未然に防ぐ
   const BringWindowToTop = user32.func('bool __stdcall BringWindowToTop(intptr_t hwnd)');
   const GetForegroundWindow = user32.func('intptr_t __stdcall GetForegroundWindow()');
   const GetWTPID = user32.func('uint32 __stdcall GetWindowThreadProcessId(intptr_t hwnd, _Out_ uint32 *pid)');
@@ -89,6 +90,7 @@ try {
     try {
       hwnd = Number(hwnd);
       if (!hwnd) return false;
+      if (!IsWindowValid(hwnd)) return false; // 既に閉じている HWND は触らない（Win32 API の連鎖失敗を防ぐ）
       if (Number(GetForegroundWindow()) === hwnd) return true; // 既に最前面
       ShowWindow(hwnd, 9); // SW_RESTORE（最小化なら復元しつつ表示）
       const cur = GetCurrentThreadId();

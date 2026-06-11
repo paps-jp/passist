@@ -289,6 +289,27 @@
       startSignaling();
       sessionStarted = true;
     }
+    // 共有対象ウィンドウが閉じられた（リモート操作で×が押された等）ことを検出。
+    // ハンドラ未設定だと renderer は「共有中」状態のまま無効HWNDへ入力注入を続けてしまい、
+    // Electron キャプチャエンジンや Win32 API がクラッシュの起点になる。
+    const vt = stream.getVideoTracks()[0];
+    if (vt) vt.onended = handleCaptureLost;
+  }
+
+  // 共有していたウィンドウが消失したときの撤収処理。
+  // セッション(URL/接続/承認)は維持して、ユーザーは「← 別の画面を選ぶ」で別ウィンドウを共有し直せる。
+  // ホスト側の selectedSourceId と activeShareName をクリアして、無効HWND への以後のアクセスを止める。
+  function handleCaptureLost() {
+    try { $('preview').srcObject = null; } catch {}
+    if (stream) {
+      try { stream.getTracks().forEach((t) => t.stop()); } catch {}
+      stream = null;
+    }
+    // 次回起動時に閉じた窓を自動再開しようとして再クラッシュ → を防ぐ
+    try { window.host.settingsSet({ activeShareName: '' }); } catch {}
+    // ホスト側の selectedSourceId をクリア → 無効HWND での setDisplayMediaRequestHandler 応答や入力注入を止める
+    try { window.host.selectSource(null, null); } catch {}
+    setStatus('共有していたウィンドウが閉じられました。「← 別の画面を選ぶ」から別のウィンドウを選び直せます。');
   }
 
   // --- セッション自動再開 / ウィンドウ監視 ---
