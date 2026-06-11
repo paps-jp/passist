@@ -657,8 +657,16 @@
     try {
       const build = await fetch('/api/build', { cache: 'no-store' }).then((r) => r.json());
       if (!build) return { state: 'error', error: 'no response' };
-      if (!build.imageDigest) return { state: 'no-attest', build };
-      return { state: 'reported', build };
+      if (!build.imageDigest || !build.bundleUrl) return { state: 'no-attest', build };
+      // ブラウザ自前 verify: sigverify.js が SHA-256 Merkle proof を独立に検証
+      if (!window.__passistSigVerify) return { state: 'lib-missing', build, error: 'sigverify.js not loaded' };
+      const bRes = await fetch(build.bundleUrl);
+      if (!bRes.ok) return { state: 'bundle-fail', build, error: 'HTTP ' + bRes.status };
+      const bundle = await bRes.json();
+      const v = await window.__passistSigVerify.verifyBundle(
+        bundle, build.imageDigest, build.certificateIdentityRegexp, build.certificateOidcIssuer
+      );
+      return { state: v.ok ? 'verified' : 'verify-fail', build, verify: v };
     } catch (e) {
       return { state: 'error', error: e.message };
     }
@@ -724,33 +732,55 @@
     const registry = b.registry || 'ghcr.io/paps-jp/passist-signaling';
     const src = b.sourceUrl || 'https://github.com/paps-jp/passist';
     const builtAt = b.builtAt || '';
+    const tag = b.tag || '';
     const head = (label, klass) => `<div><span class="${klass}">${label}</span></div>`;
     const kv = `<div class="kv">
+        ${tag ? '<b>tag</b><code>' + tag + '</code>' : ''}
         <b>commit</b><code>${commit}</code>
         <b>digest</b><code>${digest}</code>
         ${builtAt ? '<b>built at</b><span>' + builtAt + '</span>' : ''}
         <b>registry</b><code>${registry}</code>
       </div>`;
     const digestNoPrefix = (digest || '').replace(/^sha256:/, '');
-    const cosignCmd = `cosign verify ${registry}@${digest}\\\n  --certificate-identity-regexp 'https://github.com/paps-jp/passist'\\\n  --certificate-oidc-issuer 'https://token.actions.githubusercontent.com'`;
-    switch (v.state) {
-      case 'reported':
-        return head('✓ サーバが署名済 image digest を公開しています', 'ok')
-          + kv
-          + `<div style="margin-top:10px">この digest は GitHub Actions の release ワークフローで Cosign keyless 署名され、Sigstore Rekor の公開ログに記録されています。次のいずれかで暗号学的に検証できます:</div>`
-          + `<div style="margin-top:8px"><a href="https://search.sigstore.dev/?hash=sha256:${digestNoPrefix}" target="_blank" rel="noopener">🔍 Sigstore で署名を見る</a> ・ <a href="${src}/releases" target="_blank" rel="noopener">GitHub リリース</a> ・ <a href="${src}/actions" target="_blank" rel="noopener">ビルドログ</a></div>`
-          + `<details style="margin-top:8px"><summary style="cursor:pointer">cosign コマンドで完全検証</summary><pre style="white-space:pre-wrap;word-break:break-all;background:#0b0d10;color:#cfe1ff;padding:8px;border-radius:6px;font-size:11px;margin-top:6px">${cosignCmd}</pre></details>`;
-      case 'no-attest':
-        return head('ℹ このサーバはまだ署名版をリリースしていません', 'warn')
-          + `<div class="kv"><b>commit</b><code>${commit}</code></div>`
-          + '<div style="margin-top:8px">開発中・テスト中のサーバの可能性があります。本番運用には署名版（v0.2.0以降のリリース）の使用を推奨します。</div>'
-          + `<div style="margin-top:6px"><a href="${src}" target="_blank" rel="noopener">GitHub で公開コードを見る →</a></div>`;
-      case 'error':
-        return head('⚠ サーバ情報の取得に失敗しました', 'ng')
-          + `<div>${v.error || '不明なエラー'}</div>`;
-      default:
-        return head('? 不明な状態', 'warn');
+    if (v.state === 'verified') {
+      const vr = v.verify || {};
+      const ts = vr.integratedTime ? new Date(vr.integratedTime * 1000).toISOString() : '';
+      return head('✓ ブラウザで完全検証成功', 'ok')
+        + '<div style="margin-top:4px">SHA-256 Merkle inclusion proof + 申告digest一致 + identity一致を <strong>このブラウザ単独で</strong> 確認しました。</div>'
+        + kv
+        + `<div class="kv" style="margin-top:6px">
+            <b>署名者</b><code>${vr.subject || ''}</code>
+            <b>発行者</b><code>${vr.issuer || ''}</code>
+            ${ts ? '<b>署名時刻</b><span>' + ts + '</span>' : ''}
+            <b>log index</b><code>${vr.logIndex || ''}</code>
+            <b>root hash</b><code>${vr.rootHash || ''}</code>
+          </div>`
+        + `<div style="margin-top:8px"><a href="https://search.sigstore.dev/?logIndex=${vr.logIndex}" target="_blank" rel="noopener">🔍 Sigstore でこのエントリを開く →</a></div>`;
     }
+    if (v.state === 'verify-fail') {
+      const vr = v.verify || {};
+      const chk = vr.checks || {};
+      return head('✗ ブラウザ検証失敗', 'ng')
+        + `<div style="margin-top:4px">${vr.error || ''}</div>`
+        + `<div class="kv" style="margin-top:6px">
+            <b>Merkle proof</b><span>${chk.merkleProof?.ok ? '✓' : '✗ ' + (chk.merkleProof?.error || '')}</span>
+            <b>digest 一致</b><span>${chk.digestMatch?.ok ? '✓' : '✗ got=' + (chk.digestMatch?.got || '')}</span>
+            <b>identity 一致</b><span>${chk.identityMatch?.ok ? '✓' : '✗ uri=' + (chk.identityMatch?.uri || '')}</span>
+          </div>`
+        + kv;
+    }
+    if (v.state === 'bundle-fail' || v.state === 'lib-missing') {
+      return head('⚠ 検証準備に失敗: ' + v.state, 'warn')
+        + `<div>${v.error || ''}</div>`
+        + kv;
+    }
+    if (v.state === 'no-attest') {
+      return head('ℹ このサーバはまだ署名版をリリースしていません', 'warn')
+        + `<div class="kv"><b>commit</b><code>${commit}</code></div>`
+        + '<div style="margin-top:8px">開発中・テスト中のサーバの可能性があります。本番運用には署名版（v0.2.x以降のリリース）の使用を推奨します。</div>'
+        + `<div style="margin-top:6px"><a href="${src}" target="_blank" rel="noopener">GitHub で公開コードを見る →</a></div>`;
+    }
+    return head('⚠ サーバ情報の取得に失敗しました', 'ng') + `<div>${v.error || '不明なエラー'}</div>`;
   }
   function renderCrypto(c) {
     if (!c) return '接続が確立していません。映像表示後にもう一度開いてください。';

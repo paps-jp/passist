@@ -7,7 +7,7 @@ services:
     # 公開リリースの GHCR image を使用（Reproducible Build + Cosign keyless 署名済）。
     # cosign で検証可能：cosign verify ghcr.io/paps-jp/passist-signaling:${SIGNALING_VERSION}
     # ローカル開発時は build セクションで上書きする (override compose)。
-    image: ghcr.io/paps-jp/passist-signaling:${SIGNALING_VERSION:-v0.2.1}
+    image: ghcr.io/paps-jp/passist-signaling:${SIGNALING_VERSION:-v0.2.3}
     pull_policy: ${PULL_POLICY:-missing}
     restart: unless-stopped
     environment:
@@ -18,6 +18,8 @@ services:
       # image digest は build 時には未確定なので、pull 後に docker image inspect で取得した値を
       # 起動時に渡して /api/build から公開する。デプロイスクリプトで自動入力可能。
       IMAGE_DIGEST: ${SIGNALING_IMAGE_DIGEST:-}
+      # GIT_TAG (= SIGNALING_VERSION) はブラウザ自前検証で Sigstore Bundle URL を組み立てるのに使う
+      GIT_TAG: ${SIGNALING_VERSION:-v0.2.3}
       # TURN(relay)経由ピアの動的ガバナ。サーバOUT帯域に合わせて配分上限を絞る。
       RELAY_BUDGET_BPS: ${RELAY_BUDGET_BPS:-4000000}
       RELAY_MIN_BPS: ${RELAY_MIN_BPS:-100000}

@@ -16,7 +16,7 @@ on:
         required: true
 
 permissions:
-  contents: read
+  contents: write       # GitHub Release に Sigstore Bundle を attach
   packages: write       # GHCR push
   id-token: write       # cosign keyless: GitHub OIDC で短期証明書を取得
   attestations: write   # SLSA provenance attestation
@@ -67,6 +67,7 @@ jobs:
             SOURCE_DATE_EPOCH=${{ steps.meta.outputs.source_date_epoch }}
             GIT_COMMIT=${{ steps.meta.outputs.git_commit }}
             BUILD_TIMESTAMP=${{ steps.meta.outputs.build_timestamp }}
+            GIT_TAG=${{ steps.meta.outputs.tag }}
           tags: |
             ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.tag }}
             ${{ steps.meta.outputs.image }}:latest
@@ -81,13 +82,45 @@ jobs:
       - name: Install cosign
         uses: sigstore/cosign-installer@v3
 
-      - name: Cosign sign (keyless)
+      - name: Cosign sign (keyless) + Sigstore Bundle 出力
         env:
           COSIGN_EXPERIMENTAL: '1'
           IMAGE: ${{ steps.meta.outputs.image }}
           DIGEST: ${{ steps.build.outputs.digest }}
         run: |
+          # 1. 通常の cosign sign (GHCR signature attach + Rekor 登録)
           cosign sign --yes "${IMAGE}@${DIGEST}"
+          # 2. ブラウザ自前 verify 用に Sigstore Bundle (v0.3) を別途出力。
+          #    bundle には canonicalizedBody + inclusionProof + certificate が全部入る。
+          #    ブラウザは @sigstore/verify を使わず、自前で SHA-256 Merkle proof verify する。
+          mkdir -p artifacts
+          cosign sign --yes \
+            --bundle "artifacts/signaling-${{ steps.meta.outputs.tag }}.cosign-bundle.json" \
+            "${IMAGE}@${DIGEST}"
+          # メタ情報も同梱
+          cat > "artifacts/signaling-${{ steps.meta.outputs.tag }}.meta.json" <<EOF
+          {
+            "tag": "${{ steps.meta.outputs.tag }}",
+            "image": "${IMAGE}",
+            "digest": "${DIGEST}",
+            "commit": "${{ steps.meta.outputs.git_commit }}",
+            "builtAt": "${{ steps.meta.outputs.build_timestamp }}",
+            "certificateIdentityRegexp": "https://github.com/${{ github.repository }}",
+            "certificateOidcIssuer": "https://token.actions.githubusercontent.com"
+          }
+          EOF
+          ls -la artifacts/
+
+      - name: Upload Sigstore Bundle to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --title "$TAG" \
+              --notes "Cosign-signed signaling release with Sigstore Bundle for browser-verifiable provenance."
+          fi
+          gh release upload "$TAG" artifacts/* --clobber
 
       - name: Summary
         run: |
