@@ -1,0 +1,148 @@
+/* PAssist 公開サイト共通CSS（コーポレートトップ / 統計ダッシュボード）。
+   ホストアプリ側の style.css とは独立。viewer.css とも独立。 */
+:root {
+  --bg: #faf9f7;
+  --surface: #ffffff;
+  --fg: #232321;
+  --muted: #76746e;
+  --border: #e7e3da;
+  --primary: #2f6fed;
+  --primary-hover: #235fd6;
+  --hero-bg: linear-gradient(135deg, #f0eee7 0%, #e9e7e0 100%);
+  --shadow: 0 4px 18px rgba(40, 35, 25, 0.08);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1d1d1b;
+    --surface: #262624;
+    --fg: #ededea;
+    --muted: #9c9a93;
+    --border: #3a3934;
+    --primary: #4b82f0;
+    --hero-bg: linear-gradient(135deg, #262624 0%, #1d1d1b 100%);
+    --shadow: 0 6px 22px rgba(0, 0, 0, 0.35);
+  }
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0;
+  background: var(--bg); color: var(--fg);
+  font-family: system-ui, "Segoe UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
+  line-height: 1.7; -webkit-font-smoothing: antialiased;
+}
+a { color: var(--primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.container { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+
+/* Hero */
+.hero { background: var(--hero-bg); border-bottom: 1px solid var(--border); }
+.hero > .container:first-child {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-top: 18px; padding-bottom: 18px;
+}
+.hero .brand { font-size: 22px; font-weight: 700; letter-spacing: 0.3px; }
+.hero nav a { margin-left: 22px; color: var(--muted); font-size: 14px; }
+.hero nav a:hover { color: var(--primary); }
+.hero-body { padding-top: 56px; padding-bottom: 76px; }
+.hero-body h1 {
+  font-size: clamp(28px, 5vw, 44px); line-height: 1.25; margin: 0 0 18px;
+  letter-spacing: -0.01em; font-weight: 750;
+}
+.hero-body .lead {
+  font-size: 17px; color: var(--muted); max-width: 720px; margin: 0 0 28px;
+}
+.cta-row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.cta {
+  display: inline-block; padding: 13px 22px; border-radius: 10px;
+  font-weight: 600; font-size: 15px; border: 1px solid transparent;
+}
+.cta.primary { background: var(--primary); color: #fff; }
+.cta.primary:hover { background: var(--primary-hover); text-decoration: none; }
+.cta.ghost { background: transparent; color: var(--fg); border-color: var(--border); }
+.cta.ghost:hover { background: var(--surface); text-decoration: none; }
+.hero-body .hint { color: var(--muted); font-size: 13px; margin-top: 14px; }
+
+/* Section */
+main section { padding: 64px 0; border-bottom: 1px solid var(--border); }
+main section:last-of-type { border-bottom: 0; }
+h2 { font-size: 26px; font-weight: 700; margin: 0 0 28px; letter-spacing: -0.01em; }
+h3 { font-size: 17px; font-weight: 650; margin: 0 0 6px; }
+
+/* 3-grid cards */
+.grid3 {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 18px;
+}
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 22px;
+}
+.card p { color: var(--muted); margin: 0; font-size: 14.5px; }
+
+/* How (numbered steps) */
+.how-list {
+  list-style: none; padding: 0; margin: 0;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px;
+}
+.how-list li {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 22px;
+}
+.how-list h3 { margin-bottom: 8px; }
+.how-list p { color: var(--muted); margin: 0; font-size: 14.5px; }
+
+/* Use cases */
+.usecases { list-style: none; padding: 0; margin: 0; }
+.usecases li {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 14px 18px; margin-bottom: 10px; color: var(--muted);
+}
+.usecases strong { color: var(--fg); margin-right: 8px; }
+
+/* FAQ */
+.faq details {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px 18px; margin-bottom: 10px;
+}
+.faq summary {
+  cursor: pointer; font-weight: 600; list-style: none;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: '＋'; color: var(--muted); }
+.faq details[open] summary::after { content: '−'; }
+.faq details p { color: var(--muted); margin: 10px 0 0; }
+
+/* Trust strip */
+.strip {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 22px;
+}
+.strip > div h3 { margin-bottom: 6px; }
+.strip p { color: var(--muted); margin: 0; font-size: 14px; }
+
+/* Footer */
+footer { border-top: 1px solid var(--border); padding: 28px 0; color: var(--muted); font-size: 13px; }
+footer .container { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+
+/* ===== 統計ダッシュボード ===== */
+.dash-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 28px 0 18px; }
+.dash-head h1 { font-size: 26px; margin: 0; }
+.dash-head .as-of { color: var(--muted); font-size: 13px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 28px; }
+.kpi {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 16px 18px;
+}
+.kpi .label { color: var(--muted); font-size: 12.5px; letter-spacing: 0.04em; text-transform: uppercase; }
+.kpi .value { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; margin-top: 6px; }
+.kpi .unit { font-size: 13px; color: var(--muted); margin-left: 4px; }
+.kpi.live { border-left: 3px solid var(--primary); }
+.dash-section { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; margin-bottom: 22px; }
+.dash-section h2 { font-size: 16px; margin: 0 0 12px; }
+table.simple { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+table.simple th, table.simple td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: left; }
+table.simple th { color: var(--muted); font-weight: 600; font-size: 12.5px; }
+table.simple td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.note { color: var(--muted); font-size: 12.5px; }

@@ -13,6 +13,7 @@ const path = require('path');
 const crypto = require('crypto');
 const express = require('express');
 const { WebSocketServer } = require('ws');
+const stats = require('./stats'); // 匿名集計（個人情報は記録しない）。snapshot は /api/stats で公開
 
 const PORT = parseInt(process.env.PORT || '8443', 10);
 const ACCESS_MODE = process.env.ACCESS_MODE || 'approve'; // 'approve' | 'pin' | 'token'
@@ -94,9 +95,17 @@ app.get('/s/:token', (_req, res) => {
   noCache(res);
   res.sendFile(path.join(__dirname, 'public', 'viewer.html'));
 });
-app.get('/', (_req, res) =>
-  res.type('html').send('<h1>PAssist</h1><p>ホストアプリでウィンドウを選び、発行されたURLを共有してください。</p>'),
-);
+// 公開統計 API（個人情報なし。リアルタイム値と24h/日次サマリのみ）。
+app.get('/api/stats', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Access-Control-Allow-Origin', '*'); // 外部サイトからの埋め込みも許容
+  res.json(stats.snapshot());
+});
+app.get('/stats', (_req, res) => {
+  noCache(res);
+  res.sendFile(path.join(__dirname, 'public', 'stats.html'));
+});
+// "/" は public/index.html を express.static が自動配信する。手書きHTMLは削除。
 
 const server = useTls
   ? https.createServer({ cert: fs.readFileSync(TLS_CERT), key: fs.readFileSync(TLS_KEY) }, app)
@@ -165,6 +174,7 @@ function hostCreate(ws, msg) {
   });
   // 動的 bitrate ガバナの初期値を共有（TURN経由が0人なら上限値）
   send(ws, { type: 'bitrate-policy', maxBpsRelay: calcRelayBitrate(), relayCount: relayCount() });
+  stats.event('session_created', { accessMode });
   console.log(`[server] session created: ${token} (${ACCESS_MODE})`);
 }
 
@@ -176,9 +186,11 @@ function viewerJoin(ws, msg) {
     return send(ws, { type: 'error', code: 'expired', message: 'セッションの有効期限が切れています' });
   }
   if (s.viewers.size + s.pending.size >= s.maxViewers) {
+    stats.event('viewer_denied', { reason: 'busy' });
     return send(ws, { type: 'error', code: 'busy', message: '接続できる人数の上限に達しています' });
   }
   if (s.accessMode === 'pin' && String(msg.pin || '') !== s.pin) {
+    stats.event('viewer_denied', { reason: 'pin' });
     return send(ws, { type: 'error', code: 'pin', message: 'PINが違います' });
   }
 
@@ -207,6 +219,7 @@ function hostDecision(ws, approve, msg) {
   if (approve) {
     acceptViewer(s, v, msg && msg.issue);
   } else {
+    stats.event('viewer_denied', { reason: 'host_deny' });
     send(v, { type: 'denied', message: 'ホストが接続を拒否しました' });
     v.close();
     if (!s.viewers.size && !s.pending.size) s.status = 'idle';
@@ -219,6 +232,7 @@ function acceptViewer(s, v, issue) {
   // issue があれば、ホストが新規発行した信頼クレデンシャルをビューアへ渡す（localStorage 保存用）
   send(v, { type: 'accepted', issue: issue || null });
   send(s.host, { type: 'viewer:joined', viewerId: v.viewerId }); // 当該ビューア向けにホストがオファー作成
+  stats.event('viewer_accepted', { accessMode: s.accessMode });
 }
 
 function peerRoute(ws, msg) {
@@ -229,6 +243,7 @@ function peerRoute(ws, msg) {
   if (msg.via === 'relay') s.relayViewers.add(vid);
   else s.relayViewers.delete(vid); // p2p 等は外す
   if (wasRelay !== s.relayViewers.has(vid)) broadcastBitratePolicy();
+  stats.event('peer_route', { via: msg.via, prev: wasRelay ? 'relay' : 'p2p' });
 }
 
 function relaySignal(ws, msg) {
@@ -266,13 +281,16 @@ function onClose(ws) {
     sessions.delete(s.token);
     console.log(`[server] session closed: ${s.token}`);
     broadcastBitratePolicy();
+    stats.event('session_closed', { durationSec: Math.floor((Date.now() - s.createdAt) / 1000) });
   } else if (ws.role === 'viewer') {
-    if (ws.viewerId != null && s.viewers.has(ws.viewerId)) {
+    const wasViewer = ws.viewerId != null && s.viewers.has(ws.viewerId);
+    if (wasViewer) {
       s.viewers.delete(ws.viewerId);
       send(s.host, { type: 'viewer:left', viewerId: ws.viewerId });
     }
     if (ws.viewerId != null) s.pending.delete(ws.viewerId);
     if (ws.viewerId != null && s.relayViewers.delete(ws.viewerId)) broadcastBitratePolicy();
+    if (wasViewer) stats.event('viewer_left');
     if (!s.viewers.size && !s.pending.size) s.status = 'idle';
   }
 }
@@ -288,6 +306,7 @@ setInterval(() => {
       }
       send(s.host, { type: 'expired' });
       sessions.delete(token);
+      stats.event('session_expired', { durationSec: Math.floor((Date.now() - s.createdAt) / 1000) });
       console.log(`[server] session expired: ${token}`);
     }
   }
