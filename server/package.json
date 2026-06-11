@@ -1,6 +1,6 @@
 {
   "name": "passist-server",
-  "version": "0.2.7-2",
+  "version": "0.2.7-3",
   "private": true,
   "main": "server.js",
   "scripts": {

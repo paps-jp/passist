@@ -5,10 +5,8 @@ html, body {
   background: #0b0d10;
   color: #e7ecf2;
   font-family: system-ui, "Segoe UI", "Hiragino Kaku Gothic ProN", Meiryo, sans-serif;
-  line-height: 1.6;
+  line-height: 1.75;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
 }
 body { display: flex; flex-direction: column; }
 .hidden { display: none !important; }
