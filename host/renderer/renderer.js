@@ -205,7 +205,9 @@
         return;
       }
       sendWs({ type: 'host:end' });
-      window.host.settingsSet({ activeShareName: '' }); // 終了＝次回からの自動再開を解除
+      // 終了＝次回起動時に同じURLで復元しない（lastHostToken/Secretも破棄）。activeShareName も解除。
+      window.host.settingsSet({ activeShareName: '', lastHostToken: '', lastHostSecret: '' });
+      if (cfg.settings) { cfg.settings.lastHostToken = ''; cfg.settings.lastHostSecret = ''; }
       stopWatch();
       closeAllPeers();
       sessionStarted = false; // 次に画面を選ぶと新しいURLで開始
@@ -405,6 +407,10 @@
         maxViewers: (cfg.settings && cfg.settings.maxViewers) || 1,
         accessMode: (cfg.settings && cfg.settings.accessMode) || 'approve',
         ttlMinutes: cfg.settings && Number.isFinite(cfg.settings.sessionTtlMinutes) ? cfg.settings.sessionTtlMinutes : 30,
+        // セッション引き継ぎ: 前回の token/secret を送ると、サーバは同じ token でセッションを復元するか
+        // ホスト ws を張り替えてくれる（→ 同じ viewer URL を使い続けられる）。
+        existingToken: (cfg.settings && cfg.settings.lastHostToken) || undefined,
+        hostSecret:    (cfg.settings && cfg.settings.lastHostSecret) || undefined,
       });
     ws.onmessage = (e) => onMsg(JSON.parse(e.data));
     ws.onclose = () => setStatus('サーバとの接続が切断されました');
@@ -455,7 +461,15 @@
           $('pin').textContent = 'PIN: ' + msg.pin;
           $('pin').classList.remove('hidden');
         }
-        setStatus('待機中。相手がURLを開くと、ここに表示されます。');
+        // セッション引き継ぎ用に token/secret を永続化（次回起動時に同じ URL を取り戻すため）。
+        // resumed=true ならサーバが既存セッションを引き継いだ／復元した。
+        if (msg.token && msg.hostSecret) {
+          window.host.settingsSet({ lastHostToken: msg.token, lastHostSecret: msg.hostSecret });
+          if (cfg.settings) { cfg.settings.lastHostToken = msg.token; cfg.settings.lastHostSecret = msg.hostSecret; }
+        }
+        setStatus(msg.resumed
+          ? '✓ 前回のセッションを引き継ぎました（URL は同じ）。相手がURLを開くと、ここに表示されます。'
+          : '待機中。相手がURLを開くと、ここに表示されます。');
         break;
       case 'viewer:request':
         reqQueue.push({ viewerId: msg.viewerId, auth: msg.auth || null });

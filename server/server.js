@@ -153,6 +153,7 @@ function baseUrl(override) {
 
 const newToken = () => crypto.randomBytes(16).toString('base64url');
 const newPin = () => String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+const newSecret = () => crypto.randomBytes(16).toString('base64url'); // ホスト引き継ぎ認証用（ホスト以外には絶対に送らない）
 
 function send(ws, obj) {
   if (ws && ws.readyState === ws.OPEN) ws.send(JSON.stringify(obj));
@@ -342,43 +343,96 @@ function route(ws, msg) {
 }
 
 function hostCreate(ws, msg) {
+  // セッション引き継ぎ: existingToken + hostSecret が一致する既存セッションがあれば host(ws)を張り替え、
+  // セッションが消えていれば（サーバ再起動など）同じ token で復元する。secret 不一致や情報不足なら新規発行。
+  // → アプリ再起動・サーバ再起動・自動再接続後も同じ URL を使い続けられる。
+  const existingToken = msg && typeof msg.existingToken === 'string' ? msg.existingToken : '';
+  const hostSecret    = msg && typeof msg.hostSecret    === 'string' ? msg.hostSecret    : '';
+  if (existingToken && hostSecret) {
+    const old = sessions.get(existingToken);
+    if (old) {
+      if (old.hostSecret === hostSecret) {
+        // 既存セッションのホスト ws を新しい接続に張り替え（既存 viewer/pending はそのまま）
+        const prevHost = old.host;
+        if (prevHost && prevHost !== ws && prevHost.readyState === prevHost.OPEN) {
+          try { prevHost.onclose = null; prevHost.close(); } catch {}
+        }
+        old.host = ws;
+        ws.role = 'host';
+        ws.token = existingToken;
+        send(ws, {
+          type: 'session', token: existingToken,
+          viewerUrl: `${old.base}/s/${existingToken}`,
+          pin: old.pin, accessMode: old.accessMode, expiresAt: old.expiresAt,
+          hostSecret: old.hostSecret, // 同じ値を返す
+          iceServers: buildServerIceServers(),
+          resumed: true, // ホスト側で「リンク維持で復旧した」と分かるよう示す
+        });
+        send(ws, { type: 'bitrate-policy', maxBpsRelay: calcRelayBitrate(), relayCount: relayCount() });
+        console.log(`[server] host re-attached to session: ${existingToken}`);
+        return;
+      }
+      // secret 不一致 → 引き継ぎ拒否、新規発行へフォールスルー
+      console.log(`[server] hostSecret mismatch for ${existingToken}, issuing fresh session`);
+    } else {
+      // セッションが無い（サーバ再起動など）→ 同じ token で session を「復元」する
+      const restored = buildSession({ token: existingToken, hostSecret, ws, msg });
+      sessions.set(existingToken, restored);
+      ws.role = 'host';
+      ws.token = existingToken;
+      send(ws, {
+        type: 'session', token: existingToken,
+        viewerUrl: `${restored.base}/s/${existingToken}`,
+        pin: restored.pin, accessMode: restored.accessMode, expiresAt: restored.expiresAt,
+        hostSecret: restored.hostSecret,
+        iceServers: buildServerIceServers(),
+        resumed: true,
+      });
+      send(ws, { type: 'bitrate-policy', maxBpsRelay: calcRelayBitrate(), relayCount: relayCount() });
+      stats.event('session_created', { accessMode: restored.accessMode, resumed: true });
+      console.log(`[server] session restored (same token): ${existingToken}`);
+      return;
+    }
+  }
+
+  // 新規発行（通常ルート）
   const token = newToken();
-  // 接続方法はセッションごと（host:create で指定）。未指定/不正なら環境変数の既定。
-  // invite: 招待リンク(auth=信頼クレデンシャル)を持つ相手だけ自動接続。承認制(approve)の派生。
-  const accessMode = ['approve', 'pin', 'invite', 'token'].includes(msg && msg.accessMode) ? msg.accessMode : ACCESS_MODE;
-  // 有効期限（分）。host:create の ttlMinutes 優先、未指定なら環境変数の既定。0 は「無期限」(expiresAt=null)。
-  const ttlMin = msg && Number.isFinite(msg.ttlMinutes) ? msg.ttlMinutes : SESSION_TTL_MS > 0 ? SESSION_TTL_MS / 60000 : 0;
-  const expiresAt = ttlMin > 0 ? Date.now() + ttlMin * 60000 : null;
-  const s = {
-    token,
-    host: ws,
-    viewers: new Map(), // viewerId -> ws（接続中。複数同時接続可）
-    pending: new Map(), // viewerId -> ws（approve 承認待ち）
-    maxViewers: clampMaxViewers(msg && msg.maxViewers),
-    accessMode, // 'approve'(承認制) | 'pin' | 'token'(だれでも)
-    status: 'idle',
-    relayViewers: new Set(), // TURN(relay)経由と判定されたviewerIdの集合（動的bitrate配分のため）
-    base: baseUrl(msg && msg.publicBaseUrl),
-    pin: accessMode === 'pin' ? newPin() : null,
-    createdAt: Date.now(),
-    expiresAt, // null = 無期限
-  };
+  const s = buildSession({ token, hostSecret: newSecret(), ws, msg });
   sessions.set(token, s);
   ws.role = 'host';
   ws.token = token;
   send(ws, {
-    type: 'session',
-    token,
+    type: 'session', token,
     viewerUrl: `${s.base}/s/${token}`,
-    pin: s.pin,
-    accessMode: s.accessMode,
-    expiresAt: s.expiresAt,
-    iceServers: buildServerIceServers(), // ホストはこれを優先採用＝手動設定不要でTURN自動
+    pin: s.pin, accessMode: s.accessMode, expiresAt: s.expiresAt,
+    hostSecret: s.hostSecret, // 次回引き継ぎ用にホスト側へ渡す（このメッセージは host にのみ送られる）
+    iceServers: buildServerIceServers(),
   });
-  // 動的 bitrate ガバナの初期値を共有（TURN経由が0人なら上限値）
   send(ws, { type: 'bitrate-policy', maxBpsRelay: calcRelayBitrate(), relayCount: relayCount() });
-  stats.event('session_created', { accessMode });
-  console.log(`[server] session created: ${token} (${ACCESS_MODE})`);
+  stats.event('session_created', { accessMode: s.accessMode });
+  console.log(`[server] session created: ${token} (${s.accessMode})`);
+}
+
+// セッション構築の共通処理。新規発行と「復元」で共通化。
+function buildSession({ token, hostSecret, ws, msg }) {
+  const accessMode = ['approve', 'pin', 'invite', 'token'].includes(msg && msg.accessMode) ? msg.accessMode : ACCESS_MODE;
+  const ttlMin = msg && Number.isFinite(msg.ttlMinutes) ? msg.ttlMinutes : SESSION_TTL_MS > 0 ? SESSION_TTL_MS / 60000 : 0;
+  const expiresAt = ttlMin > 0 ? Date.now() + ttlMin * 60000 : null;
+  return {
+    token,
+    hostSecret, // セッションごとに固定、ホストの引き継ぎ認証に使う
+    host: ws,
+    viewers: new Map(),
+    pending: new Map(),
+    maxViewers: clampMaxViewers(msg && msg.maxViewers),
+    accessMode,
+    status: 'idle',
+    relayViewers: new Set(),
+    base: baseUrl(msg && msg.publicBaseUrl),
+    pin: accessMode === 'pin' ? newPin() : null,
+    createdAt: Date.now(),
+    expiresAt,
+  };
 }
 
 function viewerJoin(ws, msg) {
@@ -473,10 +527,10 @@ function hostEnd(ws) {
     send(v, { type: 'ended', message: 'ホストがセッションを終了しました' });
     v.close();
   }
-  s.viewers.clear();
-  s.pending.clear();
-  s.relayViewers.clear();
-  s.status = 'idle';
+  // 明示的終了: session を完全に削除（onClose の「引き継ぎ用に残す」とは違う）。
+  // ホスト側でも lastHostToken/Secret はクリア済み（renderer.js の end ボタン）→ 次回は新規発行になる。
+  sessions.delete(s.token);
+  console.log(`[server] session ended explicitly: ${s.token}`);
   broadcastBitratePolicy();
 }
 
@@ -484,12 +538,20 @@ function onClose(ws) {
   const s = ws.token && sessions.get(ws.token);
   if (!s) return;
   if (ws.role === 'host') {
+    // セッションは即削除しない＝ホストが同じ token+hostSecret で戻ってきたら復元できる。
+    // 既存 viewers/pending はホストが消えたので解放。s.host を null にして「ホスト不在」状態に。
+    // 完全削除は expiresAt の期限切れタイマー（または明示的な host:end）で行われる。
+    if (s.host !== ws) return; // 既に新しいホストに張り替え済みなら何もしない
     for (const v of [...s.viewers.values(), ...s.pending.values()]) {
       send(v, { type: 'ended', message: 'ホストが切断しました' });
       v.close();
     }
-    sessions.delete(s.token);
-    console.log(`[server] session closed: ${s.token}`);
+    s.viewers.clear();
+    s.pending.clear();
+    s.relayViewers.clear();
+    s.host = null;
+    s.status = 'idle';
+    console.log(`[server] host disconnected (session kept for reattach): ${s.token}`);
     broadcastBitratePolicy();
     stats.event('session_closed', { durationSec: Math.floor((Date.now() - s.createdAt) / 1000) });
   } else if (ws.role === 'viewer') {
