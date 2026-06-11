@@ -115,6 +115,9 @@ body { display: flex; flex-direction: column; }
 #badge { color: #3ddc84; font-size: 13px; }
 #badge.readonly { color: #8ab4ff; }
 body.view-only #video { cursor: default; }
+/* 「閲覧のみ」 時はホスト側で操作入力を全て無視するので、 操作系のボタン（モード切替・キーバー起動）は隠す */
+body.view-only #modeBtn,
+body.view-only #kbBtn { display: none !important; }
 .toolbar button { background: #2a313b; padding: 6px 10px; font-size: 13px; }
 #modeBtn { display: inline-flex; align-items: center; gap: 5px; }
 #modeBtn svg { flex: 0 0 auto; display: block; }
