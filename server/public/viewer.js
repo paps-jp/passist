@@ -4,7 +4,7 @@
   'use strict';
   // バージョン文字列。 ボタン押下時の status に含めることで、 ユーザーが「最新版を読めているか」
   // を画面上で確認できる（古いキャッシュの可能性を切り分けるため）。
-  const VIEWER_VERSION = 'v35';
+  const VIEWER_VERSION = 'v36';
   console.log('[viewer]', VIEWER_VERSION, 'loaded');
   const token = location.pathname.split('/').filter(Boolean).pop();
 
@@ -25,7 +25,7 @@
   };
   // 起動直後にバージョンを 3 秒だけ表示。 古いキャッシュなら表示されない or 古い番号が出る。
   // ホスト側 PAssist と viewer 両方が最新かをユーザー自身で確認できるようにする。
-  try { statusEl.textContent = '📐 viewer v35 loaded'; statusEl.classList.remove('hidden'); } catch {}
+  try { statusEl.textContent = '📐 viewer v36 loaded'; statusEl.classList.remove('hidden'); } catch {}
   setTimeout(() => { try { if (statusEl.textContent && statusEl.textContent.indexOf('loaded') >= 0) statusEl.textContent = ''; } catch {} }, 3000);
   // i18n ヘルパ (window.t は i18n.js が定義。 未ロードならキーをそのまま返す)
   const tr = (k) => (window.t ? window.t(k) : k);
@@ -685,6 +685,11 @@
       setStatus(`📐 ${VIEWER_VERSION} 押下 ctrl=${controlEnabled} dc=${dc ? dc.readyState : 'null'}`);
       syncSizeOn = !syncSizeOn;
       syncSizeBtn.classList.toggle('active', syncSizeOn);
+      // ホスト窓の最小サイズ制約（cmd/ブラウザは縦長にできない等）で完全に合わせられない場合の補完。
+      // 同期 ON のとき: viewer 側で object-fit:cover にして映像を画面いっぱいに広げる
+      // （上下/左右が少し切れる代わりにレターボックスが消える）。
+      // 同期 OFF: object-fit:contain（既定）に戻して全体表示。
+      try { video.style.objectFit = syncSizeOn ? 'cover' : ''; } catch {}
       if (syncSizeOn) {
         setTimeout(sendCurrentSize, 50); // 押下表示の少しあとに送信＆結果表示
         window.addEventListener('resize', onResize);

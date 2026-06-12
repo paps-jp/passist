@@ -133,6 +133,45 @@ cp docs/i18n.js host/renderer/i18n.js && cp docs/i18n.js server/public/i18n.js
 - **`.github/dependabot.yml`** が月次で update PR を作成。`electron` 系のメジャーは ignore。
 - 配布 exe で実際に使われているバージョンを `host/package.json` に反映する（リリース時の検証根拠）。
 
+## 開発時の注意（PAssist の再起動）
+
+PAssist は **タスクトレイ常駐 + Single-Instance Lock (`host/main.js` `app.requestSingleInstanceLock()`)** の Electron アプリ。 `npm start` で起動した後、 ウィンドウを ✕ で閉じても **プロセスは生き続ける**（トレイに残る）。 コードを変更しても、 同じプロセスが古い `main.js` / `input.js` / `platform/**` を握り続け、 **新規 `npm start` は即終了する**（プロンプトが戻るが何も起きていない＝古いプロセスが動き続ける）。
+
+### 完全終了の手順
+
+開発中にコードを反映したい時は、 次のどちらかで **完全に終了** してから `npm start`:
+
+1. **タスクトレイから終了**: 画面右下 `∧` → PAssist アイコン右クリック → 終了
+2. **コマンドで強制終了** (確実):
+   ```cmd
+   taskkill /F /IM electron.exe /T
+   taskkill /F /IM PAssist.exe /T
+   ```
+3. 確認: `tasklist | findstr /I "PAssist Electron"` で何も表示されないこと
+
+「`npm start` を打ったらプロンプトがすぐ戻る／ターミナルにログが出ない」 が起きたら、 古いプロセスが Single-Instance Lock を取っている合図。 上記の手順でプロセスを完全に消す。
+
+### 何が再起動なしで反映され、 何が必要か
+
+| ファイル | 再起動 | 反映方法 |
+|---|---|---|
+| `server/public/viewer.html` / `viewer.js` / `viewer.css` | 不要 | ブラウザの強制リロードで反映（HTTP 配信） |
+| `server/server.js`（内蔵子プロセス起動の場合） | 必要 | PAssist 完全再起動 |
+| `host/renderer/renderer.js` / `index.html` / `style.css` | renderer 単独可 | Ctrl+Shift+I → Cmd+R で renderer プロセスをリロード |
+| **`host/main.js` / `host/input.js` / `host/platform/**`** | **必須** | PAssist 完全再起動 |
+| `host/preload.js` | 必須 | 同上 |
+| `host/settings.js` | 必須 | 同上 |
+
+main プロセスのコードは `require()` 時にメモリへ固定されるので、 ファイルを書き換えても **絶対に反映されない**。 デバッグログがファイル (`%TEMP%\passist-resize.log` 等) にすら追記されない場合は、 ホストが古い main プロセスのままの可能性が高い。
+
+### viewer 側のキャッシュ
+
+`viewer.html` の `?v=N` をバンプしてもブラウザのキャッシュは強い（iOS Safari は特に）。 確実に最新を読ませるには:
+
+- **シークレットウィンドウ / プライベートブラウザ** で URL を開き直す（一番確実）
+- iOS Safari: 設定 → Safari → 「履歴と Web サイトデータを消去」
+- viewer 起動直後にステータスに `📐 viewer vXX loaded` を出すので、 期待する `vXX` が表示されない場合は古いキャッシュ。
+
 ## テスト
 
 - 軽量CI（`.github/workflows/test.yml`）が push/PR で:
