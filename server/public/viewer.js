@@ -4,7 +4,7 @@
   'use strict';
   // バージョン文字列。 ボタン押下時の status に含めることで、 ユーザーが「最新版を読めているか」
   // を画面上で確認できる（古いキャッシュの可能性を切り分けるため）。
-  const VIEWER_VERSION = 'v37';
+  const VIEWER_VERSION = 'v38';
   console.log('[viewer]', VIEWER_VERSION, 'loaded');
   const token = location.pathname.split('/').filter(Boolean).pop();
 
@@ -25,7 +25,7 @@
   };
   // 起動直後にバージョンを 3 秒だけ表示。 古いキャッシュなら表示されない or 古い番号が出る。
   // ホスト側 PAssist と viewer 両方が最新かをユーザー自身で確認できるようにする。
-  try { statusEl.textContent = '📐 viewer v37 loaded'; statusEl.classList.remove('hidden'); } catch {}
+  try { statusEl.textContent = '📐 viewer v38 loaded'; statusEl.classList.remove('hidden'); } catch {}
   setTimeout(() => { try { if (statusEl.textContent && statusEl.textContent.indexOf('loaded') >= 0) statusEl.textContent = ''; } catch {} }, 3000);
   // i18n ヘルパ (window.t は i18n.js が定義。 未ロードならキーをそのまま返す)
   const tr = (k) => (window.t ? window.t(k) : k);
@@ -213,13 +213,21 @@
     }
   }
 
-  // video 表示領域(レターボックス補正込み)での正規化座標 0..1。範囲外は null。
+  // video 表示領域での正規化座標 0..1。範囲外は null。
+  // U-4: 同期 ON のとき (cover 表示中) は Math.max で計算する。
+  //   ホスト窓 (例 772x766) を viewer (例 440x766) に cover フィットで表示した場合、
+  //   映像は左右がクロップされて viewer 全体を埋める。 viewer のクリック x=0 は
+  //   ホストの x≈0.215 に対応する。 Math.max + offX/offY が負になることで、
+  //   viewer 全体 (0..viewer幅) → ホスト窓の中央クロップ範囲 (0.215..0.785) に
+  //   自動マップされる。
+  // 同期 OFF: 従来通り Math.min (contain) で黒帯ありの整合した座標。
   function norm(cx, cy) {
     const r = video.getBoundingClientRect();
     const vw = video.videoWidth;
     const vh = video.videoHeight;
     if (!vw || !vh) return null;
-    const scale = Math.min(r.width / vw, r.height / vh);
+    const fit = syncSizeOn ? Math.max : Math.min;
+    const scale = fit(r.width / vw, r.height / vh);
     const dispW = vw * scale;
     const dispH = vh * scale;
     const offX = (r.width - dispW) / 2;
