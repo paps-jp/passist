@@ -40,6 +40,13 @@ jobs:
         working-directory: host
         run: npm ci
 
+      # passist-mcp の依存 (@modelcontextprotocol/sdk) を tools/passist-mcp/node_modules
+      # に展開する。 host/package.json の extraResources でそのまま PAssist.exe に
+      # 同梱され、 配布版でも AI 連携が機能するようになる。
+      - name: Install passist-mcp deps (bundled into exe)
+        working-directory: tools/passist-mcp
+        run: npm ci --omit=dev
+
       # nut.js のネイティブモジュールを Electron の ABI 向けに再ビルド（windows-latest は MSVC/Python 同梱）
       - name: Rebuild native modules for Electron
         working-directory: host
