@@ -1,0 +1,139 @@
+name: build-host-mac
+
+# Mac 版 PAssist（Electron）を macos-latest（Apple Silicon）でビルドして
+# 5秒間のヘッドレス起動スモークテストを通す。
+# - workflow_dispatch: 手動実行（動作確認用）
+# - v* タグ: リリース時に zip を GitHub Release に添付
+# 生成物は artifact としてアップロードする。
+#
+# 注意:
+#   - 署名（Apple Developer ID）/ notarization は未対応。Gatekeeper を通すには
+#     ユーザー側で `xattr -d com.apple.quarantine PAssist.app` が必要。
+#   - スモークテストは「Electron 起動が即時クラッシュしない」確認のみ。
+#     画面収録/アクセシビリティ権限が絡む実機能は CI では検証不可。
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write   # タグ時に Release へ zip を添付
+
+jobs:
+  build:
+    runs-on: macos-latest   # Apple Silicon (arm64)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # .app には server 一式（runtime 依存）が同梱される（host の build.extraResources）。
+      # 配布物には dev 依存を入れないため --omit=dev。
+      - name: Install server deps (runtime only, bundled into app)
+        working-directory: server
+        run: npm ci --omit=dev
+
+      - name: Install host deps
+        working-directory: host
+        run: npm ci
+
+      # nut.js のネイティブモジュールを Electron の ABI 向けに再ビルド。
+      - name: Rebuild native modules for Electron
+        working-directory: host
+        run: npm run rebuild
+
+      - name: Build PAssist (electron-builder zip for mac arm64)
+        working-directory: host
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'   # 証明書なし＝この段階では署名しない（誤署名防止）
+        run: npm run dist:mac
+
+      - name: List build output
+        run: |
+          ls -la dist/ || true
+          find dist -name "*.zip" -o -name "PAssist.app" -maxdepth 5 2>/dev/null | head -20
+
+      # 起動スモークテスト: Electron バイナリを直接実行し、5秒間プロセスが生き残るかを確認。
+      # 画面収録/アクセシビリティ権限はないので desktopCapturer/getWindows は空を返すが、
+      # main プロセスのロードとレンダラ起動までは検証できる。
+      - name: Headless smoke test (5s launch)
+        run: |
+          set -e
+          APP=$(find dist -type d -name "PAssist.app" -maxdepth 5 | head -1)
+          if [ -z "$APP" ]; then
+            echo "::error::PAssist.app not found in dist/"
+            ls -laR dist/ | head -100 || true
+            exit 1
+          fi
+          echo "Launching: $APP"
+          BIN="$APP/Contents/MacOS/PAssist"
+          if [ ! -x "$BIN" ]; then
+            echo "::error::executable not found at $BIN"
+            ls -la "$APP/Contents/MacOS/" || true
+            exit 1
+          fi
+          # quarantine 属性が万一付いていたら剥がす（自己ビルドなので付かないはずだが念のため）
+          xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
+          "$BIN" --no-sandbox > smoke.log 2>&1 &
+          PID=$!
+          sleep 5
+          if kill -0 $PID 2>/dev/null; then
+            echo "PAssist still running after 5s — smoke test passed"
+            kill -TERM $PID 2>/dev/null || true
+            sleep 1
+            kill -KILL $PID 2>/dev/null || true
+          else
+            echo "::error::PAssist exited prematurely"
+            echo "=== smoke log ==="
+            cat smoke.log || true
+            exit 1
+          fi
+          echo "=== smoke log (head -100) ==="
+          head -100 smoke.log || true
+
+      - name: Compute SHA256
+        id: hash
+        run: |
+          ZIP=$(find dist -name "PAssist-*-mac-*.zip" | head -1)
+          if [ -z "$ZIP" ]; then
+            echo "::error::zip artifact not found"
+            ls -la dist/ || true
+            exit 1
+          fi
+          HASH=$(shasum -a 256 "$ZIP" | awk '{print $1}')
+          NAME=$(basename "$ZIP")
+          echo "SHA256: $HASH"
+          {
+            echo "## PAssist (mac) built"
+            echo ""
+            echo "- File: \`$NAME\`"
+            echo "- SHA256: \`$HASH\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "$HASH  $NAME" > dist/SHA256SUMS-mac.txt
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PAssist-mac
+          path: |
+            dist/PAssist-*-mac-*.zip
+            dist/SHA256SUMS-mac.txt
+          if-no-files-found: error
+
+      - name: Attach to GitHub Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        shell: bash
+        run: |
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --title "$TAG" --notes "PAssist build"
+          fi
+          gh release upload "$TAG" dist/PAssist-*-mac-*.zip dist/SHA256SUMS-mac.txt --clobber

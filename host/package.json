@@ -8,7 +8,8 @@
   "scripts": {
     "start": "electron .",
     "rebuild": "electron-rebuild -f -w @nut-tree-fork/nut-js",
-    "dist": "electron-builder --win portable"
+    "dist": "electron-builder --win portable",
+    "dist:mac": "electron-builder --mac"
   },
   "dependencies": {
     "@nut-tree-fork/nut-js": "4.2.6",
@@ -53,6 +54,17 @@
     },
     "portable": {
       "artifactName": "PAssist.exe"
+    },
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": [
+        { "target": "zip", "arch": "arm64" }
+      ],
+      "artifactName": "PAssist-${version}-mac-${arch}.${ext}",
+      "extendInfo": {
+        "NSScreenCaptureUsageDescription": "PAssist が共有対象として選択した1つのウィンドウだけをキャプチャするために使います。",
+        "NSAppleEventsUsageDescription": "PAssist が遠隔操作対象のウィンドウを前面化するために使います（System Events 経由）。"
+      }
     }
   }
 }

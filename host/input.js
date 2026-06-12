@@ -9,7 +9,7 @@
 
 const nut = require('@nut-tree-fork/nut-js');
 const { mouse, keyboard, Button, Key, Point, getWindows } = nut;
-const winenum = require('./winenum'); // 対象ウィンドウの前面化（koffi）
+const platform = require('./platform'); // 対象ウィンドウの前面化 / Unicode直接入力（OS差吸収）
 
 let targetTitle = null;
 let targetHandle = null; // 対象ウィンドウの HWND（厳密一致用）
@@ -25,10 +25,10 @@ async function init() {
   //    負荷源になるため廃止。入力時にだけ遅延更新する（アイドル時は何もしない）。
 }
 
-// sourceId は Electron desktopCapturer の "window:<HWND>:0"。HWND を取り出して厳密一致に使う。
+// sourceId は Electron desktopCapturer の "window:<HANDLE>:0"。HANDLE をプラットフォーム経由で取り出す。
 function setTarget(name, sourceId) {
   targetTitle = name || null;
-  targetHandle = parseHandle(sourceId);
+  targetHandle = platform.windows.parseHandle(sourceId);
   targetWindow = null;
   region = null;
   lastRegionAt = 0;
@@ -48,11 +48,6 @@ function maybeRefresh(force) {
     });
 }
 
-function parseHandle(sourceId) {
-  const m = /^window:(\d+):/.exec(String(sourceId || ''));
-  return m ? Number(m[1]) : null;
-}
-
 // 0x0 や極端に小さい矩形（非表示/最小化）は無効として弾く（誤って画面隅へマップしないため）
 const validRegion = (r) => r && r.width >= 8 && r.height >= 8;
 
@@ -60,10 +55,10 @@ async function refreshRegion() {
   if (targetHandle == null && !targetTitle) return;
   const wins = await getWindows();
 
-  // 1) HWND で厳密一致（高速・文字コード非依存）。タイトル取得は不要。
+  // 1) ネイティブハンドルで厳密一致（高速・文字コード非依存）。タイトル取得は不要。
   if (targetHandle != null) {
     for (const w of wins) {
-      if (Number(w.windowHandle) === targetHandle) {
+      if (platform.windows.matchHandle(w, targetHandle)) {
         const r = await w.getRegion();
         if (validRegion(r)) {
           targetWindow = w;
@@ -99,7 +94,7 @@ async function refreshRegion() {
 // 操作開始時に対象ウィンドウを前面化（他ウィンドウに隠れていると入力が別窓に当たるため）
 async function focusTarget() {
   try {
-    if (targetHandle != null) winenum.bringToFront(targetHandle); // 確実に最前面へ（koffi、前面化制限を回避）
+    if (targetHandle != null) platform.windows.bringToFront(targetHandle); // 確実に最前面へ（koffi、前面化制限を回避）
     if (!targetWindow) await refreshRegion();
     if (targetWindow) await targetWindow.focus();
   } catch {
@@ -187,14 +182,14 @@ async function handle(ev) {
         break;
       }
       case 'd':
-        if (targetHandle != null) winenum.bringToFront(targetHandle); // クリック先が常に対象ウィンドウになるよう最前面化（既に最前面ならskip）
+        if (targetHandle != null) platform.windows.bringToFront(targetHandle); // クリック先が常に対象ウィンドウになるよう最前面化（既に最前面ならskip）
         await mouse.pressButton(btn(ev.b));
         break;
       case 'u':
         await mouse.releaseButton(btn(ev.b));
         break;
       case 'w': {
-        if (targetHandle != null) winenum.bringToFront(targetHandle); // スクロール先を対象ウィンドウに（既に最前面ならskip）
+        if (targetHandle != null) platform.windows.bringToFront(targetHandle); // スクロール先を対象ウィンドウに（既に最前面ならskip）
         if (ev.dy) {
           const a = Math.max(1, Math.round(Math.abs(ev.dy) / 40));
           if (ev.dy > 0) await mouse.scrollDown(a);
@@ -210,8 +205,8 @@ async function handle(ev) {
       case 'text': {
         // 確定済みテキスト（日本語含む）を Unicode 直接入力（SendInput）。ホストのIME/キーボード配列に依存しない。
         if (typeof ev.s === 'string' && ev.s.length > 0 && ev.s.length <= 2000) {
-          if (targetHandle != null) winenum.bringToFront(targetHandle); // 入力先を対象ウィンドウに
-          if (!winenum.typeUnicode(ev.s)) await keyboard.type(ev.s); // 失敗時のみ nut フォールバック
+          if (targetHandle != null) platform.windows.bringToFront(targetHandle); // 入力先を対象ウィンドウに
+          if (!platform.windows.typeUnicode(ev.s)) await keyboard.type(ev.s); // 失敗時のみ nut フォールバック
         }
         break;
       }
@@ -220,7 +215,7 @@ async function handle(ev) {
         // ibeam カーソル位置をクリックしてダイアログで編集→挿入したケース等で使う。
         // 上限 ev.s.length<=2000、空文字は単に全選択削除になる（Backspace で）。
         if (typeof ev.s !== 'string' || ev.s.length > 2000) break;
-        if (targetHandle != null) winenum.bringToFront(targetHandle);
+        if (targetHandle != null) platform.windows.bringToFront(targetHandle);
         // 全選択 (Ctrl+A)
         await keyboard.pressKey(Key.LeftControl);
         await keyboard.pressKey(Key.A);
@@ -231,7 +226,7 @@ async function handle(ev) {
           // 空で置換 = 全削除
           await keyboard.pressKey(Key.Delete);
           await keyboard.releaseKey(Key.Delete);
-        } else if (!winenum.typeUnicode(ev.s)) {
+        } else if (!platform.windows.typeUnicode(ev.s)) {
           await keyboard.type(ev.s); // 全選択状態で typing すれば上書きになる
         }
         break;
@@ -256,7 +251,7 @@ async function handle(ev) {
           else await keyboard.releaseKey(key);
         } else if (ev.down && typeof ev.key === 'string' && ev.key.length === 1) {
           // マップ外の印字可能文字は Unicode 直接入力（失敗時のみ nut）
-          if (!winenum.typeUnicode(ev.key)) await keyboard.type(ev.key);
+          if (!platform.windows.typeUnicode(ev.key)) await keyboard.type(ev.key);
         }
         break;
       }
@@ -269,7 +264,7 @@ async function handle(ev) {
 // Ctrl+A → Ctrl+C を順に送る（共有窓を前面化してから）。main 側の input:readSelected から呼ばれる。
 async function selectAndCopy() {
   try {
-    if (targetHandle != null) winenum.bringToFront(targetHandle);
+    if (targetHandle != null) platform.windows.bringToFront(targetHandle);
     await keyboard.pressKey(Key.LeftControl);
     await keyboard.pressKey(Key.A);
     await keyboard.releaseKey(Key.A);

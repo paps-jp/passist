@@ -10,10 +10,8 @@ const path = require('path');
 const fs = require('fs');
 const { spawn } = require('child_process');
 const trust = require('./trust');
-const portmap = require('./portmap');
 const settings = require('./settings');
-const cursorshape = require('./cursorshape');
-const winenum = require('./winenum'); // owned 窓（付随ウィンドウ）を精密に列挙して一覧へ補う
+const platform = require('./platform'); // OS差吸収（ウィンドウ列挙/前面化/Unicode入力・カーソル形状・UPnP）
 const QRCode = require('qrcode'); // 共有URLのQRコード生成（スマホで読み取って接続）
 
 // クラッシュ理由を %TEMP%\passist-crash.log に記録（異常終了の原因切り分け用）
@@ -154,7 +152,7 @@ ipcMain.handle('windows:list', async () => {
     for (const s of named) { const h = hwndOf(s.id); if (h != null) listed.set(h, s); }
     const seen = new Set(listed.keys());
     const WS_EX_TOOLWINDOW = 0x80;
-    for (const w of winenum.enumerate()) {
+    for (const w of platform.windows.enumerate()) {
       if (!w.visible || w.iconic) continue;
       if (w.owner === 0) continue; // 独立窓は対象外（owned のみ）
       if (!listed.has(w.owner)) continue; // 所有者が共有可能な掲載ウィンドウであること
@@ -279,9 +277,9 @@ let publicBaseUrl = '';
 let portTimer = null;
 
 async function openPublicPort() {
-  if (!settings.get().publicMode || REMOTE_SERVER_URL || process.platform !== 'win32') return;
+  if (!settings.get().publicMode || REMOTE_SERVER_URL || !platform.portmap.supported) return;
   const portNum = serverPort;
-  const tryOpen = () => portmap.open(portNum, { proto: 'TCP', description: 'PAssist Web' });
+  const tryOpen = () => platform.portmap.open(portNum, { proto: 'TCP', description: 'PAssist Web' });
   try {
     const r = await tryOpen();
     if (r.externalIp) {
@@ -300,8 +298,8 @@ async function openPublicPort() {
 function closePublicPort() {
   if (portTimer) clearInterval(portTimer);
   portTimer = null;
-  if (settings.get().publicMode && !REMOTE_SERVER_URL && process.platform === 'win32') {
-    portmap.close(serverPort, { proto: 'TCP' }).catch(() => {});
+  if (settings.get().publicMode && !REMOTE_SERVER_URL && platform.portmap.supported) {
+    platform.portmap.close(serverPort, { proto: 'TCP' }).catch(() => {});
   }
 }
 
@@ -329,7 +327,7 @@ ipcMain.on('clip:set', (_e, text) => {
 // 形状が変わるたびレンダラへ通知 → レンダラが DataChannel でクライアントへ送る。
 ipcMain.on('cursor:track', (_e, on) => {
   if (on) {
-    cursorshape.start((shape) => {
+    platform.cursor.start((shape) => {
       if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('cursor:shape', shape);
     });
   }
@@ -685,7 +683,7 @@ app.on('window-all-closed', () => {
 app.on('before-quit', () => {
   isQuitting = true;
   if (clipTimer) clearInterval(clipTimer);
-  cursorshape.stop();
+  platform.cursor.stop();
   closePublicPort();
   if (serverProc) {
     try {
