@@ -50,12 +50,57 @@ PAssist — アカウント不要で、単一ウィンドウをブラウザか�
 - 配布バージョンは `host/package.json` の `version` を Single Source of Truth とする。
 - Electron の `app.getVersion()` がこの値を返し、About モーダルに表示される。
 - **`host/package.json` の `version` は必ず semver にする**。 electron-builder は 4 桁版 (`0.2.7.5`) を `Invalid version` で reject する。 4 桁的な細かい刻みが必要なら **pre-release 形式** で表現する（例: `0.2.7-5`）。 タグや LP の表示は `v0.2.7.5` のままで構わない（CI / `lp.dl.latest` 側で 4 桁表記を使い、 package.json だけ semver）。
-- **リリース手順**:
-  1. `host/package.json` の `version` を上げる（例: `0.2.7-4` → `0.2.7-5`）。
-  2. `docs/i18n.js` (および同期先) の `lp.dl.latest`（ja / en）の表記も同時に更新する。
-  3. ビルドして検証 → `git tag vX.Y.Z` → `git push origin vX.Y.Z` で署名ワークフロー起動。
-  4. `build-host` CI が成功して `PAssist.exe` が Release に添付されることを必ず確認する。
 - リリースタグ・配布物・`package.json` の **3 つを必ず一致**させる（過去に乖離して about 画面が古い版を表示していた事例あり）。
+
+### `i18n.js` の 3 同期先
+
+`i18n.js` は次の **3 ファイルがバイト単位で同一**でなければならない（差分は CI で検知されないが、 page によって表示文言が食い違うのを防ぐため）。
+
+- `docs/i18n.js` — GitHub Pages 配信 (LP / docs / verification / stats)
+- `host/renderer/i18n.js` — Electron host UI (PAssist.exe 同梱)
+- `server/public/i18n.js` — viewer (signaling サーバ配信)
+
+編集は `docs/i18n.js` を正本として行い、 必ず以下で 2 か所にコピー:
+
+```bash
+cp docs/i18n.js host/renderer/i18n.js && cp docs/i18n.js server/public/i18n.js
+```
+
+### リリース手順
+
+1. **3 つのバージョン番号を同時に揃える** (必ずセット):
+   - `host/package.json` の `"version"` (例: `"0.2.7-5"` → `"0.2.7-6"`)
+   - `server/package.json` の `"version"` (同じ semver、 例: `"0.2.7-6"`)
+   - `docs/i18n.js` の `lp.dl.latest` (ja / en 両方、 タグ表示形式: 例 `<b>v0.2.7.6</b>`)
+2. `i18n.js` を 3 同期先にコピー (前項参照)。
+3. コミット → タグ → push:
+   ```bash
+   git add host/package.json server/package.json docs/i18n.js host/renderer/i18n.js server/public/i18n.js
+   git commit -m "chore: バージョンを v0.2.7.6 に bump"
+   git tag v0.2.7.6
+   git push origin main && git push origin v0.2.7.6
+   ```
+4. **v* タグ push により以下 3 ワークフローが並行起動** (3 つとも独立、 互いに gate しない):
+
+   | ワークフロー | 成果物 | 平均所要 |
+   |---|---|---|
+   | `build-host` | `PAssist.exe`, `SHA256SUMS.txt` → Release に添付 | 約 3 分 |
+   | `build-host-mac` | `PAssist-X.Y.Z-mac-arm64.zip`, `SHA256SUMS-mac.txt` → Release に添付 | 約 2 分 |
+   | `release-signaling` | `ghcr.io/paps-jp/passist-signaling:vX.Y.Z` + Cosign 署名 + Rekor 記録 + bundle 添付 | 約 1 分 |
+
+5. **完了確認**:
+   ```bash
+   gh run watch <run-id>                                  # 個別に監視
+   gh run list --limit 5                                  # 一覧
+   gh release view vX.Y.Z --json assets --jq '.assets[].name'  # 添付確認
+   curl -sI -L https://github.com/paps-jp/passist/releases/latest/download/PAssist.exe \
+     | grep -E "HTTP/|Location:"                          # DL URL 200 OK 確認
+   ```
+6. **VPS の signaling コンテナを反映**:
+   ```bash
+   ssh www@<vps-ip> 'cd /www/passist && docker compose pull && docker compose up -d'
+   ```
+   これで `passist.paps.jp/s/<token>` の viewer に新しいサーバが反映される。
 
 ### ダウンロード URL の方針
 
@@ -126,45 +171,36 @@ PAssist — アカウント不要で、単一ウィンドウをブラウザか�
 - 開示にあたっては、最小限の情報（請求対象のセッション token に該当する IP / タイムスタンプのみ）を提供することを基本とする。
 - 提供前にログをアーカイブして証跡を残す（手動）。
 
-## リリース
+## リリース（各ワークフローの中身）
 
-### signaling サーバ（自動・署名済み）
+実際のリリース実行手順は「### リリース手順」 (上方) を参照。 ここでは v* タグ push で並行起動する 3 ワークフローが**何をしているか**を記す。
 
-`v*` タグを push すると `.github/workflows/release-signaling.yml` が起動し:
+### `.github/workflows/release-signaling.yml`
 
 1. Reproducible Build（`SOURCE_DATE_EPOCH = git commit時刻`）で Docker image を構築。
 2. **GHCR** (`ghcr.io/paps-jp/passist-signaling:<tag>`) に push。
 3. **SLSA provenance + SBOM** を attestation として image に添付（mode=max）。
-4. **Cosign keyless 署名**（GitHub OIDC → Sigstore Fulcio で短期証明書発行 → Rekor の透明性ログに公開記録）。秘密鍵は運営者が保持しない＝鍵漏洩リスクなし。
+4. **Cosign keyless 署名**（GitHub OIDC → Sigstore Fulcio で短期証明書発行 → Rekor の透明性ログに公開記録）。 秘密鍵は運営者が保持しない＝鍵漏洩リスクなし。
+5. Rekor entry / 署名 / 検証用 bundle を GitHub Release に添付（ブラウザ自前検証用）。
 
-リリース手順:
+### `.github/workflows/build-host.yml`
+
+Windows ランナーで `electron-builder portable` を実行し `PAssist.exe` (~91 MB) を作成、 `SHA256SUMS.txt` 付きで Release に添付。 `host/package.json` の `version` が semver でないとここで fail する (前述)。
+
+将来的に **SignPath Foundation** によるコード署名連携を追加予定 (申請承認後)。 SmartScreen 警告を即時通過する。 ワークフロー末尾にコメントアウト済みのテンプレあり。
+
+### `.github/workflows/build-host-mac.yml`
+
+macOS ランナーで Mac arm64 zip を作成、 `SHA256SUMS-mac.txt` 付きで Release に添付。 公証/Gatekeeper 署名は未実装 (実機検証向け)。
+
+### 緊急ローカルビルド (CI が落ちた等)
+
+CI が機能しない場合の手動フォールバック (通常は不要):
+
 ```bash
-git tag vX.Y.Z
-git push origin vX.Y.Z
-# あとは workflow が全部やる。Actions の Summary に検証コマンドが出力される。
-```
-
-### host (PAssist.exe)（半手動）
-
-現状は手動ビルド＋GitHub Releases へアップロード:
-
-```bash
-# 1) 事前確認: PAssist プロセスが起動中だと dist/PAssist.exe がロックされてビルド失敗する
 powershell -NoProfile -Command "Get-Process -Name PAssist -ErrorAction SilentlyContinue | Stop-Process"
-
-# 2) ビルド（electron-builder portable）
-cd host && npm run dist
-# → dist/PAssist.exe が生成される
-
-# 3) 検証: asar 内の renderer.js / settings.js / viewer.html がコミット内容と一致しているか確認
-node -e "const a=require('./host/node_modules/@electron/asar'); console.log(a.extractFile('dist/win-unpacked/resources/app.asar','main.js').toString().includes('computeSignalWs'))"
-
-# 4) 既存リリース(v0.1.0等)に差し替えアップロード
-gh release upload v0.1.0 dist/PAssist.exe --clobber
-
-# 5) sha256 を release notes に記録
-sha256sum dist/PAssist.exe
-gh release view v0.1.0 --json assets --jq '.assets[] | {name,size,digest,updatedAt}'
+cd host && npm ci && npm run rebuild && npm run dist     # → dist/PAssist.exe
+gh release upload vX.Y.Z dist/PAssist.exe --clobber
 ```
 
 ## 検証（誰でも実行可能）
@@ -196,6 +232,12 @@ cosign verify ghcr.io/paps-jp/passist-signaling:vX.Y.Z \
 - `.env` に `DOMAIN=passist.paps.jp` と `ICE_TURN_*`（TURN 認証）を設定。
 - VPS 構成スクリプト: `deploy/bootstrap.sh`（UFW・Docker 導入・`.env` 雛形生成）。
 - アップデート: `docker compose pull && docker compose up -d`。
+
+### server.js の重要な動作
+
+- **WebSocket heartbeat**: 30 秒ごとに ping を送り、 pong が返らない接続は terminate する (`WS_HEARTBEAT_MS` で上書き可)。 ブラウザ閉じ・モバイル画面ロック等で TCP RST が来ないケースで viewer slot が永久占有されるのを防ぐ。 terminate により `ws.on('close')` 経由で `onClose()` が呼ばれ、 `s.viewers` / `s.pending` から viewerId が外れ `maxViewers` 枠が解放される。
+- **maxViewers**: 既定 1, セッション作成時に host から指定可能 (1〜4)。 操作可は常に 1 人 (最初に accepted された viewer)、 他は閲覧のみ。
+- **セッション復元**: host が切断しても session は即削除せず、 同じ token + hostSecret で戻れば既存セッションを引き継ぐ。 完全削除は `expiresAt` 期限切れか明示的な `host:end` のみ。
 
 ## ブラウザ向けトップ・統計
 
