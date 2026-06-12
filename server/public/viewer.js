@@ -2,6 +2,10 @@
  * 役割: WebRTC の answer 側。映像を表示し、マウス/キーボード入力を DataChannel で送る。 */
 (() => {
   'use strict';
+  // バージョン文字列。 ボタン押下時の status に含めることで、 ユーザーが「最新版を読めているか」
+  // を画面上で確認できる（古いキャッシュの可能性を切り分けるため）。
+  const VIEWER_VERSION = 'v32';
+  console.log('[viewer]', VIEWER_VERSION, 'loaded');
   const token = location.pathname.split('/').filter(Boolean).pop();
 
   const $ = (id) => document.getElementById(id);
@@ -647,24 +651,24 @@
     // 合わない」現象になる。 多くのケースで CSS px ≒ ホスト Win32 のスクリーン px。
     const w = Math.round(r.width);
     const h = Math.round(r.height);
-    if (w <= 0 || h <= 0) { setStatus(`📐 サイズ取得失敗 (stage=${w}×${h})`); return; }
+    if (w <= 0 || h <= 0) { setStatus(`📐 ${VIEWER_VERSION} サイズ取得失敗 (stage=${w}×${h})`); return; }
     const dpr = (window.devicePixelRatio || 1).toFixed(2);
     // 実際に送られたかを判定（send は controlEnabled false や dc 未確立で黙って捨てる）
     let status = '';
     if (!controlEnabled) {
-      status = `📐 送信できません（閲覧のみモード／操作権がありません）`;
+      status = `📐 ${VIEWER_VERSION} 送信できません（閲覧のみモード／操作権がありません）`;
     } else if (!dc || dc.readyState !== 'open') {
-      status = `📐 送信できません（接続未確立 dc=${dc ? dc.readyState : 'null'}）`;
+      status = `📐 ${VIEWER_VERSION} 送信できません（接続未確立 dc=${dc ? dc.readyState : 'null'}）`;
     } else {
       try {
         dc.send(JSON.stringify({ t: 'resize', w, h }));
-        status = `📐 送信 ${w}×${h} (DPR ${dpr})`;
+        status = `📐 ${VIEWER_VERSION} 送信 ${w}×${h} (DPR ${dpr})`;
       } catch (e) {
-        status = `📐 送信失敗: ${e.message}`;
+        status = `📐 ${VIEWER_VERSION} 送信失敗: ${e.message}`;
       }
     }
     setStatus(status);
-    setTimeout(() => { if (syncSizeOn) setStatus('', false); }, 3000);
+    setTimeout(() => { if (syncSizeOn) setStatus('', false); }, 5000);
   }
   function onResize() {
     if (!syncSizeOn) return;
@@ -673,16 +677,21 @@
   }
   if (syncSizeBtn) {
     syncSizeBtn.onclick = () => {
+      // 押下を即座に画面に出す。 これが出れば「viewer.js 最新版が読み込まれている」 ことが確認できる
+      setStatus(`📐 ${VIEWER_VERSION} 押下 ctrl=${controlEnabled} dc=${dc ? dc.readyState : 'null'}`);
       syncSizeOn = !syncSizeOn;
       syncSizeBtn.classList.toggle('active', syncSizeOn);
       if (syncSizeOn) {
-        sendCurrentSize(); // 即時1回
+        setTimeout(sendCurrentSize, 50); // 押下表示の少しあとに送信＆結果表示
         window.addEventListener('resize', onResize);
       } else {
         window.removeEventListener('resize', onResize);
         if (syncDebounce) { clearTimeout(syncDebounce); syncDebounce = null; }
+        setTimeout(() => setStatus(`📐 ${VIEWER_VERSION} 同期 OFF`), 50);
       }
     };
+  } else {
+    console.warn('[viewer]', VIEWER_VERSION, '#syncSizeBtn が DOM に無い → viewer.html が古い可能性');
   }
 
   function teardown() {
