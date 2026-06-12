@@ -4,7 +4,7 @@
   'use strict';
   // バージョン文字列。 ボタン押下時の status に含めることで、 ユーザーが「最新版を読めているか」
   // を画面上で確認できる（古いキャッシュの可能性を切り分けるため）。
-  const VIEWER_VERSION = 'v33';
+  const VIEWER_VERSION = 'v34';
   console.log('[viewer]', VIEWER_VERSION, 'loaded');
   const token = location.pathname.split('/').filter(Boolean).pop();
 
@@ -25,7 +25,7 @@
   };
   // 起動直後にバージョンを 3 秒だけ表示。 古いキャッシュなら表示されない or 古い番号が出る。
   // ホスト側 PAssist と viewer 両方が最新かをユーザー自身で確認できるようにする。
-  try { statusEl.textContent = '📐 viewer v33 loaded'; statusEl.classList.remove('hidden'); } catch {}
+  try { statusEl.textContent = '📐 viewer v34 loaded'; statusEl.classList.remove('hidden'); } catch {}
   setTimeout(() => { try { if (statusEl.textContent && statusEl.textContent.indexOf('loaded') >= 0) statusEl.textContent = ''; } catch {} }, 3000);
   // i18n ヘルパ (window.t は i18n.js が定義。 未ロードならキーをそのまま返す)
   const tr = (k) => (window.t ? window.t(k) : k);
@@ -641,6 +641,29 @@
     if (document.fullscreenElement) document.exitFullscreen();
     else stage.requestFullscreen();
   };
+
+  // 📺 表示モード循環: contain(全体表示・黒帯あり) → cover(画面いっぱい・切り抜き) → fill(画面いっぱい・歪み)。
+  // ホスト窓のサイズ制約（cmd の最小カラム数・ブラウザの最小幅等）で 📐 同期しても合わない場合に、
+  // viewer 側で映像を画面いっぱいに広げるためのフォールバック。
+  const fitModeBtn = $('fitModeBtn');
+  const FIT_MODES = [
+    { mode: 'contain', label: '📺 全体', title: '全体表示（黒帯あり）' },
+    { mode: 'cover',   label: '📺 拡大', title: '画面いっぱい（上下/左右が切れる場合あり）' },
+    { mode: 'fill',    label: '📺 伸縮', title: '画面いっぱい（縦横の比率が歪む）' },
+  ];
+  let fitModeIdx = 0;
+  function applyFitMode() {
+    const m = FIT_MODES[fitModeIdx];
+    try { video.style.objectFit = m.mode; } catch {}
+    if (fitModeBtn) { fitModeBtn.textContent = m.label; fitModeBtn.title = m.title; }
+  }
+  if (fitModeBtn) {
+    fitModeBtn.onclick = () => {
+      fitModeIdx = (fitModeIdx + 1) % FIT_MODES.length;
+      applyFitMode();
+    };
+  }
+  applyFitMode();
 
   // 📐 サイズ同期: viewer 表示エリアの幅×高さ(CSSピクセル)をホストへ送り、 共有ウィンドウをそのサイズへ。
   // 操作座標が画面ピクセルに 1:1 で近づき、 レターボックスも消える。 ON/OFF トグル。 ON中はリサイズに追従。
