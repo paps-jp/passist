@@ -4,6 +4,18 @@
 > Author: ぱっぷす / Claude Code セッション
 > Last update: 2026-06-12
 
+## 決定事項ログ
+
+| 日付 | 論点 | 決定 |
+|---|---|---|
+| 2026-06-12 | `passist-mcp install` を一般ユーザーに公開するか | **公開する**。 PAssist インストーラに「Claude 連携を有効にする」 オプションを設け、 開発者ツールだけでなく一般ユーザーも GUI でセットアップできるようにする (詳細: §7) |
+
+未決議点 (要 ぱっぷす理事会):
+
+- AI 操作中の被害者 (ビューア) への通知有無
+- 監査ログ保持期間 (既定 30 日と開示請求対応の整合)
+- `set_access_mode: 'token'` への移行確認の要否
+
 ## 0. ねらい
 
 PAssist を **AI エージェントから自然言語で操作可能**にする。 例:
@@ -394,43 +406,95 @@ PAssist Tray アイコンに以下を表示:
 
 ## 7. インストール
 
-### 7.1 開発者向け (手動)
+`passist-mcp` は **一般ユーザーに公開する** (決定事項: 2026-06-12)。 npm に技術的な知識がないユーザーでも、 PAssist の GUI 操作だけで Claude 連携を有効化できる。
 
-```bash
-# 1. PAssist 本体は既存通り
-# 2. passist-mcp をグローバルインストール
-npm i -g @paps-jp/passist-mcp
+### 7.1 一般ユーザー向け (推奨パス)
 
-# 3. Claude Desktop 設定に追加
-passist-mcp install
-# → ~/.claude/claude_desktop_config.json (Mac) or
-#   %APPDATA%\Claude\claude_desktop_config.json (Win) を編集
+#### A. PAssist インストール時に同時セットアップ
 
-# 4. Claude Desktop 再起動
+PAssist のインストーラ (`PAssist.exe` の portable も同様) は、 起動時の「初期設定」 ステップで:
+
+```
+☐ Claude Desktop / Claude Code と連携する (オプション)
+   PAssist を Claude から自然言語で操作できるようにします。
+   例: 「VS Code の画面を相手に共有して」 → URL が自動発行されます。
 ```
 
-### 7.2 一般ユーザー向け (バンドル)
+チェックを入れると:
+1. `%LOCALAPPDATA%\PAssist\mcp\passist-mcp.exe` を展開 (Node Single Executable Application で同梱)
+2. Claude Desktop の `claude_desktop_config.json` を自動編集 (既存設定はマージ、 衝突したら確認ダイアログ)
+3. Claude Code の `~/.claude/mcp-servers.json` も自動編集
+4. 「Claude Desktop を再起動してください」 案内を表示
 
-将来的に PAssist インストーラに同梱:
-- 「Claude Desktop 連携を有効にする」 チェックボックス
-- インストール時に `passist-mcp` を `%APPDATA%\PAssist\mcp\` に展開
-- `claude_desktop_config.json` を自動編集 (既存設定は保持してマージ)
+#### B. PAssist 設定モーダルからあとで有効化
+
+⚙ 設定 → 「Claude 連携」 タブ:
+
+```
+[Claude Desktop と連携する]   現在: 無効
+[Claude Code と連携する]      現在: 無効
+[手動で設定ファイルを開く]
+[連携を解除する]
+```
+
+ボタン押下で同じ自動編集が走る。 ステータス表示で「設定済み」「Claude Desktop が見つからない」「設定ファイルがロックされています」 等を明示。
+
+#### C. 設定の検証
+
+PAssist 設定 → 「Claude 連携」 タブの「動作テスト」 ボタンで:
+- `passist-mcp.exe` を試験起動して MCP の `initialize` レスポンスを確認
+- token の読み出しが成功するか確認
+- 結果を ✅/❌ で表示
+
+### 7.2 開発者向け (手動)
+
+npm パッケージとしても並行配布する (CI / コントリビューター用):
+
+```bash
+npm i -g @paps-jp/passist-mcp
+passist-mcp install   # claude_desktop_config.json に追加
+passist-mcp install --target claude-code   # ~/.claude/mcp-servers.json に追加
+passist-mcp uninstall # 解除
+```
+
+`passist-mcp install` は dry-run (`--dry-run`) と編集前バックアップ (`<config>.bak.YYYYMMDDhhmmss`) を持つ。
 
 ### 7.3 Claude Desktop 設定例
+
+自動編集で挿入される項目 (既存設定があれば `mcpServers` キーにマージ):
 
 ```json
 {
   "mcpServers": {
     "passist": {
-      "command": "passist-mcp",
+      "command": "C:\\Users\\<user>\\AppData\\Local\\PAssist\\mcp\\passist-mcp.exe",
       "args": [],
       "env": {
-        "PASSIST_API_URL": "http://127.0.0.1:8444"
+        "PASSIST_API_URL": "http://127.0.0.1:8444",
+        "PASSIST_TOKEN_FILE": "%APPDATA%\\PAssist\\local-api-token"
       }
     }
   }
 }
 ```
+
+### 7.4 アンインストール
+
+PAssist 本体のアンインストール時:
+- `claude_desktop_config.json` の `passist` エントリを削除
+- `%LOCALAPPDATA%\PAssist\mcp\` を削除
+- 設定ファイル自体は残す (他の MCP サーバ設定を消さないため)
+
+PAssist は残したまま連携だけ解除する場合:
+- 設定モーダル → 「連携を解除する」 → 上記と同じ削除を実行
+
+### 7.5 一般公開にあたっての UX 配慮
+
+- インストーラ上のチェックは **既定 OFF**。 ユーザーが意識して選ぶ
+- 「これは何？」 をクリックすると説明モーダル (リスク・有効化される機能・解除方法) が出る
+- 連携有効時の最初の MCP 呼び出しは必ずトレイ通知で確認 (§5.3 既定方針と同じ)
+- 設定モーダル「Claude 連携」 タブには常に「最近 7 日の AI 操作履歴」 を可視化 (§5.4 監査ログ参照)
+- LP の DL ページに「Claude 連携機能つき」 と銘打つ。 紹介リンクは [`docs/mcp.html`](mcp.html) (一般ユーザー向け解説、 後日作成)
 
 ## 8. エラー応答仕様
 
@@ -492,10 +556,14 @@ passist-mcp install
 - 承認系 (`approve_pending_viewer`, Tray confirmation)
 - 監査ログ + UI 表示
 
-### Phase 3 — 配布 (1 週)
-- インストーラ同梱
-- 自動設定 (`passist-mcp install`)
-- 英語ドキュメント (LP に「Claude integration」 を追加)
+### Phase 3 — 一般公開 (1〜2 週)
+- PAssist インストーラ / 初期設定に「Claude 連携を有効にする」 チェックボックスを追加 (§7.1.A)
+- 設定モーダル「Claude 連携」 タブを新設 (§7.1.B): 状態表示・有効化/解除・動作テスト・最近 7 日の操作履歴
+- Node Single Executable Application で `passist-mcp.exe` を作成、 `%LOCALAPPDATA%\PAssist\mcp\` に同梱
+- `claude_desktop_config.json` と `~/.claude/mcp-servers.json` の自動編集ロジック (既存設定の保持・バックアップ・衝突確認)
+- npm パッケージ `@paps-jp/passist-mcp` を並行公開 (CI / 開発者用)
+- LP に「Claude 連携機能」 セクション、 ja / en 両対応 (i18n.js に `lp.mcp.*` キーを追加)
+- 一般ユーザー向け解説ページ `docs/mcp.html` (`docs/mcp.md` を簡易化・i18n 対応)
 
 ### Phase 4 — 拡張 (将来)
 - Resources / Prompts
