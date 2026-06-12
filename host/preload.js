@@ -22,4 +22,13 @@ contextBridge.exposeInMainWorld('host', {
   onThemePalette: (cb) => ipcRenderer.on('theme:palette', (_e, p) => cb(p)),
   cursorTrack: (on) => ipcRenderer.send('cursor:track', on),
   onCursorShape: (cb) => ipcRenderer.on('cursor:shape', (_e, s) => cb(s)),
+  // === MCP (AI アシスタント連携) ===
+  // main → renderer のリクエスト (mcp:get-share-state / mcp:start-share / mcp:end-share)
+  // を購読し、 同じ _reqId を付けて 'mcp:renderer-reply' で結果を返す。
+  onMcpRequest: (cb) => {
+    ipcRenderer.on('mcp:get-share-state', (_e, payload) => cb('get-share-state', payload));
+    ipcRenderer.on('mcp:start-share', (_e, payload) => cb('start-share', payload));
+    ipcRenderer.on('mcp:end-share', (_e, payload) => cb('end-share', payload));
+  },
+  replyMcp: (reqId, result, error) => ipcRenderer.send('mcp:renderer-reply', { _reqId: reqId, result, error }),
 });

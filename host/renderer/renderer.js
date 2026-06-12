@@ -238,6 +238,68 @@
     };
     await loadWindows();
     maybeResume(); // 前回「終了」を押していなければ、同じウィンドウの共有を自動再開（無ければ起動を監視）
+    attachMcpBridge(); // MCP (AI 連携) からの操作リクエストを受け付ける
+  }
+
+  // main から飛んでくる MCP 由来の問い合わせを処理して reply する。
+  // host が AI から「画面を共有して」 と頼まれたときの実体。
+  function attachMcpBridge() {
+    if (!window.host || !window.host.onMcpRequest) return;
+    window.host.onMcpRequest(async (type, payload) => {
+      const reqId = payload && payload._reqId;
+      try {
+        if (type === 'get-share-state') {
+          const urlVal = ($('url') && $('url').value) || '';
+          const viewerList = [...peers.keys()].map((id) => ({ id, mode: id === controllerId ? 'operate' : 'view' }));
+          const pendingList = reqQueue.map((r) => ({ id: r.viewerId }));
+          const s = (cfg && cfg.settings) || {};
+          return window.host.replyMcp(reqId, {
+            active: !!sessionStarted && !!urlVal,
+            url: urlVal || null,
+            sharedWindow: lastSharedWindow ? { id: lastSharedWindow.id, title: lastSharedWindow.name } : null,
+            accessMode: s.accessMode || 'approve',
+            maxViewers: s.maxViewers || 1,
+            readonly: !!s.readonly,
+            viewers: viewerList,
+            pending: pendingList,
+          }, null);
+        }
+        if (type === 'start-share') {
+          // 設定変更があれば反映 (次の共有から有効になる項目もあるが MCP 経由は即時)
+          if (payload.accessMode && cfg && cfg.settings) { cfg.settings.accessMode = payload.accessMode; await window.host.settingsSet({ accessMode: payload.accessMode }); }
+          if (payload.maxViewers && cfg && cfg.settings) { cfg.settings.maxViewers = payload.maxViewers; await window.host.settingsSet({ maxViewers: payload.maxViewers }); }
+          if (payload.ttlMinutes !== undefined && cfg && cfg.settings) { cfg.settings.sessionTtlMinutes = payload.ttlMinutes; await window.host.settingsSet({ sessionTtlMinutes: payload.ttlMinutes }); }
+          if (payload.readonly !== undefined && cfg && cfg.settings) { cfg.settings.readonly = !!payload.readonly; await window.host.settingsSet({ readonly: !!payload.readonly }); }
+          // ウィンドウを選ぶ → choose() が signaling→URL までやってくれる
+          const w = { id: payload.windowId, name: payload.windowName || payload.windowId };
+          await choose(w);
+          // URL が出るまで最大 10 秒待つ (signaling のレスポンス次第)
+          let urlVal = '';
+          for (let i = 0; i < 100; i++) {
+            urlVal = ($('url') && $('url').value) || '';
+            if (urlVal) break;
+            await new Promise((r) => setTimeout(r, 100));
+          }
+          if (!urlVal) return window.host.replyMcp(reqId, null, 'timed out waiting for share URL');
+          // QR は qrImg.src に同期で生成される (qrToggle 押下時)。 ここでは省略 (Phase 1 MVP)。
+          return window.host.replyMcp(reqId, {
+            url: urlVal,
+            sharedWindow: { id: w.id, title: w.name },
+          }, null);
+        }
+        if (type === 'end-share') {
+          // 「終了」ボタンと同じロジックを呼ぶ
+          const endBtn = $('end');
+          if (endBtn && endBtn.dataset && endBtn.dataset.mode !== 'resume' && sessionStarted) {
+            endBtn.click();
+          }
+          return window.host.replyMcp(reqId, { ok: true }, null);
+        }
+        return window.host.replyMcp(reqId, null, 'unknown mcp request type: ' + type);
+      } catch (e) {
+        return window.host.replyMcp(reqId, null, e.message || String(e));
+      }
+    });
   }
 
   async function loadWindows() {

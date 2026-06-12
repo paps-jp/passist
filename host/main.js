@@ -13,6 +13,38 @@ const trust = require('./trust');
 const settings = require('./settings');
 const platform = require('./platform'); // OS差吸収（ウィンドウ列挙/前面化/Unicode入力・カーソル形状・UPnP）
 const QRCode = require('qrcode'); // 共有URLのQRコード生成（スマホで読み取って接続）
+const localApi = require('./local-api'); // MCP 連携用のローカル HTTP API (127.0.0.1:8444)
+
+// === MCP / Local API: renderer 往復用の Promise トラッキング ===
+// main → renderer に「mcp:get-share-state」 等のリクエストを送り、 renderer が
+// 'mcp:renderer-reply' で result + reqId を返す。 ここで Promise を resolve する。
+let mcpNextReqId = 1;
+const mcpPendingRendererReqs = new Map();
+function askRenderer(channel, payload, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const id = mcpNextReqId++;
+    mcpPendingRendererReqs.set(id, { resolve, reject });
+    setTimeout(() => {
+      if (mcpPendingRendererReqs.has(id)) {
+        mcpPendingRendererReqs.delete(id);
+        reject(new Error(`renderer timeout: ${channel}`));
+      }
+    }, timeoutMs || 5000);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(channel, { _reqId: id, ...payload });
+    } else {
+      mcpPendingRendererReqs.delete(id);
+      reject(new Error('renderer not ready'));
+    }
+  });
+}
+ipcMain.on('mcp:renderer-reply', (_e, { _reqId, result, error }) => {
+  const p = mcpPendingRendererReqs.get(_reqId);
+  if (!p) return;
+  mcpPendingRendererReqs.delete(_reqId);
+  if (error) p.reject(new Error(error));
+  else p.resolve(result);
+});
 
 // クラッシュ理由を %TEMP%\passist-crash.log に記録（異常終了の原因切り分け用）
 function crashLog(msg) {
@@ -668,6 +700,50 @@ if (!app.requestSingleInstanceLock()) {
     }
     createWindow();
     startClipboardSync();
+    // MCP 連携用 Local HTTP API (127.0.0.1:8444) を起動。 失敗してもアプリは続行。
+    try {
+      await localApi.start({
+        userDataDir: app.getPath('userData'),
+        port: parseInt(process.env.LOCAL_API_PORT || '8444', 10),
+        bridge: {
+          getWindowList: async () => {
+            // PAssist のウィンドウ列挙ロジックは windows:list に集約済み。
+            // ここでは MCP 用に簡略版 (thumbnail なし) を直接呼ぶ。
+            const sources = await desktopCapturer.getSources({ types: ['window'], fetchWindowIcons: false, thumbnailSize: { width: 1, height: 1 } });
+            return sources.filter((s) => s.name && s.name.trim()).map((s) => ({ id: s.id, name: s.name }));
+          },
+          getShareState: () => askRenderer('mcp:get-share-state', {}, 3000),
+          startShareForRenderer: (opts) => askRenderer('mcp:start-share', opts, 10000),
+          endShareFromRenderer: () => askRenderer('mcp:end-share', {}, 5000),
+          requestConsent: async ({ clientInfo }) => {
+            const label = clientInfo.label || clientInfo.exePath || 'unknown';
+            const w = mainWindow && !mainWindow.isDestroyed() ? mainWindow : null;
+            const choice = await dialog.showMessageBox(w, {
+              type: 'question',
+              title: '🤖 AI アシスタントから接続要求',
+              message: `${label} に PAssist の操作を許可しますか?`,
+              detail:
+                `クライアント: ${label}\n` +
+                `プロセスパス: ${clientInfo.exePath || '(unknown)'}\n` +
+                `PID: ${clientInfo.pid || '?'}\n\n` +
+                '許可した場合のアシスタントの能力:\n' +
+                '・共有可能なウィンドウ一覧の取得\n' +
+                '・ウィンドウ共有の開始 / 切替 / 終了\n' +
+                '・共有状態 (URL・接続中の人数) の参照\n\n' +
+                '※ 接続承認 / 招待リンク発行は別途毎回確認が出ます',
+              buttons: ['今回だけ許可', 'このクライアントは常に許可', '拒否'],
+              defaultId: 1,
+              cancelId: 2,
+              noLink: true,
+            });
+            const map = { 0: 'once', 1: 'always', 2: 'deny' };
+            return { decision: map[choice.response] || 'deny' };
+          },
+        },
+      });
+    } catch (e) {
+      console.warn('[host] local-api start failed:', e.message);
+    }
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow();
       else showMainWindow();
@@ -685,6 +761,7 @@ app.on('before-quit', () => {
   if (clipTimer) clearInterval(clipTimer);
   platform.cursor.stop();
   closePublicPort();
+  try { localApi.stop(); } catch {}
   if (serverProc) {
     try {
       serverProc.kill();
