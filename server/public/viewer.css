@@ -161,6 +161,37 @@ body.view-only #syncSizeBtn { display: none !important; }
 #moreBtn { display: inline-flex; align-items: center; }
 #moreBtn svg { display: block; }
 
+/* V-4: タッチデバイスのみボタンを大きくする (iOS HIG 推奨 44pt 以上)。
+   PC（マウス）には影響しない。 タブレットや iPad もタッチ判定で大きくなる。 */
+@media (pointer: coarse) {
+  .toolbar {
+    bottom: 16px;
+    padding: 8px 12px;
+    gap: 8px;
+  }
+  .toolbar button {
+    padding: 10px 14px;
+    font-size: 14px;
+    min-height: 44px;
+    min-width: 44px;
+  }
+  .toolbar button svg { width: 20px; height: 20px; }
+  #badge { font-size: 14px; }
+  .moremenu {
+    bottom: 88px;
+    gap: 6px;
+    padding: 8px;
+    min-width: 200px;
+  }
+  .moremenu button {
+    padding: 12px 18px;
+    font-size: 15px;
+    min-height: 48px;
+    gap: 12px;
+  }
+  .moremenu button svg { width: 20px; height: 20px; }
+}
+
 /* 画面上キーバー（スマホ用の特殊キー/修飾キー） */
 .keybar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 25;
