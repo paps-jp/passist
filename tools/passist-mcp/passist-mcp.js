@@ -27,24 +27,37 @@ import { execSync } from 'node:child_process';
 
 // --- 設定 ---
 const API_URL = (process.env.PASSIST_API_URL || 'http://127.0.0.1:8444').replace(/\/$/, '');
-const TOKEN_FILE = process.env.PASSIST_TOKEN_FILE || defaultTokenFile();
 
-function defaultTokenFile() {
+// PAssist の userData ディレクトリ名は環境で異なる:
+//  - production (PAssist.exe portable):  %APPDATA%\PAssist\
+//  - dev (`npm start`, electron が name フィールドを使う):  %APPDATA%\passist-host\
+// 起動時に存在する方を採用し、 どちらにも無ければ PASSIST_TOKEN_FILE を要求するエラーを返す。
+function candidateTokenFiles() {
+  if (process.env.PASSIST_TOKEN_FILE) return [process.env.PASSIST_TOKEN_FILE];
   if (process.platform === 'win32') {
-    return path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'PAssist', 'local-api-token');
+    const base = process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming');
+    return [
+      path.join(base, 'PAssist', 'local-api-token'),       // production
+      path.join(base, 'passist-host', 'local-api-token'),  // dev (npm start)
+    ];
   }
   if (process.platform === 'darwin') {
-    return path.join(os.homedir(), 'Library', 'Application Support', 'PAssist', 'local-api-token');
+    const base = path.join(os.homedir(), 'Library', 'Application Support');
+    return [path.join(base, 'PAssist', 'local-api-token'), path.join(base, 'passist-host', 'local-api-token')];
   }
-  return path.join(os.homedir(), '.config', 'PAssist', 'local-api-token');
+  const base = path.join(os.homedir(), '.config');
+  return [path.join(base, 'PAssist', 'local-api-token'), path.join(base, 'passist-host', 'local-api-token')];
 }
 
+const TOKEN_FILE_CANDIDATES = candidateTokenFiles();
+
 function readToken() {
-  try {
-    return fs.readFileSync(TOKEN_FILE, 'utf8').trim();
-  } catch {
-    return null;
+  for (const f of TOKEN_FILE_CANDIDATES) {
+    try {
+      return fs.readFileSync(f, 'utf8').trim();
+    } catch {}
   }
+  return null;
 }
 
 // --- 親プロセス検出 (consent ダイアログでユーザーに「どのクライアントが要求しているか」 を見せる) ---
@@ -73,14 +86,14 @@ function detectParentExe() {
   return '';
 }
 
-const PARENT_EXE = detectParentExe();
+const PARENT_EXE = process.env.PASSIST_CLIENT_EXE || detectParentExe();
 const CLIENT_LABEL = process.env.PASSIST_CLIENT_LABEL || (PARENT_EXE ? path.basename(PARENT_EXE, path.extname(PARENT_EXE)) : `pid-${process.ppid}`);
 
 // --- HTTP クライアント (Local API 呼び出し) ---
 async function callApi(method, urlPath, body) {
   const token = readToken();
   if (!token) {
-    const e = new Error(`PASSIST_NOT_RUNNING: token file not found at ${TOKEN_FILE}. Please start PAssist.`);
+    const e = new Error(`PASSIST_NOT_RUNNING: token file not found in any of [${TOKEN_FILE_CANDIDATES.join(', ')}]. Please start PAssist.`);
     e.code = 'PASSIST_NOT_RUNNING';
     throw e;
   }
