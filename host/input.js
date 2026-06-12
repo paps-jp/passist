@@ -192,12 +192,14 @@ async function handle(ev) {
         // viewer が「自分の表示エリア（CSSピクセル）」を送ってきた → 共有ウィンドウをそのサイズに合わせる。
         // 操作座標と画面ピクセルが 1:1 に近づき、レターボックスが消える。
         // 上限/下限は platform.windows.setWindowSize 内で clamp する。
-        if (targetHandle != null && platform.windows && platform.windows.setWindowSize) {
-          platform.windows.setWindowSize(targetHandle, ev.w, ev.h);
-          // region キャッシュを次回 maybeRefresh で更新（古い region で座標が外れるのを防ぐ）
-          region = null;
-          lastRegionAt = 0;
-        }
+        console.log(`[host] resize event: target=${targetHandle} request=${ev.w}x${ev.h}`);
+        if (targetHandle == null) { console.log('[host] resize skipped (no target)'); break; }
+        if (!(platform.windows && platform.windows.setWindowSize)) { console.log('[host] resize skipped (no API)'); break; }
+        const ok = platform.windows.setWindowSize(targetHandle, ev.w, ev.h);
+        if (!ok) console.log('[host] resize: setWindowSize returned false');
+        // region キャッシュを次回 maybeRefresh で更新（古い region で座標が外れるのを防ぐ）
+        region = null;
+        lastRegionAt = 0;
         break;
       }
       case 'w': {

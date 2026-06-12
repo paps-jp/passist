@@ -38,8 +38,12 @@ try {
   const GetWTPID = user32.func('uint32 __stdcall GetWindowThreadProcessId(intptr_t hwnd, _Out_ uint32 *pid)');
   const AttachThreadInput = user32.func('bool __stdcall AttachThreadInput(uint32 idAttach, uint32 idAttachTo, bool fAttach)');
   const GetCurrentThreadId = kernel32.func('uint32 __stdcall GetCurrentThreadId()');
-  // ウィンドウのサイズ変更（位置は維持）。 SWP_NOMOVE=2 SWP_NOZORDER=4 SWP_NOACTIVATE=0x10
+  // ウィンドウのサイズ変更（位置は維持）。 SWP_NOMOVE=2 SWP_NOZORDER=4 SWP_NOACTIVATE=0x10 SWP_FRAMECHANGED=0x20
   const SetWindowPos = user32.func('bool __stdcall SetWindowPos(intptr_t hwnd, intptr_t insertAfter, int x, int y, int cx, int cy, uint flags)');
+  // MoveWindow は SetWindowPos より単純で conhost のような特殊ウィンドウでも追従しやすい
+  const MoveWindow = user32.func('bool __stdcall MoveWindow(intptr_t hwnd, int x, int y, int nWidth, int nHeight, bool bRepaint)');
+  // 現サイズ取得用（intptr_t 版、ログ・差分判定のため）
+  const GetWindowRectV = user32.func('bool __stdcall GetWindowRect(intptr_t hwnd, _Out_ RECT *rect)');
 
   // Unicode テキスト入力（SendInput + KEYEVENTF_UNICODE）。キーボードレイアウト非依存で日本語等を正しく入力。
   const MOUSEINPUT = koffi.struct('MOUSEINPUT', { dx: 'int32', dy: 'int32', mouseData: 'uint32', dwFlags: 'uint32', time: 'uint32', dwExtraInfo: 'uintptr_t' });
@@ -130,10 +134,14 @@ try {
 
 // 対象ウィンドウのサイズを指定（位置は維持・最前面化しない・アクティブ化しない）。
 // viewer から「自分の表示エリアの幅×高さ」を受け取ってホスト窓を合わせるのに使う(S-2)。
+// conhost.exe (Command Prompt) のような特殊ウィンドウは SetWindowPos だけだと描画が追従しない
+// ことがあるため、 ①SWP_FRAMECHANGED でフレーム再計算 → ②MoveWindow(再描画あり) で位置も指定し直す、
+// の二段構えにする。 GetWindowRect で前後サイズを取得してログに出す（調査用）。
 // koffi 読み込み失敗時は no-op。
 let setWindowSize = () => false;
 try {
-  if (typeof SetWindowPos !== 'undefined') {
+  if (typeof SetWindowPos !== 'undefined' && typeof MoveWindow !== 'undefined') {
+    const RECT = koffi.struct('RECT', { left: 'long', top: 'long', right: 'long', bottom: 'long' });
     setWindowSize = function (hwnd, width, height) {
       try {
         hwnd = Number(hwnd);
@@ -142,9 +150,33 @@ try {
         width  = Math.max(120, Math.min(8192, Math.round(Number(width)  || 0)));
         height = Math.max(80,  Math.min(8192, Math.round(Number(height) || 0)));
         if (!width || !height) return false;
-        // SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE = 0x2 | 0x4 | 0x10 = 0x16
-        return !!SetWindowPos(hwnd, 0, 0, 0, width, height, 0x16);
-      } catch { return false; }
+
+        // 前のサイズ・位置を取得
+        const before = [0, 0, 0, 0];
+        let prevX = 0, prevY = 0, prevW = 0, prevH = 0;
+        try {
+          const r = {};
+          if (GetWindowRectV(hwnd, r)) { prevX = r.left; prevY = r.top; prevW = r.right - r.left; prevH = r.bottom - r.top; }
+        } catch {}
+
+        // SWP_NOMOVE(0x2)|SWP_NOZORDER(0x4)|SWP_NOACTIVATE(0x10)|SWP_FRAMECHANGED(0x20) = 0x36
+        const okSwp = !!SetWindowPos(hwnd, 0, 0, 0, width, height, 0x36);
+        // MoveWindow で位置を維持しつつ確実に再描画させる（conhost にはこちらが効く）。
+        const okMv = !!MoveWindow(hwnd, prevX || 0, prevY || 0, width, height, true);
+
+        // 結果を取得してログ（コンソール起動なしのリリースexeでも console.log は noop なので無害）
+        let afterW = 0, afterH = 0;
+        try {
+          const r = {};
+          if (GetWindowRectV(hwnd, r)) { afterW = r.right - r.left; afterH = r.bottom - r.top; }
+        } catch {}
+        console.log(`[host] setWindowSize hwnd=${hwnd} want=${width}x${height} before=${prevW}x${prevH} after=${afterW}x${afterH} swp=${okSwp} mv=${okMv}`);
+        // どちらか成功すれば true
+        return okSwp || okMv;
+      } catch (e) {
+        console.warn('[host] setWindowSize threw:', e && e.message);
+        return false;
+      }
     };
   }
 } catch {}
