@@ -54,7 +54,7 @@ PAssist — アカウント不要で、単一ウィンドウをブラウザか�
 - 発信者情報開示請求（プロバイダ責任制限法）と不正利用調査のため、**接続元 IP / User-Agent / イベント種別 / セッショントークン** を記録する。
 - 出力: `data/audit/YYYY-MM-DD.jsonl`（JSON Lines、append-only、UTC 日付）。
 - 公開しない（HTTP API も無し）。VPS ファイルシステム権限のみで保護。
-- 保持: 既定 **90 日**。環境変数 `PASSIST_AUDIT_RETENTION_DAYS` で変更可。期限切れは毎日自動削除。
+- 保持: 既定 **365 日**。環境変数 `PASSIST_AUDIT_RETENTION_DAYS` で変更可。期限切れは毎日自動削除。
 - 保存場所の上書き（テスト用）: `PASSIST_AUDIT_DIR`。
 - 記録しないもの: WebRTC メディア・DataChannel・入力イベント・クリップボード（そもそも P2P でサーバを通らない）。
 

@@ -89,6 +89,8 @@ SIGNALING_VERSION=v0.2.7.4
 RELAY_BUDGET_BPS=4000000
 RELAY_MIN_BPS=100000
 RELAY_MAX_BPS=1500000
+# 監査ログ保管期間（日）。プロバイダ責任制限法・情プラ法対応で接続元IP等を非公開記録。
+PASSIST_AUDIT_RETENTION_DAYS=365
 REALM=paps.jp
 TURN_PASSWORD=$TURN_PASSWORD
 TURN_AUTH_SECRET=$TURN_AUTH_SECRET
@@ -101,6 +103,14 @@ EOF
 else
   echo "[bootstrap] .env already exists, keeping"
 fi
+
+# 監査ログ・公開集計の永続化ディレクトリを事前に作成し、IPを含む audit/ は厳格な権限に。
+# docker compose の volumes (./data:/data) でマウントされる。
+mkdir -p "$DEPLOY/data/audit"
+chown -R "$WWW_USER":"$WWW_USER" "$DEPLOY/data"
+chmod 750 "$DEPLOY/data"
+chmod 700 "$DEPLOY/data/audit"
+echo "[bootstrap] data/ created (audit/ is 700, contains IP logs)"
 
 # turnserver.conf を展開（再生成は手で消してから）
 if [ ! -f turnserver.conf ]; then

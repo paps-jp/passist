@@ -31,8 +31,19 @@ services:
       TURN_AUTH_SECRET: ${TURN_AUTH_SECRET:-}
       SIGN_TURN_USERNAME: ${SIGN_TURN_USERNAME:-passist}
       SIGN_TURN_TTL_SEC: ${SIGN_TURN_TTL_SEC:-86400}
+      # 監査ログ（プロバイダ責任制限法・情プラ法対応／非公開・IP含む）。
+      # PASSIST_AUDIT_DIR は volumes でマウントしたパスに固定。コンテナ再起動で消えないよう永続化する。
+      PASSIST_AUDIT_DIR: /data/audit
+      PASSIST_AUDIT_RETENTION_DAYS: ${PASSIST_AUDIT_RETENTION_DAYS:-365}
+      # 公開集計（匿名）も同ボリュームに永続化。
+      PASSIST_STATS_DIR: /data
     expose:
       - "8443"
+    volumes:
+      # 監査ログと公開集計をホスト側に永続化。containerが消えても保持される。
+      # 監査ログには接続元IP等が含まれるため、ホスト側で 0700 推奨：
+      #   sudo chown -R root:root ./data && sudo chmod 700 ./data/audit
+      - ./data:/data
     networks:
       - pn
 

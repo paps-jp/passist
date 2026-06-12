@@ -4,7 +4,7 @@
 // 既存 stats.js（匿名・公開）とは目的が違うので完全に分離する。
 //
 // - 1行1イベントの JSONL を data/audit/YYYY-MM-DD.jsonl に追記
-// - 既定 90 日保管。それ以上古いファイルは毎日自動削除
+// - 既定 365 日保管。それ以上古いファイルは毎日自動削除
 // - 通信内容（WebRTC メディア・DataChannel・入力イベント）は記録しない（プライバシー上不要かつ取れない）
 // - 公開 API には載せない（/api/stats は匿名集計のまま）
 // - テスト時は PASSIST_AUDIT_DIR で独立 dir を渡す
@@ -13,7 +13,7 @@ const fs = require('fs');
 const path = require('path');
 
 const DATA_DIR = process.env.PASSIST_AUDIT_DIR || path.join(__dirname, '..', 'data', 'audit');
-const RETENTION_DAYS = parseInt(process.env.PASSIST_AUDIT_RETENTION_DAYS || '90', 10);
+const RETENTION_DAYS = parseInt(process.env.PASSIST_AUDIT_RETENTION_DAYS || '365', 10);
 const UA_MAX = 200; // User-Agent は先頭 200 文字まで（情報過剰を避ける）
 
 let enabled = true;
