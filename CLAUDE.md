@@ -33,10 +33,43 @@ PAssist — アカウント不要で、単一ウィンドウをブラウザか�
 
 - 軽量CI（`.github/workflows/test.yml`）が push/PR で:
   1. `node --check` で全 `.js` の構文チェック（host/server/viewer）。
-  2. `cd server && node test-signaling.js`（in-process でシグナリングを検証）。
-  3. `npm audit --omit=dev`（脆弱性アドバイザリ）。
+  2. `cd server && node --test test-util.js test-stats.js test-audit.js`（ピュア関数の単体テスト）。
+  3. `cd server && node test-signaling.js`（in-process でシグナリングを検証）。
+  4. `npm audit --omit=dev`（脆弱性アドバイザリ）。
 - 新機能には可能ならピュア関数の単体テストを追加（標準 `node --test`、追加依存ゼロ）。
 - WebRTC メディア・Win32 API・キャプチャは実機検証マトリクスで確認（自動化困難）。
+
+## ログ運用（中央サーバ）
+
+匿名集計（公開）と監査ログ（非公開）の **2 系統** を分けて運用する。プライバシーポリシーは `docs/privacy.html`、利用者が確認できる場所はビューア「PAssist について」モーダル → 「プライバシーポリシー」。
+
+### `server/stats.js` — 匿名集計（公開）
+
+- 個人を特定する情報（IP / token / UA / 拒否相手）は**一切記録しない**。
+- 出力: `data/stats.json`、API: `GET https://passist.paps.jp/api/stats`（CORS `*`）、ダッシュボード: `https://paps-jp.github.io/passist/stats.html`。
+- 保持: 直近 24h ローリング + 日次サマリ 30 日。
+
+### `server/audit.js` — 監査ログ（非公開）
+
+- 発信者情報開示請求（プロバイダ責任制限法）と不正利用調査のため、**接続元 IP / User-Agent / イベント種別 / セッショントークン** を記録する。
+- 出力: `data/audit/YYYY-MM-DD.jsonl`（JSON Lines、append-only、UTC 日付）。
+- 公開しない（HTTP API も無し）。VPS ファイルシステム権限のみで保護。
+- 保持: 既定 **90 日**。環境変数 `PASSIST_AUDIT_RETENTION_DAYS` で変更可。期限切れは毎日自動削除。
+- 保存場所の上書き（テスト用）: `PASSIST_AUDIT_DIR`。
+- 記録しないもの: WebRTC メディア・DataChannel・入力イベント・クリップボード（そもそも P2P でサーバを通らない）。
+
+### IP 取得方針
+
+- Caddy リバースプロキシ越しを想定し、`X-Forwarded-For` ヘッダの**最左**を採用、無ければ `socket.remoteAddress`。
+- IPv4-mapped IPv6 (`::ffff:192.0.2.1`) は IPv4 に正規化。
+- 偽装対策: Caddy 以外を経由する経路を作らないこと（`deploy/docker-compose.yml` で signaling は Caddy 配下のみ公開）。
+
+### 開示請求対応
+
+- 受付窓口は `docs/privacy.html` 記載の PAPS お問い合わせ先。
+- 開示判断は運営者（PAPS）が法令と本ポリシーに基づき行う。
+- 開示にあたっては、最小限の情報（請求対象のセッション token に該当する IP / タイムスタンプのみ）を提供することを基本とする。
+- 提供前にログをアーカイブして証跡を残す（手動）。
 
 ## リリース
 

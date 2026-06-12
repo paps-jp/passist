@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#78b3f7" />
+    <title>PAssist プライバシーポリシー — paps-jp.github.io/passist</title>
+    <meta name="description" content="PAssist の中央サーバ(passist.paps.jp)が取得・記録する情報、保管期間、開示の条件、お問い合わせ先の説明。" />
+    <link rel="icon" href="passist_min.svg" />
+    <meta property="og:type" content="article" />
+    <meta property="og:title" content="PAssist プライバシーポリシー" />
+    <meta property="og:url" content="https://paps-jp.github.io/passist/privacy.html" />
+    <style>
+      :root{
+        --p:#78b3f7; --acc:#3776e6;
+        --ink:#1f2733; --mut:#5b6b80; --bg:#f7f9fc; --card:#fff; --line:#e9eef5;
+        --maxw:880px;
+      }
+      *{box-sizing:border-box}
+      html{scroll-behavior:smooth}
+      body{margin:0;font-family:system-ui,"Segoe UI","Hiragino Kaku Gothic ProN",Meiryo,sans-serif;color:var(--ink);background:var(--bg);line-height:1.85;-webkit-font-smoothing:antialiased}
+      a{color:var(--acc)}
+      .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px}
+      .hero{background:linear-gradient(150deg,#5278e8 0%,#4a9de6 55%,#3599a8 100%);color:#fff;padding:38px 24px 44px}
+      .crumbs{display:flex;align-items:center;gap:10px;font-size:13px;color:rgba(255,255,255,.85);margin-bottom:8px}
+      .crumbs a{color:#fff;text-decoration:none;border-bottom:1px solid rgba(255,255,255,.4)}
+      .hero h1{margin:6px 0 4px;font-size:clamp(22px,3.2vw,28px);font-weight:800;letter-spacing:.2px}
+      .hero .sub{color:rgba(255,255,255,.92);font-size:14px;margin:0}
+      .sec{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px 26px;margin:18px 0;box-shadow:0 4px 12px rgba(40,80,160,.04)}
+      h2{font-size:18px;font-weight:800;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+      h2 .n{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:50%;background:var(--p);color:#fff;font-size:13px}
+      h3{font-size:15px;margin:16px 0 6px}
+      ul,ol{padding-left:22px}
+      li{margin:4px 0}
+      table{width:100%;border-collapse:collapse;font-size:14px;margin:10px 0}
+      th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+      th{color:var(--mut);font-weight:600;font-size:12.5px;text-transform:uppercase;letter-spacing:.04em}
+      .note{color:var(--mut);font-size:13px}
+      .pill{display:inline-block;font-size:12px;padding:2px 8px;border-radius:999px;background:#eef3ff;color:#2f5ec8}
+      .meta{color:var(--mut);font-size:12.5px;margin-top:8px}
+      footer{border-top:1px solid var(--line);color:var(--mut);font-size:13px;text-align:center;padding:26px 24px 44px;margin-top:24px}
+      footer a{color:var(--mut)}
+    </style>
+  </head>
+  <body>
+    <header class="hero">
+      <div class="wrap">
+        <div class="crumbs">
+          <a href="./">トップ</a>
+          <span>›</span>
+          <span>プライバシーポリシー</span>
+        </div>
+        <h1>PAssist プライバシーポリシー</h1>
+        <p class="sub">中央サーバ(<code>passist.paps.jp</code>)で取得・記録する情報、保管期間、開示の条件、問い合わせ先の説明です。</p>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <section class="sec">
+        <h2><span class="n">1</span>基本方針</h2>
+        <p>PAssist は、特定非営利活動法人ぱっぷす（PAPS）が運営するリモート操作ツールです。
+        本サービスは、不正利用の防止と利用者・第三者の権利保護のために、通信の発生に伴う最小限の情報を記録します。
+        <strong>映像・音声・操作・クリップボード等の通信内容は、サーバを経由しません</strong>（WebRTC によりホストPC ↔ 閲覧者ブラウザの直接通信）。
+        したがって運営者は通信内容を把握する手段を持ちません。</p>
+        <p class="meta">本ポリシーの対象は中央サーバ <code>https://passist.paps.jp/</code> ＝シグナリング・配信API・統計APIです。</p>
+      </section>
+
+      <section class="sec">
+        <h2><span class="n">2</span>取得・記録する情報</h2>
+
+        <h3><span class="pill">公開</span> 匿名集計（<code>/api/stats</code>）</h3>
+        <p>個人を特定する情報を含まない、匿名集計のみを公開しています。<a href="/passist/stats.html">運用統計ページ</a> で常時公開しています。</p>
+        <ul>
+          <li>現在の共有中セッション数・接続中ビューア数・TURN 中継数</li>
+          <li>直近24時間および日次のイベント件数集計</li>
+        </ul>
+
+        <h3><span class="pill" style="background:#fff5f3;color:#a8421d">非公開</span> 監査ログ（IP含む）</h3>
+        <p>発信者情報開示請求・不正利用調査に対応するため、以下の項目を非公開で記録します。<strong>運営者以外がアクセスできる場所には保存しません</strong>。</p>
+        <table>
+          <thead><tr><th>項目</th><th>内容</th><th>用途</th></tr></thead>
+          <tbody>
+            <tr><td>タイムスタンプ</td><td>UTC ISO8601</td><td>いつ発生したか</td></tr>
+            <tr><td>接続元 IP アドレス</td><td>IPv4 / IPv6</td><td>接続元の特定</td></tr>
+            <tr><td>User-Agent</td><td>ブラウザ識別子（先頭200文字）</td><td>クライアント種別</td></tr>
+            <tr><td>イベント種別</td><td>WebSocket 接続/セッション発行/Viewer 参加/承認/拒否/切断 など</td><td>何が起きたか</td></tr>
+            <tr><td>セッショントークン</td><td>無作為に発行されるセッション識別子</td><td>同一セッション内の関連付け</td></tr>
+            <tr><td>拒否理由</td><td>PIN間違い／招待リンク無し／満員 等</td><td>不正利用検知</td></tr>
+          </tbody>
+        </table>
+
+        <h3>記録しないもの</h3>
+        <ul>
+          <li>共有された画面の映像・音声（サーバを通らない＝技術的に取得不能）</li>
+          <li>遠隔操作の入力イベント（同上）</li>
+          <li>クリップボード・テキスト入力の内容（同上）</li>
+          <li>氏名・メールアドレス等の個人識別情報（アカウント登録が無いため取得しない）</li>
+        </ul>
+      </section>
+
+      <section class="sec">
+        <h2><span class="n">3</span>保管期間</h2>
+        <ul>
+          <li><strong>匿名集計</strong>: 当日累計＋直近24時間ローリング＋日次30日サマリ。</li>
+          <li><strong>監査ログ</strong>: 既定 <strong>90日</strong>（環境変数 <code>PASSIST_AUDIT_RETENTION_DAYS</code> で調整可能）。期限超過分は毎日自動削除します。</li>
+        </ul>
+      </section>
+
+      <section class="sec">
+        <h2><span class="n">4</span>第三者提供・法執行機関への開示</h2>
+        <p>監査ログは、原則として運営者以外に開示しません。次の場合に限り開示することがあります。</p>
+        <ol>
+          <li><strong>法令に基づく要請</strong>: 裁判所・捜査機関等からの令状・正式な照会に基づく場合。</li>
+          <li><strong>発信者情報開示請求</strong>: プロバイダ責任制限法に基づく適法な開示請求があり、要件を満たすと判断した場合。</li>
+          <li><strong>緊急性のある人命・身体への危険</strong>: 利用者または第三者の生命・身体に対する差し迫った危険を防止するために必要な場合。</li>
+        </ol>
+        <p>その他の目的（広告・分析・第三者の営利目的等）には一切提供しません。</p>
+      </section>
+
+      <section class="sec">
+        <h2><span class="n">5</span>セキュリティ</h2>
+        <ul>
+          <li>通信は HTTPS / WSS （TLS）で暗号化しています。</li>
+          <li>シグナリングサーバ（コンテナ）はソースコードからのビルドが <a href="verification.html">Sigstore Rekor で検証可能</a> です。</li>
+          <li>監査ログは中央サーバのファイルシステム上に置き、外部公開していません。</li>
+          <li>暗号化キーやパスワード等は記録しません。</li>
+        </ul>
+      </section>
+
+      <section class="sec">
+        <h2><span class="n">6</span>利用者の権利</h2>
+        <p>利用者は、運営者に対して以下を求めることができます。</p>
+        <ul>
+          <li>本人に関する監査ログの開示・削除（個人を特定できる場合）</li>
+          <li>記録内容に関する問い合わせ・苦情</li>
+        </ul>
+        <p>請求方法は次項のお問い合わせ先までご連絡ください。</p>
+      </section>
+
+      <section class="sec">
+        <h2><span class="n">7</span>お問い合わせ</h2>
+        <p>特定非営利活動法人ぱっぷす（PAPS）<br/>
+        ウェブサイト: <a href="https://paps.jp" target="_blank" rel="noopener">https://paps.jp</a><br/>
+        本ツールに関するお問い合わせ: <a href="https://github.com/paps-jp/passist/issues" target="_blank" rel="noopener">GitHub Issues</a>（個別の開示請求は paps.jp 経由でご連絡ください）</p>
+      </section>
+
+      <section class="sec">
+        <h2><span class="n">8</span>改定</h2>
+        <p>本ポリシーは、法令の改正や運用の見直しに伴って改定することがあります。重要な変更は、本ページおよび GitHub リポジトリで通知します。</p>
+        <p class="meta">最終更新: 2026-06-12（初版）</p>
+      </section>
+    </main>
+
+    <footer>
+      PAssist — 単一ウィンドウ・ブラウザ完結・アカウント不要のリモート操作 ／
+      <a href="https://github.com/paps-jp/passist">github.com/paps-jp/passist</a>
+    </footer>
+  </body>
+</html>

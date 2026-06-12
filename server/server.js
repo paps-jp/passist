@@ -14,6 +14,7 @@ const crypto = require('crypto');
 const express = require('express');
 const { WebSocketServer } = require('ws');
 const stats = require('./stats'); // 匿名集計（個人情報は記録しない）。snapshot は /api/stats で公開
+const audit = require('./audit'); // 監査ログ（IP/UA等を記録、非公開）。プロバイダ責任制限法・情プラ法対応
 const { sanitizeBase, clampMaxViewers, calcBitrate } = require('./util'); // 純粋関数（test-util.js でテスト）
 
 const PORT = parseInt(process.env.PORT || '8443', 10);
@@ -314,9 +315,14 @@ const server = useTls
   : http.createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 
-wss.on('connection', (ws) => {
+wss.on('connection', (ws, req) => {
   ws.role = null;
   ws.token = null;
+  // 監査ログ用: 接続元 IP / User-Agent を ws に保存（X-Forwarded-For 経由対応）。
+  // ※ stats（公開集計）には載せない。/api/stats は匿名のまま。
+  ws.auditIp = audit.extractIp(req);
+  ws.auditUa = audit.extractUserAgent(req);
+  audit.log({ type: 'ws_connect', ip: ws.auditIp, ua: ws.auditUa });
   ws.on('message', (raw) => {
     let msg;
     try {
@@ -369,10 +375,12 @@ function hostCreate(ws, msg) {
           resumed: true, // ホスト側で「リンク維持で復旧した」と分かるよう示す
         });
         send(ws, { type: 'bitrate-policy', maxBpsRelay: calcRelayBitrate(), relayCount: relayCount() });
+        audit.log({ type: 'host_reattach', ip: ws.auditIp, ua: ws.auditUa, token: existingToken });
         console.log(`[server] host re-attached to session: ${existingToken}`);
         return;
       }
       // secret 不一致 → 引き継ぎ拒否、新規発行へフォールスルー
+      audit.log({ type: 'host_create_secret_mismatch', ip: ws.auditIp, ua: ws.auditUa, token: existingToken });
       console.log(`[server] hostSecret mismatch for ${existingToken}, issuing fresh session`);
     } else {
       // セッションが無い（サーバ再起動など）→ 同じ token で session を「復元」する
@@ -390,6 +398,7 @@ function hostCreate(ws, msg) {
       });
       send(ws, { type: 'bitrate-policy', maxBpsRelay: calcRelayBitrate(), relayCount: relayCount() });
       stats.event('session_created', { accessMode: restored.accessMode, resumed: true });
+      audit.log({ type: 'host_restore', ip: ws.auditIp, ua: ws.auditUa, token: existingToken, meta: { accessMode: restored.accessMode } });
       console.log(`[server] session restored (same token): ${existingToken}`);
       return;
     }
@@ -410,6 +419,7 @@ function hostCreate(ws, msg) {
   });
   send(ws, { type: 'bitrate-policy', maxBpsRelay: calcRelayBitrate(), relayCount: relayCount() });
   stats.event('session_created', { accessMode: s.accessMode });
+  audit.log({ type: 'host_create', ip: ws.auditIp, ua: ws.auditUa, token, meta: { accessMode: s.accessMode } });
   console.log(`[server] session created: ${token} (${s.accessMode})`);
 }
 
@@ -444,21 +454,25 @@ function viewerJoin(ws, msg) {
   }
   if (s.viewers.size + s.pending.size >= s.maxViewers) {
     stats.event('viewer_denied', { reason: 'busy' });
+    audit.log({ type: 'viewer_denied', ip: ws.auditIp, ua: ws.auditUa, token: s.token, meta: { reason: 'busy' } });
     return send(ws, { type: 'error', code: 'busy', message: '接続できる人数の上限に達しています' });
   }
   if (s.accessMode === 'pin' && String(msg.pin || '') !== s.pin) {
     stats.event('viewer_denied', { reason: 'pin' });
+    audit.log({ type: 'viewer_denied', ip: ws.auditIp, ua: ws.auditUa, token: s.token, meta: { reason: 'pin' } });
     return send(ws, { type: 'error', code: 'pin', message: 'PINが違います' });
   }
   // 招待リンクモード: auth(信頼クレデンシャル) が無ければ即拒否（通常URLでの接続を防ぐ）
   if (s.accessMode === 'invite' && !msg.auth) {
     stats.event('viewer_denied', { reason: 'no-invite' });
+    audit.log({ type: 'viewer_denied', ip: ws.auditIp, ua: ws.auditUa, token: s.token, meta: { reason: 'no-invite' } });
     return send(ws, { type: 'error', code: 'invite', message: 'このセッションは招待リンク専用です。ホストから「招待リンク」を受け取ってください。' });
   }
 
   ws.role = 'viewer';
   ws.token = s.token;
   ws.viewerId = String(++viewerSeq);
+  audit.log({ type: 'viewer_join', ip: ws.auditIp, ua: ws.auditUa, token: s.token, viewerId: ws.viewerId, meta: { accessMode: s.accessMode, hasAuth: !!msg.auth } });
 
   if (s.accessMode === 'approve' || s.accessMode === 'invite') {
     // approve: ホスト承認 / invite: ホスト側で trust 照合し trusted なら自動承認・それ以外は自動拒否
@@ -483,6 +497,7 @@ function hostDecision(ws, approve, msg) {
     acceptViewer(s, v, msg && msg.issue);
   } else {
     stats.event('viewer_denied', { reason: 'host_deny' });
+    audit.log({ type: 'viewer_denied', ip: v.auditIp, ua: v.auditUa, token: s.token, viewerId: v.viewerId, meta: { reason: 'host_deny' } });
     send(v, { type: 'denied', message: 'ホストが接続を拒否しました' });
     v.close();
     if (!s.viewers.size && !s.pending.size) s.status = 'idle';
@@ -497,6 +512,7 @@ function acceptViewer(s, v, issue) {
   send(v, { type: 'accepted', issue: issue || null, turn: turnForViewer() });
   send(s.host, { type: 'viewer:joined', viewerId: v.viewerId }); // 当該ビューア向けにホストがオファー作成
   stats.event('viewer_accepted', { accessMode: s.accessMode });
+  audit.log({ type: 'viewer_accepted', ip: v.auditIp, ua: v.auditUa, token: s.token, viewerId: v.viewerId, meta: { accessMode: s.accessMode } });
 }
 
 function peerRoute(ws, msg) {
@@ -531,6 +547,7 @@ function hostEnd(ws) {
   // ホスト側でも lastHostToken/Secret はクリア済み（renderer.js の end ボタン）→ 次回は新規発行になる。
   sessions.delete(s.token);
   console.log(`[server] session ended explicitly: ${s.token}`);
+  audit.log({ type: 'host_end', ip: ws.auditIp, ua: ws.auditUa, token: s.token });
   broadcastBitratePolicy();
 }
 
@@ -552,6 +569,7 @@ function onClose(ws) {
     s.host = null;
     s.status = 'idle';
     console.log(`[server] host disconnected (session kept for reattach): ${s.token}`);
+    audit.log({ type: 'host_disconnect', ip: ws.auditIp, ua: ws.auditUa, token: s.token });
     broadcastBitratePolicy();
     stats.event('session_closed', { durationSec: Math.floor((Date.now() - s.createdAt) / 1000) });
   } else if (ws.role === 'viewer') {
@@ -562,7 +580,7 @@ function onClose(ws) {
     }
     if (ws.viewerId != null) s.pending.delete(ws.viewerId);
     if (ws.viewerId != null && s.relayViewers.delete(ws.viewerId)) broadcastBitratePolicy();
-    if (wasViewer) stats.event('viewer_left');
+    if (wasViewer) { stats.event('viewer_left'); audit.log({ type: 'viewer_left', ip: ws.auditIp, ua: ws.auditUa, token: s.token, viewerId: ws.viewerId }); }
     if (!s.viewers.size && !s.pending.size) s.status = 'idle';
   }
 }
@@ -579,6 +597,7 @@ setInterval(() => {
       send(s.host, { type: 'expired' });
       sessions.delete(token);
       stats.event('session_expired', { durationSec: Math.floor((Date.now() - s.createdAt) / 1000) });
+      audit.log({ type: 'session_expired', token });
       console.log(`[server] session expired: ${token}`);
     }
   }

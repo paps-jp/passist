@@ -48,7 +48,7 @@ jobs:
 
       # util / stats の純粋関数を node 標準テストランナーで（追加依存なし）
       - name: Unit tests (node --test)
-        run: node --test test-util.js test-stats.js
+        run: node --test test-util.js test-stats.js test-audit.js
         working-directory: server
 
       # signaling は外部プロセスとして起動 → test-signaling.js が WebSocket で接続して結合検証
