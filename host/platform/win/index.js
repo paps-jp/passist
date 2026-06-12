@@ -13,6 +13,7 @@ module.exports = {
     bringToFront: winenum.bringToFront,
     typeUnicode: winenum.typeUnicode,
     setWindowSize: winenum.setWindowSize, // viewer 画面比率にホスト窓を合わせる（S-2）
+    getWindowRect: winenum.getWindowRect, // V-3 サイズ調整 OFF で元サイズに復元するための取得
     _logResize: winenum._logResize,      // デバッグ用: %TEMP%\passist-resize.log への追記関数（S-2.3）
     _RESIZE_LOG: winenum._RESIZE_LOG,
     // desktopCapturer の sourceId は Win では "window:<HWND>:0"。HWND を数値で取り出す。

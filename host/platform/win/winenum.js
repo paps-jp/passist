@@ -20,6 +20,7 @@ let enumerate = () => [];
 let bringToFront = () => false; // 対象ウィンドウを最前面へ（koffi 失敗時は no-op）
 let typeUnicode = () => false; // Unicode文字列を直接入力（koffi 失敗時は no-op）
 let setWindowSize = () => ({ ok: false, w: 0, h: 0 }); // 対象ウィンドウのサイズ変更（koffi 失敗時は no-op）
+let getWindowRect = () => null; // 対象ウィンドウの現在位置/サイズ取得（koffi 失敗時は null）
 
 try {
   const koffi = require('koffi');
@@ -194,8 +195,21 @@ try {
       return { ok: false, w: 0, h: 0 };
     }
   };
+
+  // V-3: 対象ウィンドウの現在の位置とサイズを取得。 サイズ調整 ON 直前の元サイズを
+  //   記憶しておき、 OFF 時に setWindowSize で復元するために使う。
+  getWindowRect = function (hwnd) {
+    try {
+      hwnd = Number(hwnd);
+      if (!hwnd) return null;
+      if (!IsWindowValid(hwnd)) return null;
+      const r = {};
+      if (!GetWindowRectV(hwnd, r)) return null;
+      return { x: r.left, y: r.top, w: r.right - r.left, h: r.bottom - r.top };
+    } catch { return null; }
+  };
 } catch (e) {
   console.warn('[host] winenum 無効（koffi ロード失敗 → owned 窓掲載/前面化なし）:', e && e.message);
 }
 
-module.exports = { enumerate, bringToFront, typeUnicode, setWindowSize, _logResize: logResize, _RESIZE_LOG: RESIZE_LOG };
+module.exports = { enumerate, bringToFront, typeUnicode, setWindowSize, getWindowRect, _logResize: logResize, _RESIZE_LOG: RESIZE_LOG };

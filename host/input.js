@@ -17,6 +17,9 @@ let targetWindow = null; // 一致した nut.js Window（focus 用にキャッ�
 let region = null; // { left, top, width, height }
 let lastRegionAt = 0; // 最後に region を更新した時刻
 let refreshing = false; // 同時リフレッシュ防止
+// V-3: サイズ調整 ON 直前の元サイズ。 OFF (restore) で setWindowSize して戻す。
+//   setTarget で null にリセットされ、 次の resize で再度記憶する。
+let savedSize = null; // { handle, w, h } | null
 
 async function init() {
   mouse.config.mouseSpeed = 100000; // ほぼ即時移動
@@ -32,6 +35,7 @@ function setTarget(name, sourceId) {
   targetWindow = null;
   region = null;
   lastRegionAt = 0;
+  savedSize = null; // V-3: 共有ウィンドウが変わったら元サイズ記憶もリセット
   maybeRefresh(true);
 }
 
@@ -214,6 +218,16 @@ async function handle(ev) {
         if (!(platform.windows && platform.windows.setWindowSize)) { log('resize skipped (no API)'); break; }
         const handle = targetHandle;
         const w = ev.w, h = ev.h;
+        // V-3: 初回 resize (まだ保存無し or 別ウィンドウ) なら現サイズを「元サイズ」 として記憶
+        if (!savedSize || savedSize.handle !== handle) {
+          try {
+            const cur = platform.windows.getWindowRect ? platform.windows.getWindowRect(handle) : null;
+            if (cur && cur.w > 0 && cur.h > 0) {
+              savedSize = { handle, w: cur.w, h: cur.h };
+              log(`saved original size: ${cur.w}x${cur.h} (will restore on 'restore' event)`);
+            }
+          } catch (e) { log('save size error: ' + (e && e.message)); }
+        }
         let last = { ok: false, w: 0, h: 0 };
         // 段階的縮小 4 回
         for (let i = 0; i < 4; i++) {
@@ -240,6 +254,25 @@ async function handle(ev) {
           }
         } catch (e) { log('aspect correct error: ' + (e && e.message)); }
         // region キャッシュを次回 maybeRefresh で更新（古い region で座標が外れるのを防ぐ）
+        region = null;
+        lastRegionAt = 0;
+        break;
+      }
+      case 'restore': {
+        // V-3: サイズ調整 OFF → 記憶した「元サイズ」 に戻す。 位置は維持。
+        const log = (m) => {
+          console.log('[host] ' + m);
+          try { if (platform.windows && platform.windows._logResize) platform.windows._logResize(m); } catch {}
+        };
+        log(`restore event: target=${targetHandle} saved=${savedSize ? `${savedSize.w}x${savedSize.h}@${savedSize.handle}` : 'null'}`);
+        if (targetHandle == null) { log('restore skipped (no target)'); break; }
+        if (!(platform.windows && platform.windows.setWindowSize)) { log('restore skipped (no API)'); break; }
+        if (!savedSize || savedSize.handle !== targetHandle) { log('restore skipped (no saved size for this window)'); break; }
+        try {
+          const r = platform.windows.setWindowSize(targetHandle, savedSize.w, savedSize.h);
+          log(`restore result: want=${savedSize.w}x${savedSize.h} actual=${r.w}x${r.h} ok=${r.ok}`);
+        } catch (e) { log('restore error: ' + (e && e.message)); }
+        savedSize = null; // 復元したので破棄。 次の resize でまた記憶し直す。
         region = null;
         lastRegionAt = 0;
         break;
