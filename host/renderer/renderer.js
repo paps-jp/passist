@@ -168,10 +168,11 @@
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && !$('settingsModal').classList.contains('hidden')) closeSettings();
     });
-    // 設定モーダル内のタブ切替（基本 / くわしい設定）。 タブ選択も sessionStorage に保存。
+    // 設定モーダル内のタブ切替（基本 / くわしい設定 / AI 連携）。 タブ選択も sessionStorage に保存。
     const activateTab = (tabName) => {
       document.querySelectorAll('#settingsModal .tabs .tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === tabName));
       document.querySelectorAll('#settingsModal .tab-content').forEach((c) => c.classList.toggle('hidden', c.id !== 'tab-' + tabName));
+      if (tabName === 'ai') { refreshAiClients(); refreshAiConsents(); }
     };
     document.querySelectorAll('#settingsModal .tabs .tab').forEach((tab) => {
       tab.onclick = () => {
@@ -179,6 +180,7 @@
         try { sessionStorage.setItem(SETTINGS_TAB_KEY, tab.dataset.tab); } catch {}
       };
     });
+    if ($('aiRefresh')) $('aiRefresh').onclick = () => { refreshAiClients(); refreshAiConsents(); };
     // リロード前の状態を復元 (言語切替リロード後など)
     try {
       const savedTab = sessionStorage.getItem(SETTINGS_TAB_KEY);
@@ -239,6 +241,84 @@
     await loadWindows();
     maybeResume(); // 前回「終了」を押していなければ、同じウィンドウの共有を自動再開（無ければ起動を監視）
     attachMcpBridge(); // MCP (AI 連携) からの操作リクエストを受け付ける
+  }
+
+  // === 設定タブ「AI 連携」 のリスト更新 ===
+  async function refreshAiClients() {
+    const el = $('aiClientsList');
+    if (!el || !window.host || !window.host.mcpAdmin) return;
+    el.innerHTML = '';
+    try {
+      const list = await window.host.mcpAdmin.listClients();
+      if (!list.length) { el.innerHTML = '<div class="ai-empty">' + tr('host.ai.empty') + '</div>'; return; }
+      for (const c of list) {
+        const row = document.createElement('div'); row.className = 'ai-item';
+        const name = document.createElement('div'); name.className = 'ai-name';
+        name.textContent = c.name;
+        row.appendChild(name);
+        const status = document.createElement('span'); status.className = 'ai-status';
+        let statusKey, statusCls, canToggle;
+        if (!c.exists) { statusKey = 'host.ai.status.notInstalled'; statusCls = ''; canToggle = false; }
+        else if (c.configured) { statusKey = 'host.ai.status.enabled'; statusCls = 'ok'; canToggle = true; }
+        else { statusKey = 'host.ai.status.disabled'; statusCls = 'off'; canToggle = true; }
+        status.textContent = tr(statusKey);
+        if (statusCls) status.classList.add(statusCls);
+        row.appendChild(status);
+        if (canToggle) {
+          const btn = document.createElement('button');
+          btn.textContent = c.configured ? tr('host.ai.btn.disable') : tr('host.ai.btn.enable');
+          btn.onclick = async () => {
+            btn.disabled = true;
+            try {
+              if (c.configured) await window.host.mcpAdmin.disableClient(c.id);
+              else await window.host.mcpAdmin.enableClient(c.id);
+            } catch (e) { alert('操作失敗: ' + e.message); }
+            refreshAiClients();
+          };
+          row.appendChild(btn);
+        }
+        el.appendChild(row);
+      }
+    } catch (e) {
+      el.innerHTML = '<div class="ai-empty">取得失敗: ' + e.message + '</div>';
+    }
+  }
+  async function refreshAiConsents() {
+    const el = $('aiConsentsList');
+    if (!el || !window.host || !window.host.mcpAdmin) return;
+    el.innerHTML = '';
+    try {
+      const list = await window.host.mcpAdmin.listConsents();
+      if (!list.length) { el.innerHTML = '<div class="ai-empty">' + tr('host.ai.empty') + '</div>'; return; }
+      for (const c of list) {
+        const row = document.createElement('div'); row.className = 'ai-item';
+        const name = document.createElement('div'); name.className = 'ai-name';
+        name.textContent = c.label || c.exePath || c.key;
+        if (c.exePath && c.label && c.exePath !== c.label) {
+          const meta = document.createElement('div'); meta.className = 'ai-meta';
+          meta.textContent = c.exePath;
+          name.appendChild(document.createElement('br'));
+          name.appendChild(meta);
+        }
+        row.appendChild(name);
+        const status = document.createElement('span'); status.className = 'ai-status';
+        if (c.state === 'always') { status.textContent = tr('host.ai.consent.always'); status.classList.add('ok'); }
+        else if (c.state === 'deny') { status.textContent = tr('host.ai.consent.deny'); status.classList.add('off'); }
+        else { status.textContent = tr('host.ai.consent.once'); }
+        row.appendChild(status);
+        const btn = document.createElement('button');
+        btn.textContent = tr('host.ai.btn.revoke');
+        btn.onclick = async () => {
+          btn.disabled = true;
+          try { await window.host.mcpAdmin.revokeConsent(c.key); } catch (e) { alert('取消失敗: ' + e.message); }
+          refreshAiConsents();
+        };
+        row.appendChild(btn);
+        el.appendChild(row);
+      }
+    } catch (e) {
+      el.innerHTML = '<div class="ai-empty">取得失敗: ' + e.message + '</div>';
+    }
   }
 
   // main から飛んでくる MCP 由来の問い合わせを処理して reply する。

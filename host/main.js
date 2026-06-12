@@ -14,6 +14,7 @@ const settings = require('./settings');
 const platform = require('./platform'); // OS差吸収（ウィンドウ列挙/前面化/Unicode入力・カーソル形状・UPnP）
 const QRCode = require('qrcode'); // 共有URLのQRコード生成（スマホで読み取って接続）
 const localApi = require('./local-api'); // MCP 連携用のローカル HTTP API (127.0.0.1:8444)
+const mcpReg = require('./mcp-auto-register'); // MCP クライアント設定ファイルへの自動登録
 
 // === MCP / Local API: renderer 往復用の Promise トラッキング ===
 // main → renderer に「mcp:get-share-state」 等のリクエストを送り、 renderer が
@@ -45,6 +46,20 @@ ipcMain.on('mcp:renderer-reply', (_e, { _reqId, result, error }) => {
   if (error) p.reject(new Error(error));
   else p.resolve(result);
 });
+
+// === MCP Admin IPC: renderer (設定タブ) からの管理操作 ===
+ipcMain.handle('mcpAdmin:listClients', () => mcpReg.detectAll());
+ipcMain.handle('mcpAdmin:enableClient', (_e, id) => {
+  const passistEntry = mcpReg.buildPassistEntry({
+    appPath: app.getAppPath(),
+    isPackaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+  });
+  return mcpReg.enableClient(id, passistEntry);
+});
+ipcMain.handle('mcpAdmin:disableClient', (_e, id) => mcpReg.disableClient(id));
+ipcMain.handle('mcpAdmin:listConsents', () => localApi.consent.list());
+ipcMain.handle('mcpAdmin:revokeConsent', (_e, key) => { localApi.consent.revoke(key); return { ok: true }; });
 
 // クラッシュ理由を %TEMP%\passist-crash.log に記録（異常終了の原因切り分け用）
 function crashLog(msg) {
@@ -700,6 +715,28 @@ if (!app.requestSingleInstanceLock()) {
     }
     createWindow();
     startClipboardSync();
+    // === MCP 自動登録 ===
+    // 起動時に既知の MCP クライアント (Claude Desktop / Cursor 等) を検出し、
+    // 設定ファイルに passist エントリを silently 追加する。 既にあれば何もしない。
+    // ユーザが設定タブから無効化したクライアントはスキップ。
+    try {
+      mcpReg.init(app.getPath('userData'));
+      const passistEntry = mcpReg.buildPassistEntry({
+        appPath: app.getAppPath(),
+        isPackaged: app.isPackaged,
+        resourcesPath: process.resourcesPath,
+      });
+      const regResults = mcpReg.autoEnableAll(passistEntry);
+      for (const r of regResults) {
+        if (r.status === 'enabled-now') console.log(`[mcp-auto-register] ${r.name}: 設定ファイルに passist を追加 (backup=${r.backupPath})`);
+        else if (r.status === 'already-enabled') console.log(`[mcp-auto-register] ${r.name}: すでに登録済み`);
+        else if (r.status === 'user-disabled') console.log(`[mcp-auto-register] ${r.name}: ユーザが無効化済み`);
+        else if (r.status === 'not-installed') console.log(`[mcp-auto-register] ${r.name}: 未インストール`);
+        else if (r.status === 'error') console.warn(`[mcp-auto-register] ${r.name}: エラー: ${r.error}`);
+      }
+    } catch (e) {
+      console.warn('[mcp-auto-register] 失敗:', e.message);
+    }
     // MCP 連携用 Local HTTP API (127.0.0.1:8444) を起動。 失敗してもアプリは続行。
     try {
       await localApi.start({

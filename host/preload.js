@@ -31,4 +31,12 @@ contextBridge.exposeInMainWorld('host', {
     ipcRenderer.on('mcp:end-share', (_e, payload) => cb('end-share', payload));
   },
   replyMcp: (reqId, result, error) => ipcRenderer.send('mcp:renderer-reply', { _reqId: reqId, result, error }),
+  // === MCP Admin: 設定タブ「AI 連携」 用 ===
+  mcpAdmin: {
+    listClients: () => ipcRenderer.invoke('mcpAdmin:listClients'),
+    enableClient: (id) => ipcRenderer.invoke('mcpAdmin:enableClient', id),
+    disableClient: (id) => ipcRenderer.invoke('mcpAdmin:disableClient', id),
+    listConsents: () => ipcRenderer.invoke('mcpAdmin:listConsents'),
+    revokeConsent: (key) => ipcRenderer.invoke('mcpAdmin:revokeConsent', key),
+  },
 });

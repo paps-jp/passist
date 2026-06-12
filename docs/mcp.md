@@ -646,12 +646,17 @@ PAssist は残したまま連携だけ解除する場合:
 - 承認系 (`approve_pending_viewer`, Tray confirmation)
 - 監査ログ + UI 表示
 
-### Phase 3 — 一般公開 (1〜2 週)
-- PAssist インストーラ / 初期設定に「MCP 対応の AI アシスタントと連携する」 チェックボックスを追加 (§7.1.A)
-- 設定モーダル「AI アシスタント連携」 タブを新設 (§7.1.B): 検出済みクライアント一覧・有効化/解除・動作テスト・最近 7 日の操作履歴
-- 対応 MCP クライアントの自動検出ロジック (§7.2): Claude Desktop / Claude Code / Cursor / Cline / Continue の既知の設定ファイル位置を走査
+### Phase 1.5 ✅ — 自動登録 + 設定タブ (完了)
+- `host/mcp-auto-register.js`: 既知の MCP クライアント (Claude Desktop / Claude Code / Cursor / Continue) 設定ファイルを起動時に走査し、 passist エントリを silently 登録 (既存設定保持・タイムスタンプ付きバックアップ作成)。 ユーザが UI から無効化したクライアントは `mcp-disabled-clients.json` で記録し以降の自動登録対象外に。
+- 設定モーダルに **「AI 連携」 タブ**を新設: 検出済みクライアント一覧 + 有効化 / 無効化ボタン、 許可済み consent 一覧 + 取消ボタン。
+- IPC: `mcpAdmin:listClients` / `enableClient` / `disableClient` / `listConsents` / `revokeConsent`。
+- 動作確認済み: Claude Desktop / Claude Code が起動時に自動登録 → 既存 preferences 全保持 → backup ファイル作成。 設定タブで個別 disable / enable が機能。
+
+### Phase 3 — 一般公開向けポリッシュ (1〜2 週・未着手)
+- PAssist インストーラに「MCP 対応の AI アシスタントと連携する」 チェックボックスを追加 (Phase 1.5 で自動登録になったので必要性は薄い)
+- 動作テストボタン (passist-mcp.exe を試験起動して `initialize` 確認)
+- 最近 7 日の操作履歴ビュー (mcp-audit.jsonl の閲覧)
 - Node Single Executable Application で `passist-mcp.exe` を作成、 `%LOCALAPPDATA%\PAssist\mcp\` に同梱
-- 各クライアント設定ファイルの自動編集ロジック (既存設定の保持・バックアップ・衝突確認)
 - npm パッケージ `@paps-jp/passist-mcp` を並行公開 (CI / 開発者用、 `passist-mcp install --target <name>` で個別指定可)
 - LP に「AI アシスタント連携対応」 セクション (ベンダー名は明示しない方針)、 ja / en 両対応 (i18n.js に `lp.mcp.*` キーを追加)
 - 一般ユーザー向け解説ページ `docs/mcp.html` (`docs/mcp.md` を簡易化・i18n 対応)

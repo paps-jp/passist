@@ -29,6 +29,7 @@
           <div class="tabs" role="tablist">
             <button class="tab active" role="tab" data-tab="basic" data-i18n="host.set.tab.basic">基本</button>
             <button class="tab" role="tab" data-tab="advanced" data-i18n="host.set.tab.advanced">くわしい設定</button>
+            <button class="tab" role="tab" data-tab="ai" data-i18n="host.set.tab.ai">AI 連携</button>
           </div>
 
           <!-- タブ1: 基本 -->
@@ -122,6 +123,25 @@
                   <input id="turnPass" type="password" data-i18n-attr="placeholder:host.set.turn.placeholder.pass" placeholder="パスワード" />
                 </div>
                 <p id="turnHint" class="hint"></p>
+              </div>
+            </div>
+          </div>
+
+          <!-- タブ3: AI 連携 (MCP 対応 AI から PAssist を操作するための管理) -->
+          <div class="tab-content hidden" id="tab-ai" role="tabpanel">
+            <div class="set-row">
+              <span class="set-label" data-i18n="host.ai.clientsHeading">AI クライアント</span>
+              <div class="set-field" style="flex:1">
+                <p class="hint" style="margin:0 0 8px" data-i18n="host.ai.note">PAssist は MCP プロトコル対応の AI アシスタントからの操作要求を受け付けます。 検出した AI クライアントには起動時に自動で passist エントリが登録されます。 個別に無効化すると登録は解除され、 以降の自動登録対象から外れます。</p>
+                <div id="aiClientsList" class="ai-list"></div>
+                <button id="aiRefresh" class="ghost small" data-i18n="host.ai.btn.refresh">再検出</button>
+              </div>
+            </div>
+            <div class="set-row">
+              <span class="set-label" data-i18n="host.ai.consentsHeading">許可済みのアクセス</span>
+              <div class="set-field" style="flex:1">
+                <p class="hint" style="margin:0 0 8px" data-i18n="host.ai.consentsNote">AI クライアントが初めて PAssist にアクセスした際の許可記録です。 「取消」 すると次回アクセス時に再度同意ダイアログが出ます。</p>
+                <div id="aiConsentsList" class="ai-list"></div>
               </div>
             </div>
           </div>
