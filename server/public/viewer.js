@@ -4,7 +4,7 @@
   'use strict';
   // バージョン文字列。 ボタン押下時の status に含めることで、 ユーザーが「最新版を読めているか」
   // を画面上で確認できる（古いキャッシュの可能性を切り分けるため）。
-  const VIEWER_VERSION = 'v38';
+  const VIEWER_VERSION = 'v39';
   console.log('[viewer]', VIEWER_VERSION, 'loaded');
   const token = location.pathname.split('/').filter(Boolean).pop();
 
@@ -25,7 +25,7 @@
   };
   // 起動直後にバージョンを 3 秒だけ表示。 古いキャッシュなら表示されない or 古い番号が出る。
   // ホスト側 PAssist と viewer 両方が最新かをユーザー自身で確認できるようにする。
-  try { statusEl.textContent = '📐 viewer v38 loaded'; statusEl.classList.remove('hidden'); } catch {}
+  try { statusEl.textContent = '📐 viewer v39 loaded'; statusEl.classList.remove('hidden'); } catch {}
   setTimeout(() => { try { if (statusEl.textContent && statusEl.textContent.indexOf('loaded') >= 0) statusEl.textContent = ''; } catch {} }, 3000);
   // i18n ヘルパ (window.t は i18n.js が定義。 未ロードならキーをそのまま返す)
   const tr = (k) => (window.t ? window.t(k) : k);
@@ -214,20 +214,25 @@
   }
 
   // video 表示領域での正規化座標 0..1。範囲外は null。
-  // U-4: 同期 ON のとき (cover 表示中) は Math.max で計算する。
-  //   ホスト窓 (例 772x766) を viewer (例 440x766) に cover フィットで表示した場合、
-  //   映像は左右がクロップされて viewer 全体を埋める。 viewer のクリック x=0 は
-  //   ホストの x≈0.215 に対応する。 Math.max + offX/offY が負になることで、
-  //   viewer 全体 (0..viewer幅) → ホスト窓の中央クロップ範囲 (0.215..0.785) に
-  //   自動マップされる。
-  // 同期 OFF: 従来通り Math.min (contain) で黒帯ありの整合した座標。
+  // U-5: 同期 ON のとき (fill 表示中) は viewer 全体 = ホスト窓全体に直接マップ。
+  //   Chrome 等の最小幅制約 (例 772px) でホスト窓を viewer (440x766) に完全一致
+  //   させられないため、 viewer 側で「歪んでもいいから全体表示」 を選ぶ。
+  //   操作座標は単純な viewer 矩形 → ホスト窓矩形マッピング (アスペクト比無視)。
+  // 同期 OFF: 従来通り contain (Math.min) で黒帯ありの整合した座標。
   function norm(cx, cy) {
     const r = video.getBoundingClientRect();
     const vw = video.videoWidth;
     const vh = video.videoHeight;
     if (!vw || !vh) return null;
-    const fit = syncSizeOn ? Math.max : Math.min;
-    const scale = fit(r.width / vw, r.height / vh);
+    if (syncSizeOn) {
+      // fill: viewer の表示矩形全体が ホスト窓全体に対応 (歪みあり)。
+      const x = (cx - r.left) / r.width;
+      const y = (cy - r.top) / r.height;
+      if (x < 0 || x > 1 || y < 0 || y > 1) return null;
+      return { x, y };
+    }
+    // contain (デフォルト)
+    const scale = Math.min(r.width / vw, r.height / vh);
     const dispW = vw * scale;
     const dispH = vh * scale;
     const offX = (r.width - dispW) / 2;
@@ -693,14 +698,15 @@
       setStatus(`📐 ${VIEWER_VERSION} 押下 ctrl=${controlEnabled} dc=${dc ? dc.readyState : 'null'}`);
       syncSizeOn = !syncSizeOn;
       syncSizeBtn.classList.toggle('active', syncSizeOn);
-      // ホスト窓の最小サイズ制約（cmd/ブラウザは縦長にできない等）で完全に合わせられない場合の補完。
-      // 同期 ON のとき: video のサイズを stage 全体に広げ、 object-fit:cover で画面いっぱい表示
-      // （既定 CSS は max-width:100%; max-height:100vh で video が映像比に縮むため、 ここで
-      //  width/height も 100% に明示しないと cover の効果が出ず黒帯が残る）。
+      // ホスト窓の最小サイズ制約（Chrome は ~772px、 cmd は ~714px が下限）で
+      // viewer のアスペクト比に完全に合わせられない場合の補完。
+      // 同期 ON: object-fit:fill (アスペクト比無視で画面いっぱい)。 ホスト窓の中身が
+      //   viewer の縦長比率に圧縮されて歪むが、 「ホスト窓全体が映る + 黒帯ゼロ」 を
+      //   両立できるのはこれだけ。 操作座標も norm() で fill モードに切り替え済。
       // 同期 OFF: 全て空に戻して既定 CSS（contain 風 全体表示）に戻す。
       try {
         if (syncSizeOn) {
-          video.style.objectFit = 'cover';
+          video.style.objectFit = 'fill';
           video.style.width = '100%';
           video.style.height = '100%';
         } else {
