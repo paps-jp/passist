@@ -46,6 +46,18 @@
       {
         "from": "../server/node_modules",
         "to": "server/node_modules"
+      },
+      {
+        "from": "../tools/passist-mcp",
+        "to": "passist-mcp",
+        "filter": [
+          "passist-mcp.js",
+          "package.json"
+        ]
+      },
+      {
+        "from": "../tools/passist-mcp/node_modules",
+        "to": "passist-mcp/node_modules"
       }
     ],
     "win": {

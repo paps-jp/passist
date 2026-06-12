@@ -54,6 +54,7 @@ ipcMain.handle('mcpAdmin:enableClient', (_e, id) => {
     appPath: app.getAppPath(),
     isPackaged: app.isPackaged,
     resourcesPath: process.resourcesPath,
+    execPath: process.execPath,
   });
   return mcpReg.enableClient(id, passistEntry);
 });
@@ -725,6 +726,7 @@ if (!app.requestSingleInstanceLock()) {
         appPath: app.getAppPath(),
         isPackaged: app.isPackaged,
         resourcesPath: process.resourcesPath,
+        execPath: process.execPath,
       });
       const regResults = mcpReg.autoEnableAll(passistEntry);
       for (const r of regResults) {

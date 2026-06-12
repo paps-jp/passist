@@ -109,20 +109,27 @@ function effectivePath(client) {
 }
 
 // === passist エントリの生成 ===
-// dev mode (npm start): node + 絶対パスのスクリプト
-// production (PAssist.exe): bundle した passist-mcp.exe を指す (Phase 3)
-// 今は appPath から ../tools/passist-mcp/passist-mcp.js を解決して dev/prod 共用
-function buildPassistEntry({ appPath, isPackaged, resourcesPath }) {
-  let scriptPath;
+// dev mode (`npm start`): ユーザ環境の node + リポジトリ内の script を使う
+// production (PAssist.exe portable): PAssist.exe 自身を Node ランタイムとして再利用する。
+//   - ELECTRON_RUN_AS_NODE=1 を付けて Electron バイナリを呼ぶと GUI を開かず Node プロセスになる
+//   - 利点: ユーザに Node.js のインストールを要求しない、 passist-mcp.exe (Phase 3) を待たなくてよい
+//   - 同梱物: host/package.json の extraResources で tools/passist-mcp と
+//     その node_modules を resources/passist-mcp/ に展開する
+function buildPassistEntry({ appPath, isPackaged, resourcesPath, execPath }) {
   if (isPackaged) {
-    // 配布物: resources/tools/passist-mcp/passist-mcp.js
-    // (build.extraResources で同梱予定。 Phase 3 で .exe 化する)
-    scriptPath = path.join(resourcesPath, 'tools', 'passist-mcp', 'passist-mcp.js');
-  } else {
-    // 開発時: <project>/tools/passist-mcp/passist-mcp.js
-    // appPath = <project>/host なので一つ上に上がる
-    scriptPath = path.join(appPath, '..', 'tools', 'passist-mcp', 'passist-mcp.js');
+    const scriptPath = path.join(resourcesPath, 'passist-mcp', 'passist-mcp.js');
+    return {
+      command: execPath,
+      args: [scriptPath],
+      env: {
+        ELECTRON_RUN_AS_NODE: '1',
+        PASSIST_API_URL: 'http://127.0.0.1:8444',
+      },
+    };
   }
+  // 開発時: <project>/tools/passist-mcp/passist-mcp.js
+  // appPath = <project>/host なので一つ上に上がる
+  const scriptPath = path.join(appPath, '..', 'tools', 'passist-mcp', 'passist-mcp.js');
   return {
     command: 'node',
     args: [scriptPath],
