@@ -642,8 +642,11 @@
   function sendCurrentSize() {
     if (!syncSizeOn) return;
     const r = stage.getBoundingClientRect();
-    const w = Math.round(r.width * (window.devicePixelRatio || 1));
-    const h = Math.round(r.height * (window.devicePixelRatio || 1));
+    // CSSピクセルのまま送る（DPRを掛けない）。 ホストの DPI awareness とビューア側の
+    // devicePixelRatio が違うと、 縦サイズが画面解像度を超えて切り詰められ「縦だけ
+    // 合わない」現象になる。 多くのケースで CSS px ≒ ホスト Win32 のスクリーン px。
+    const w = Math.round(r.width);
+    const h = Math.round(r.height);
     if (w > 0 && h > 0) send({ t: 'resize', w, h });
   }
   function onResize() {

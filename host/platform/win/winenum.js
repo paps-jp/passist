@@ -45,6 +45,8 @@ try {
   const MoveWindow = user32.func('bool __stdcall MoveWindow(intptr_t hwnd, int x, int y, int nWidth, int nHeight, bool bRepaint)');
   // 現サイズ取得用（intptr_t 版、ログ・差分判定のため）
   const GetWindowRectV = user32.func('bool __stdcall GetWindowRect(intptr_t hwnd, _Out_ RECT *rect)');
+  // 画面サイズ取得（プライマリディスプレイ）。 SM_CXSCREEN=0, SM_CYSCREEN=1
+  const GetSystemMetrics = user32.func('int __stdcall GetSystemMetrics(int idx)');
 
   // Unicode テキスト入力（SendInput + KEYEVENTF_UNICODE）。キーボードレイアウト非依存で日本語等を正しく入力。
   const MOUSEINPUT = koffi.struct('MOUSEINPUT', { dx: 'int32', dy: 'int32', mouseData: 'uint32', dwFlags: 'uint32', time: 'uint32', dwExtraInfo: 'uintptr_t' });
@@ -141,9 +143,16 @@ try {
       hwnd = Number(hwnd);
       if (!hwnd) return false;
       if (!IsWindowValid(hwnd)) return false; // 既に閉じている
-      width  = Math.max(120, Math.min(8192, Math.round(Number(width)  || 0)));
-      height = Math.max(80,  Math.min(8192, Math.round(Number(height) || 0)));
+      width  = Math.max(120, Math.round(Number(width)  || 0));
+      height = Math.max(80,  Math.round(Number(height) || 0));
       if (!width || !height) return false;
+
+      // 画面サイズ（プライマリ）で上限 clamp。 ウィンドウフレーム/タスクバー分の余裕を残すため
+      // 横は -16px、 縦は -48px ほど引く（タスクバー約40px想定）。
+      let screenW = 1920, screenH = 1080;
+      try { const sw = GetSystemMetrics(0), sh = GetSystemMetrics(1); if (sw > 0) screenW = sw; if (sh > 0) screenH = sh; } catch {}
+      width  = Math.min(width,  Math.max(120, screenW - 16));
+      height = Math.min(height, Math.max(80,  screenH - 48));
 
       // 前のサイズ・位置（MoveWindow に渡す x,y を保持するため）
       let prevX = 0, prevY = 0, prevW = 0, prevH = 0;
@@ -152,17 +161,22 @@ try {
         if (GetWindowRectV(hwnd, r)) { prevX = r.left; prevY = r.top; prevW = r.right - r.left; prevH = r.bottom - r.top; }
       } catch {}
 
-      // SWP_NOMOVE(0x2)|SWP_NOZORDER(0x4)|SWP_NOACTIVATE(0x10)|SWP_FRAMECHANGED(0x20) = 0x36
-      const okSwp = !!SetWindowPos(hwnd, 0, 0, 0, width, height, 0x36);
+      // 新サイズで画面外にはみ出すなら、 はみ出さない位置に補正（ウィンドウ右端/下端が画面内に収まるよう）
+      let newX = prevX, newY = prevY;
+      if (newX + width  > screenW) newX = Math.max(0, screenW - width);
+      if (newY + height > screenH) newY = Math.max(0, screenH - height);
+
+      // SWP_NOZORDER(0x4)|SWP_NOACTIVATE(0x10)|SWP_FRAMECHANGED(0x20) = 0x34（位置補正もする＝SWP_NOMOVE は外す）
+      const okSwp = !!SetWindowPos(hwnd, 0, newX, newY, width, height, 0x34);
       // MoveWindow(再描画あり)。 conhost には特にこれが効く。
-      const okMv = !!MoveWindow(hwnd, prevX || 0, prevY || 0, width, height, true);
+      const okMv = !!MoveWindow(hwnd, newX, newY, width, height, true);
 
       let afterW = 0, afterH = 0;
       try {
         const r = {};
         if (GetWindowRectV(hwnd, r)) { afterW = r.right - r.left; afterH = r.bottom - r.top; }
       } catch {}
-      console.log(`[host] setWindowSize hwnd=${hwnd} want=${width}x${height} before=${prevW}x${prevH} after=${afterW}x${afterH} swp=${okSwp} mv=${okMv}`);
+      console.log(`[host] setWindowSize hwnd=${hwnd} screen=${screenW}x${screenH} want=${width}x${height} at=(${newX},${newY}) before=${prevW}x${prevH}@(${prevX},${prevY}) after=${afterW}x${afterH} swp=${okSwp} mv=${okMv}`);
       return okSwp || okMv;
     } catch (e) {
       console.warn('[host] setWindowSize threw:', e && e.message);
