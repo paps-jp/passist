@@ -11,6 +11,7 @@
 let enumerate = () => [];
 let bringToFront = () => false; // 対象ウィンドウを最前面へ（koffi 失敗時は no-op）
 let typeUnicode = () => false; // Unicode文字列を直接入力（koffi 失敗時は no-op）
+let setWindowSize = () => false; // 対象ウィンドウのサイズ変更（koffi 失敗時は no-op）
 
 try {
   const koffi = require('koffi');
@@ -128,57 +129,48 @@ try {
       return false;
     }
   };
+
+  // 対象ウィンドウのサイズを指定（位置は維持・最前面化しない・アクティブ化しない）。
+  // viewer から「自分の表示エリアの幅×高さ」を受け取ってホスト窓を合わせるのに使う(S-2)。
+  // conhost.exe (Command Prompt) のような特殊ウィンドウは SetWindowPos だけだと描画が追従しないため、
+  // ①SWP_FRAMECHANGED でフレーム再計算 → ②MoveWindow(再描画あり) で位置も指定し直す、の二段構え。
+  // GetWindowRect で前後サイズを取得してログに出す（調査用）。
+  // ※ この関数は上の try ブロック内（SetWindowPos などが定義されているスコープ）で代入する。
+  setWindowSize = function (hwnd, width, height) {
+    try {
+      hwnd = Number(hwnd);
+      if (!hwnd) return false;
+      if (!IsWindowValid(hwnd)) return false; // 既に閉じている
+      width  = Math.max(120, Math.min(8192, Math.round(Number(width)  || 0)));
+      height = Math.max(80,  Math.min(8192, Math.round(Number(height) || 0)));
+      if (!width || !height) return false;
+
+      // 前のサイズ・位置（MoveWindow に渡す x,y を保持するため）
+      let prevX = 0, prevY = 0, prevW = 0, prevH = 0;
+      try {
+        const r = {};
+        if (GetWindowRectV(hwnd, r)) { prevX = r.left; prevY = r.top; prevW = r.right - r.left; prevH = r.bottom - r.top; }
+      } catch {}
+
+      // SWP_NOMOVE(0x2)|SWP_NOZORDER(0x4)|SWP_NOACTIVATE(0x10)|SWP_FRAMECHANGED(0x20) = 0x36
+      const okSwp = !!SetWindowPos(hwnd, 0, 0, 0, width, height, 0x36);
+      // MoveWindow(再描画あり)。 conhost には特にこれが効く。
+      const okMv = !!MoveWindow(hwnd, prevX || 0, prevY || 0, width, height, true);
+
+      let afterW = 0, afterH = 0;
+      try {
+        const r = {};
+        if (GetWindowRectV(hwnd, r)) { afterW = r.right - r.left; afterH = r.bottom - r.top; }
+      } catch {}
+      console.log(`[host] setWindowSize hwnd=${hwnd} want=${width}x${height} before=${prevW}x${prevH} after=${afterW}x${afterH} swp=${okSwp} mv=${okMv}`);
+      return okSwp || okMv;
+    } catch (e) {
+      console.warn('[host] setWindowSize threw:', e && e.message);
+      return false;
+    }
+  };
 } catch (e) {
   console.warn('[host] winenum 無効（koffi ロード失敗 → owned 窓掲載/前面化なし）:', e && e.message);
 }
-
-// 対象ウィンドウのサイズを指定（位置は維持・最前面化しない・アクティブ化しない）。
-// viewer から「自分の表示エリアの幅×高さ」を受け取ってホスト窓を合わせるのに使う(S-2)。
-// conhost.exe (Command Prompt) のような特殊ウィンドウは SetWindowPos だけだと描画が追従しない
-// ことがあるため、 ①SWP_FRAMECHANGED でフレーム再計算 → ②MoveWindow(再描画あり) で位置も指定し直す、
-// の二段構えにする。 GetWindowRect で前後サイズを取得してログに出す（調査用）。
-// koffi 読み込み失敗時は no-op。
-let setWindowSize = () => false;
-try {
-  if (typeof SetWindowPos !== 'undefined' && typeof MoveWindow !== 'undefined') {
-    const RECT = koffi.struct('RECT', { left: 'long', top: 'long', right: 'long', bottom: 'long' });
-    setWindowSize = function (hwnd, width, height) {
-      try {
-        hwnd = Number(hwnd);
-        if (!hwnd) return false;
-        if (!IsWindowValid(hwnd)) return false; // 既に閉じている
-        width  = Math.max(120, Math.min(8192, Math.round(Number(width)  || 0)));
-        height = Math.max(80,  Math.min(8192, Math.round(Number(height) || 0)));
-        if (!width || !height) return false;
-
-        // 前のサイズ・位置を取得
-        const before = [0, 0, 0, 0];
-        let prevX = 0, prevY = 0, prevW = 0, prevH = 0;
-        try {
-          const r = {};
-          if (GetWindowRectV(hwnd, r)) { prevX = r.left; prevY = r.top; prevW = r.right - r.left; prevH = r.bottom - r.top; }
-        } catch {}
-
-        // SWP_NOMOVE(0x2)|SWP_NOZORDER(0x4)|SWP_NOACTIVATE(0x10)|SWP_FRAMECHANGED(0x20) = 0x36
-        const okSwp = !!SetWindowPos(hwnd, 0, 0, 0, width, height, 0x36);
-        // MoveWindow で位置を維持しつつ確実に再描画させる（conhost にはこちらが効く）。
-        const okMv = !!MoveWindow(hwnd, prevX || 0, prevY || 0, width, height, true);
-
-        // 結果を取得してログ（コンソール起動なしのリリースexeでも console.log は noop なので無害）
-        let afterW = 0, afterH = 0;
-        try {
-          const r = {};
-          if (GetWindowRectV(hwnd, r)) { afterW = r.right - r.left; afterH = r.bottom - r.top; }
-        } catch {}
-        console.log(`[host] setWindowSize hwnd=${hwnd} want=${width}x${height} before=${prevW}x${prevH} after=${afterW}x${afterH} swp=${okSwp} mv=${okMv}`);
-        // どちらか成功すれば true
-        return okSwp || okMv;
-      } catch (e) {
-        console.warn('[host] setWindowSize threw:', e && e.message);
-        return false;
-      }
-    };
-  }
-} catch {}
 
 module.exports = { enumerate, bringToFront, typeUnicode, setWindowSize };
