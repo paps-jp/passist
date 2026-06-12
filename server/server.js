@@ -609,10 +609,16 @@ function hostEnd(ws) {
     send(v, { type: 'ended', message: 'ホストがセッションを終了しました' });
     v.close();
   }
-  // 明示的終了: session を完全に削除（onClose の「引き継ぎ用に残す」とは違う）。
-  // ホスト側でも lastHostToken/Secret はクリア済み（renderer.js の end ボタン）→ 次回は新規発行になる。
-  sessions.delete(s.token);
-  console.log(`[server] session ended explicitly: ${s.token}`);
+  // 「終了」は viewer 全部切断 + 受付停止だが、 session 自体は残す（S-1.1）。
+  // ホストが「もう一度共有」で同 token+secret で host:create を送ったら張り替え経路に乗り、
+  // 同じ viewerUrl を返せる（URLが変わらない）。 onClose と同じセマンティクス。
+  // 完全削除は expiresAt の自動掃除 か ホスト WS の完全切断後の TTL に任せる。
+  s.viewers.clear();
+  s.pending.clear();
+  s.relayViewers.clear();
+  s.host = null;
+  s.status = 'idle';
+  console.log(`[server] session ended explicitly (host detached, session kept): ${s.token}`);
   audit.log({ type: 'host_end', ip: ws.auditIp, ua: ws.auditUa, token: s.token });
   broadcastBitratePolicy();
 }
