@@ -166,12 +166,7 @@
         document.querySelectorAll('#settingsModal .tab-content').forEach((c) => c.classList.toggle('hidden', c.id !== 'tab-' + tab.dataset.tab));
       };
     });
-    // 言語切替ボタン (CSP がインライン onclick を弾くので、 ここで addEventListener する)
-    document.querySelectorAll('[data-lang-btn]').forEach((b) => {
-      const cur = window.getLang ? window.getLang() : 'ja';
-      b.classList.toggle('active', b.dataset.langBtn === cur);
-      b.onclick = () => { if (window.setLang) window.setLang(b.dataset.langBtn); };
-    });
+    // 言語切替ボタンの bind は i18n.js の applyI18n が自動でやる (CSP 制約下でも動く)。
     // QRコードの開閉（既定は開）。相手はスマホのカメラで読み取って接続できる。
     $('qrToggle').onclick = () => {
       const shown = $('qrPanel').classList.toggle('hidden') === false;

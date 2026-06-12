@@ -1189,6 +1189,12 @@
         if (v && v !== k) el.setAttribute(attr, v);
       }
     }
+    // [data-lang-btn] 言語切替ボタン: 現在の言語に .active を付与し、 クリックで setLang。
+    // CSP がインライン onclick を弾く環境 (Electron) でも i18n.js のロードだけで動く。
+    for (const el of r.querySelectorAll('[data-lang-btn]')) {
+      el.classList.toggle('active', el.dataset.langBtn === lang);
+      el.onclick = (e) => { if (e && e.preventDefault) e.preventDefault(); setLang(el.dataset.langBtn); };
+    }
   }
 
   function setLang(newLang) {
