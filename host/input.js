@@ -199,6 +199,12 @@ async function handle(ev) {
         //   全部広がった状態の最小値（例 990px）で止まる。
         //   ウィンドウが縮んだ後 Chrome がツールバーを折りたためば次の最小値が下がるため、
         //   連続して呼ぶことで手動ドラッグと同じ「段階的縮小」をシミュレートする。
+        //
+        // U-6: アスペクト比補正。 Chrome が最小幅 772 で押し戻された場合、 ホスト窓は
+        //   ほぼ正方形 (772x766) になり、 viewer 縦長 (例 440x766) と比率が合わずに
+        //   fill 表示で横圧縮歪みが出る。 押し戻された width を保ったまま高さを viewer
+        //   のアスペクト比 (w/h) に合わせて伸ばす (例 772x766 → 772x1344) と、 ホスト窓
+        //   と viewer の比率が一致して fill での歪みが消える。
         const log = (m) => {
           console.log('[host] ' + m);
           try { if (platform.windows && platform.windows._logResize) platform.windows._logResize(m); } catch {}
@@ -208,12 +214,31 @@ async function handle(ev) {
         if (!(platform.windows && platform.windows.setWindowSize)) { log('resize skipped (no API)'); break; }
         const handle = targetHandle;
         const w = ev.w, h = ev.h;
+        let last = { ok: false, w: 0, h: 0 };
+        // 段階的縮小 4 回
         for (let i = 0; i < 4; i++) {
           log(`resize step ${i + 1}/4`);
-          const ok = platform.windows.setWindowSize(handle, w, h);
-          if (i === 0 && !ok) log('resize: setWindowSize returned false');
+          last = platform.windows.setWindowSize(handle, w, h);
+          if (i === 0 && (!last || !last.ok)) log('resize: setWindowSize returned false');
           if (i < 3) await new Promise((r) => setTimeout(r, 150));
         }
+        // U-6 アスペクト比補正: 押し戻された場合 (実幅 > 要求幅) は、 高さを viewer アスペクトに合わせる
+        try {
+          if (last && last.ok && last.w > 0 && last.h > 0 && w > 0 && h > 0) {
+            const targetAspect = w / h; // viewer 側のアスペクト比
+            const actualAspect = last.w / last.h;
+            // ホストが viewer よりも横長になっている (= 縦が足りない) → 縦を伸ばす
+            if (actualAspect > targetAspect + 0.02) {
+              const newH = Math.round(last.w / targetAspect);
+              if (newH > last.h + 8) {
+                log(`aspect correct: target=${targetAspect.toFixed(3)} actual=${actualAspect.toFixed(3)} → resize to ${last.w}x${newH}`);
+                await new Promise((r) => setTimeout(r, 150));
+                const corrected = platform.windows.setWindowSize(handle, last.w, newH);
+                log(`aspect correct result: ${corrected.w}x${corrected.h} ok=${corrected.ok}`);
+              }
+            }
+          }
+        } catch (e) { log('aspect correct error: ' + (e && e.message)); }
         // region キャッシュを次回 maybeRefresh で更新（古い region で座標が外れるのを防ぐ）
         region = null;
         lastRegionAt = 0;

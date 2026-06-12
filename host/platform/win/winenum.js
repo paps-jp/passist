@@ -19,7 +19,7 @@ function logResize(line) {
 let enumerate = () => [];
 let bringToFront = () => false; // 対象ウィンドウを最前面へ（koffi 失敗時は no-op）
 let typeUnicode = () => false; // Unicode文字列を直接入力（koffi 失敗時は no-op）
-let setWindowSize = () => false; // 対象ウィンドウのサイズ変更（koffi 失敗時は no-op）
+let setWindowSize = () => ({ ok: false, w: 0, h: 0 }); // 対象ウィンドウのサイズ変更（koffi 失敗時は no-op）
 
 try {
   const koffi = require('koffi');
@@ -187,10 +187,11 @@ try {
       const summary = `setWindowSize hwnd=${hwnd} screen=${screenW}x${screenH} want=${width}x${height} at=(${newX},${newY}) before=${prevW}x${prevH}@(${prevX},${prevY}) after=${afterW}x${afterH} swp=${okSwp} mv=${okMv}`;
       console.log('[host] ' + summary);
       logResize(summary); // 配布exeでもファイルから確認できるよう %TEMP%\passist-resize.log にも追記
-      return okSwp || okMv;
+      // U-6: 呼出元が「押し戻し後の実サイズ」 を見て補正できるよう、 実サイズも返す。
+      return { ok: okSwp || okMv, w: afterW, h: afterH };
     } catch (e) {
       console.warn('[host] setWindowSize threw:', e && e.message);
-      return false;
+      return { ok: false, w: 0, h: 0 };
     }
   };
 } catch (e) {
