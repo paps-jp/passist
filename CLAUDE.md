@@ -49,12 +49,29 @@ PAssist — アカウント不要で、単一ウィンドウをブラウザか�
 
 - 配布バージョンは `host/package.json` の `version` を Single Source of Truth とする。
 - Electron の `app.getVersion()` がこの値を返し、About モーダルに表示される。
+- **`host/package.json` の `version` は必ず semver にする**。 electron-builder は 4 桁版 (`0.2.7.5`) を `Invalid version` で reject する。 4 桁的な細かい刻みが必要なら **pre-release 形式** で表現する（例: `0.2.7-5`）。 タグや LP の表示は `v0.2.7.5` のままで構わない（CI / `lp.dl.latest` 側で 4 桁表記を使い、 package.json だけ semver）。
 - **リリース手順**:
-  1. `host/package.json` の `version` を上げる（例: 0.2.7.4 → 0.2.7.5）。
-  2. `host/renderer/i18n.js` の `lp.dl.latest`（ja / en）の表記も同時に更新する。
+  1. `host/package.json` の `version` を上げる（例: `0.2.7-4` → `0.2.7-5`）。
+  2. `docs/i18n.js` (および同期先) の `lp.dl.latest`（ja / en）の表記も同時に更新する。
   3. ビルドして検証 → `git tag vX.Y.Z` → `git push origin vX.Y.Z` で署名ワークフロー起動。
-  4. `gh release upload` で Windows 配布物を差し替え。
+  4. `build-host` CI が成功して `PAssist.exe` が Release に添付されることを必ず確認する。
 - リリースタグ・配布物・`package.json` の **3 つを必ず一致**させる（過去に乖離して about 画面が古い版を表示していた事例あり）。
+
+### ダウンロード URL の方針
+
+- LP / docs から exe をダウンロードさせる URL は **`https://github.com/paps-jp/passist/releases/latest/download/PAssist.exe`** に固定する。
+- これは GitHub が「最新の非 pre-release タグ」 にリダイレクトする仕組みで、 タグ追加のたびに HTML を書き換える必要がない。
+- ただし **「最新タグの Release に PAssist.exe が無い」** ケース（build-host CI 失敗、 タグ追加直後でビルドがまだ走っていない、 etc.）では、 上記 URL は 404 になる。
+
+### build-host CI が失敗したときの復旧
+
+1. **すぐに該当 Release を pre-release に降格**:
+   ```bash
+   gh release edit vX.Y.Z --prerelease
+   ```
+   こうすると GitHub の「Latest」 判定が **1 つ前の安定リリース**に戻り、 `releases/latest/download/PAssist.exe` も自動でそちらを指すようになる（公開ページの DL リンクが復活する）。
+2. CI 失敗の原因を直して再タグ（例: `host/package.json` を semver に修正 → 新タグ `vX.Y.Z+1` を push）。
+3. 新タグの `build-host` が成功し PAssist.exe が添付されたら、 `gh release edit vX.Y.Z+1 --latest` を明示しなくても自動的に「Latest」 に戻る（pre-release でなければ）。
 
 ## 依存バージョン管理
 
