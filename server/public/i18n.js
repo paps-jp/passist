@@ -9,11 +9,13 @@
 // DOMContentLoaded で自動適用。 動的追加は applyI18n(rootElement) を呼ぶ。
 (function () {
   'use strict';
+  console.log('[i18n] script loaded, document.readyState =', document.readyState);
   const navRaw = (typeof navigator !== 'undefined' && navigator.language) || 'en';
   const navLang = String(navRaw).toLowerCase().split('-')[0];
   let stored = null;
   try { stored = (typeof localStorage !== 'undefined') ? localStorage.getItem('passist-lang') : null; } catch {}
   const lang = (stored === 'ja' || stored === 'en') ? stored : (navLang === 'ja' ? 'ja' : 'en');
+  console.log('[i18n] navLang=' + navLang + ', stored=' + stored + ', chosen lang=' + lang);
 
   const M = {
     ja: {
@@ -60,7 +62,7 @@
       'lp.dl.title': 'ダウンロード',
       'lp.dl.lead': '下のボタンから最新版の実行ファイルを入手できます。',
       'lp.dl.btn': 'PAssist.exe をダウンロード',
-      'lp.dl.latest': '最新版 <b>v0.1.0</b>',
+      'lp.dl.latest': '最新版 <b>v0.2.7.4</b>',
       'lp.dl.os': '<b>Windows 10 / 11</b>（64bit）',
       'lp.dl.size': '約 <b>91 MB</b>',
       'lp.dl.portable': 'インストール不要（ポータブル）',
@@ -629,7 +631,7 @@
       'lp.dl.title': 'Download',
       'lp.dl.lead': 'Grab the latest portable executable below.',
       'lp.dl.btn': 'Download PAssist.exe',
-      'lp.dl.latest': 'Latest <b>v0.1.0</b>',
+      'lp.dl.latest': 'Latest <b>v0.2.7.4</b>',
       'lp.dl.os': '<b>Windows 10 / 11</b> (64-bit)',
       'lp.dl.size': 'Approx <b>91 MB</b>',
       'lp.dl.portable': 'Portable, no install required',
@@ -1191,15 +1193,32 @@
     }
     // [data-lang-btn] 言語切替ボタン: 現在の言語に .active を付与し、 クリックで setLang。
     // CSP がインライン onclick を弾く環境 (Electron) でも i18n.js のロードだけで動く。
-    for (const el of r.querySelectorAll('[data-lang-btn]')) {
+    const langBtns = r.querySelectorAll('[data-lang-btn]');
+    for (const el of langBtns) {
       el.classList.toggle('active', el.dataset.langBtn === lang);
-      el.onclick = (e) => { if (e && e.preventDefault) e.preventDefault(); setLang(el.dataset.langBtn); };
+      el.onclick = (e) => {
+        if (e && e.preventDefault) e.preventDefault();
+        console.log('[i18n] lang-btn clicked:', el.dataset.langBtn);
+        setLang(el.dataset.langBtn);
+      };
     }
+    console.log('[i18n] applyI18n: lang=' + lang + ', bound ' + langBtns.length + ' lang-btn elements');
   }
 
   function setLang(newLang) {
-    if (newLang !== 'ja' && newLang !== 'en') return;
-    try { if (typeof localStorage !== 'undefined') localStorage.setItem('passist-lang', newLang); } catch {}
+    console.log('[i18n] setLang called with:', newLang);
+    if (newLang !== 'ja' && newLang !== 'en') { console.warn('[i18n] invalid lang, abort'); return; }
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('passist-lang', newLang);
+        console.log('[i18n] localStorage[passist-lang] now =', localStorage.getItem('passist-lang'));
+      } else {
+        console.warn('[i18n] localStorage unavailable');
+      }
+    } catch (e) {
+      console.error('[i18n] localStorage error:', e);
+    }
+    console.log('[i18n] reloading page...');
     if (typeof location !== 'undefined' && location.reload) location.reload();
   }
 
