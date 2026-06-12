@@ -8,7 +8,8 @@
 
 | 日付 | 論点 | 決定 |
 |---|---|---|
-| 2026-06-12 | `passist-mcp install` を一般ユーザーに公開するか | **公開する**。 PAssist インストーラに「Claude 連携を有効にする」 オプションを設け、 開発者ツールだけでなく一般ユーザーも GUI でセットアップできるようにする (詳細: §7) |
+| 2026-06-12 | `passist-mcp install` を一般ユーザーに公開するか | **公開する**。 PAssist インストーラに「AI アシスタント連携を有効にする」 オプションを設け、 開発者ツールだけでなく一般ユーザーも GUI でセットアップできるようにする (詳細: §7) |
+| 2026-06-12 | 特定 AI ベンダーを UI で明示するか | **明示しない**。 表記は **「MCP 対応 AI アシスタント」**・「AI クライアント」 等の汎用語に統一する。 具体的プロダクト名 (Claude Desktop, Cursor, Cline 等) はドキュメントの「対応クライアント例」 リストにのみ出す |
 
 未決議点 (要 ぱっぷす理事会):
 
@@ -16,26 +17,46 @@
 - 監査ログ保持期間 (既定 30 日と開示請求対応の整合)
 - `set_access_mode: 'token'` への移行確認の要否
 
+## 用語
+
+| 用語 | 意味 |
+|---|---|
+| **MCP** | Model Context Protocol。 AI クライアントが外部ツールを呼ぶための標準プロトコル (2024 年に Anthropic がオープン化、 現在は OpenAI / 各エディタが採用)。 仕様: <https://modelcontextprotocol.io> |
+| **MCP サーバ** | ツールを公開する側 (PAssist 側)。 本ドキュメントの `passist-mcp` |
+| **MCP クライアント** | ツールを呼ぶ側 (AI アシスタント本体)。 ベンダー非依存 |
+
+### 確認済み対応クライアント (2026-06 時点)
+
+- Claude Desktop (Anthropic)
+- Claude Code (Anthropic CLI)
+- Cursor (エディタ)
+- Cline (VS Code 拡張)
+- Continue (VS Code / JetBrains 拡張)
+- Zed (エディタ)
+- OpenAI Agents SDK (Python)
+- 他、 仕様準拠の任意のクライアント
+
 ## 0. ねらい
 
 PAssist を **AI エージェントから自然言語で操作可能**にする。 例:
 
 > ユーザー: 「VS Code の画面を山田さんに共有して。 1 時間だけ。」
 >
-> Claude Desktop が PAssist の MCP ツールを順に呼び:
+> AI アシスタント (MCP クライアント) が PAssist の MCP ツールを順に呼び:
 >
 > 1. `list_windows()` → "VS Code - main.js" を発見
 > 2. `start_share({ titleMatch: "VS Code", ttlMinutes: 60 })` → 共有URL+QR を取得
 > 3. ユーザーに「共有URL を生成しました。 こちらをコピーして山田さんに送ってください: …」 と提示
 
-Claude 以外の MCP クライアント (Cursor, Cline, 他) からも同様に動く。
+MCP は仕様公開された標準プロトコルなので、 **特定のベンダー・特定の AI に依存しない**。 Claude Desktop / Claude Code / Cursor / Cline / OpenAI Agents SDK など、 MCP 対応の任意のクライアントから同じツール群を呼べる。
 
 ## 1. 全体構成
 
 ```
                   ┌─────────────────────────────┐
-                  │  Claude Desktop / Code       │
-                  │  (or 他の MCP クライアント)    │
+                  │  MCP クライアント             │
+                  │  (Claude Desktop / Cursor /   │
+                  │   Cline / OpenAI Agents 等)   │
                   └──────────────┬──────────────┘
                                  │ MCP (stdio: stdin/stdout)
                                  ▼
@@ -84,14 +105,14 @@ Claude 以外の MCP クライアント (Cursor, Cline, 他) からも同様に�
 - パッケージ名: `@paps-jp/passist-mcp`
 - 配布: npm (`npm i -g @paps-jp/passist-mcp`) + PAssist インストーラ同梱
 - 実装: `@modelcontextprotocol/sdk` の Node 版
-- 通信: MCP は **stdio** で Claude Desktop と、 **HTTP** で PAssist 本体と
+- 通信: MCP は **stdio** で MCP クライアントと、 **HTTP** で PAssist 本体と
 
 責務:
 - MCP プロトコルの実装 (tools, resources, prompts)
 - ツール呼び出しを Local HTTP API へ翻訳
 - token をファイルから読み、 ヘッダ付与
 - PAssist 不在時の明示エラー
-- `passist-mcp install` で Claude Desktop 設定ファイルへ自動追加
+- `passist-mcp install` で MCP クライアントの設定ファイルへ自動追加
 
 ### 2.3 トークン管理
 
@@ -291,7 +312,7 @@ Tray 通知の内容例: 「Claude が "山田さん" の接続承認をリク�
 
 ## 4. MCP ツール表面
 
-`passist-mcp` が Claude Desktop 等に公開するもの。 命名は **MCP の慣例 (snake_case)** に従う。
+`passist-mcp` が MCP クライアントに公開するもの。 命名は **MCP の慣例 (snake_case)** に従う。
 
 ### 4.1 Tools
 
@@ -338,7 +359,7 @@ Resources は Claude が**ツール呼び出しなしで参照できる**ので�
 | `end-now` | 即座に共有を終了 |
 | `who-is-watching` | 現在の接続状況を要約 |
 
-これらは Claude Desktop の `/` メニューに出る。
+これらは MCP クライアントのプロンプト一覧 (Claude Desktop なら `/` メニュー) に出る。
 
 ## 5. セキュリティ
 
@@ -383,7 +404,7 @@ Resources は Claude が**ツール呼び出しなしで参照できる**ので�
 
 `passist-mcp` は HTTP 接続失敗時、 ユーザーに次のメッセージを返す:
 
-> PAssist が起動していません。 スタートメニューから PAssist を起動してから、 もう一度同じ依頼をしてください。 (自動起動を有効にするには PAssist の設定 → 「Claude 連携を有効にする」 を ON)
+> PAssist が起動していません。 スタートメニューから PAssist を起動してから、 もう一度同じ依頼をしてください。 (自動起動を有効にするには PAssist の設定 → 「AI アシスタント連携」 タブ → 「自動起動」 を ON)
 
 将来オプション (`passist-mcp` の設定): `autoStart=true` で `PAssist.exe` をバックグラウンド起動。 既定 false。
 
@@ -406,7 +427,9 @@ PAssist Tray アイコンに以下を表示:
 
 ## 7. インストール
 
-`passist-mcp` は **一般ユーザーに公開する** (決定事項: 2026-06-12)。 npm に技術的な知識がないユーザーでも、 PAssist の GUI 操作だけで Claude 連携を有効化できる。
+`passist-mcp` は **一般ユーザーに公開する** (決定事項: 2026-06-12)。 npm に技術的な知識がないユーザーでも、 PAssist の GUI 操作だけで AI 連携を有効化できる。
+
+UI 上は特定 AI ベンダーを明示しない (決定事項: 2026-06-12)。 「**MCP 対応の AI アシスタント**」 などの汎用語で表現し、 PAssist が対応 MCP クライアントを自動検出して当該の設定ファイルを編集する形にする。
 
 ### 7.1 一般ユーザー向け (推奨パス)
 
@@ -415,53 +438,84 @@ PAssist Tray アイコンに以下を表示:
 PAssist のインストーラ (`PAssist.exe` の portable も同様) は、 起動時の「初期設定」 ステップで:
 
 ```
-☐ Claude Desktop / Claude Code と連携する (オプション)
-   PAssist を Claude から自然言語で操作できるようにします。
-   例: 「VS Code の画面を相手に共有して」 → URL が自動発行されます。
+☐ MCP 対応の AI アシスタントと連携する (オプション)
+
+  PAssist を AI アシスタント (Claude, Cursor, Cline, ChatGPT/OpenAI
+  Agents 等) から自然言語で操作できるようにします。 例: 「VS Code の
+  画面を相手に共有して」 → URL が自動発行されます。
+
+  [これは何？]  [対応クライアント一覧]
 ```
 
 チェックを入れると:
 1. `%LOCALAPPDATA%\PAssist\mcp\passist-mcp.exe` を展開 (Node Single Executable Application で同梱)
-2. Claude Desktop の `claude_desktop_config.json` を自動編集 (既存設定はマージ、 衝突したら確認ダイアログ)
-3. Claude Code の `~/.claude/mcp-servers.json` も自動編集
-4. 「Claude Desktop を再起動してください」 案内を表示
+2. インストール済みの MCP クライアントを **自動検出** (Claude Desktop / Claude Code / Cursor / Cline 等の既知の設定ファイル位置を走査)
+3. 検出したクライアントごとに設定ファイル (例: `claude_desktop_config.json`, `~/.claude/mcp-servers.json`, Cursor の `mcp.json` 等) を自動編集 (既存設定はマージ、 衝突したら確認ダイアログ)
+4. 「検出した AI クライアントを再起動してください」 案内 + 検出結果リストを表示
 
 #### B. PAssist 設定モーダルからあとで有効化
 
-⚙ 設定 → 「Claude 連携」 タブ:
+⚙ 設定 → 「**AI アシスタント連携**」 タブ:
 
 ```
-[Claude Desktop と連携する]   現在: 無効
-[Claude Code と連携する]      現在: 無効
-[手動で設定ファイルを開く]
-[連携を解除する]
+MCP 対応 AI クライアントの検出結果:
+  ✅ Claude Desktop (有効)
+  ✅ Claude Code (有効)
+  ⬜ Cursor (検出: 設定が未挿入)
+  ⬜ Cline (検出: 設定が未挿入)
+  — Continue (未インストール)
+
+[すべての検出クライアントに有効化]  [選択して有効化]
+[手動で設定ファイルを開く]           [連携を解除する]
+
+連携有効時に PAssist がサポートする機能:
+ ・ MCP プロトコル (Anthropic 公開仕様)
+ ・ stdio 経由・ローカルホストのみ
+ ・ 操作履歴は設定 → 監査ログで確認可能
 ```
 
-ボタン押下で同じ自動編集が走る。 ステータス表示で「設定済み」「Claude Desktop が見つからない」「設定ファイルがロックされています」 等を明示。
+ボタン押下で同じ自動編集が走る。 ステータス表示で「設定済み」「クライアントが見つからない」「設定ファイルがロックされています」 等を明示。
 
 #### C. 設定の検証
 
-PAssist 設定 → 「Claude 連携」 タブの「動作テスト」 ボタンで:
+PAssist 設定 → 「AI アシスタント連携」 タブの「動作テスト」 ボタンで:
 - `passist-mcp.exe` を試験起動して MCP の `initialize` レスポンスを確認
 - token の読み出しが成功するか確認
 - 結果を ✅/❌ で表示
 
-### 7.2 開発者向け (手動)
+### 7.2 対応 MCP クライアントの自動検出ロジック
+
+PAssist が認識する設定ファイル位置 (Windows):
+
+| クライアント | 設定ファイル | キー |
+|---|---|---|
+| Claude Desktop | `%APPDATA%\Claude\claude_desktop_config.json` | `mcpServers` |
+| Claude Code | `%USERPROFILE%\.claude.json` (or `~/.claude/settings.json`) | `mcpServers` |
+| Cursor | `%USERPROFILE%\.cursor\mcp.json` | `mcpServers` |
+| Cline (VS Code) | VS Code 設定経由 (拡張機能管理画面に誘導) | — |
+| Continue | `%USERPROFILE%\.continue\config.json` | `mcpServers` |
+| 他 | `passist-mcp install --target <name>` で個別指定可能 | — |
+
+`passist-mcp install` は **存在する設定ファイルのみ編集**し、 存在しないクライアントは無視 (ユーザーが対応クライアントを追加インストール後、 再度実行すれば自動取り込み)。
+
+### 7.3 開発者向け (手動)
 
 npm パッケージとしても並行配布する (CI / コントリビューター用):
 
 ```bash
 npm i -g @paps-jp/passist-mcp
-passist-mcp install   # claude_desktop_config.json に追加
-passist-mcp install --target claude-code   # ~/.claude/mcp-servers.json に追加
-passist-mcp uninstall # 解除
+passist-mcp install                            # 検出した全クライアントに追加
+passist-mcp install --target claude-desktop    # 個別指定
+passist-mcp install --target cursor
+passist-mcp uninstall                          # 全削除
+passist-mcp list                               # 検出状況だけ表示
 ```
 
-`passist-mcp install` は dry-run (`--dry-run`) と編集前バックアップ (`<config>.bak.YYYYMMDDhhmmss`) を持つ。
+`install` は `--dry-run` と編集前バックアップ (`<config>.bak.YYYYMMDDhhmmss`) を持つ。
 
-### 7.3 Claude Desktop 設定例
+### 7.4 MCP クライアント設定例
 
-自動編集で挿入される項目 (既存設定があれば `mcpServers` キーにマージ):
+自動編集で挿入される項目 (どのクライアントでも `mcpServers` キーにマージ):
 
 ```json
 {
@@ -478,23 +532,24 @@ passist-mcp uninstall # 解除
 }
 ```
 
-### 7.4 アンインストール
+### 7.5 アンインストール
 
 PAssist 本体のアンインストール時:
-- `claude_desktop_config.json` の `passist` エントリを削除
+- 検出済みの全 MCP クライアント設定から `passist` エントリを削除
 - `%LOCALAPPDATA%\PAssist\mcp\` を削除
-- 設定ファイル自体は残す (他の MCP サーバ設定を消さないため)
+- 各設定ファイル自体は残す (他の MCP サーバ設定を消さないため)
 
 PAssist は残したまま連携だけ解除する場合:
 - 設定モーダル → 「連携を解除する」 → 上記と同じ削除を実行
 
-### 7.5 一般公開にあたっての UX 配慮
+### 7.6 一般公開にあたっての UX 配慮
 
 - インストーラ上のチェックは **既定 OFF**。 ユーザーが意識して選ぶ
 - 「これは何？」 をクリックすると説明モーダル (リスク・有効化される機能・解除方法) が出る
+- ベンダー名 (Claude / OpenAI 等) は LP / 設定画面では明示せず、 「対応クライアント一覧」 ボタンの先でのみ表示
 - 連携有効時の最初の MCP 呼び出しは必ずトレイ通知で確認 (§5.3 既定方針と同じ)
-- 設定モーダル「Claude 連携」 タブには常に「最近 7 日の AI 操作履歴」 を可視化 (§5.4 監査ログ参照)
-- LP の DL ページに「Claude 連携機能つき」 と銘打つ。 紹介リンクは [`docs/mcp.html`](mcp.html) (一般ユーザー向け解説、 後日作成)
+- 設定モーダル「AI アシスタント連携」 タブには常に「最近 7 日の AI 操作履歴」 を可視化 (§5.4 監査ログ参照)
+- LP の DL ページに「AI アシスタント連携対応」 と銘打つ。 紹介リンクは [`docs/mcp.html`](mcp.html) (一般ユーザー向け解説、 後日作成)
 
 ## 8. エラー応答仕様
 
@@ -538,7 +593,15 @@ PAssist は残したまま連携だけ解除する場合:
 - Loopback bind 強制 (`0.0.0.0` で listen していないこと)
 - 承認系操作で UI confirmation が走ること
 
-### 9.3 E2E (実 Claude Desktop で手動)
+### 9.3 E2E (実 MCP クライアントで手動)
+
+主要クライアントの通し動作確認マトリクス:
+
+- Claude Desktop (Anthropic)
+- Cursor
+- Cline (VS Code)
+
+各クライアントで:
 - `list_windows` → `start_share` → ビューア接続 → `end_share` の通し検証
 - 異常系: PAssist 落としてから MCP 呼び出し
 - Privacy: viewer.ip がデフォルトで漏れないこと
@@ -557,12 +620,13 @@ PAssist は残したまま連携だけ解除する場合:
 - 監査ログ + UI 表示
 
 ### Phase 3 — 一般公開 (1〜2 週)
-- PAssist インストーラ / 初期設定に「Claude 連携を有効にする」 チェックボックスを追加 (§7.1.A)
-- 設定モーダル「Claude 連携」 タブを新設 (§7.1.B): 状態表示・有効化/解除・動作テスト・最近 7 日の操作履歴
+- PAssist インストーラ / 初期設定に「MCP 対応の AI アシスタントと連携する」 チェックボックスを追加 (§7.1.A)
+- 設定モーダル「AI アシスタント連携」 タブを新設 (§7.1.B): 検出済みクライアント一覧・有効化/解除・動作テスト・最近 7 日の操作履歴
+- 対応 MCP クライアントの自動検出ロジック (§7.2): Claude Desktop / Claude Code / Cursor / Cline / Continue の既知の設定ファイル位置を走査
 - Node Single Executable Application で `passist-mcp.exe` を作成、 `%LOCALAPPDATA%\PAssist\mcp\` に同梱
-- `claude_desktop_config.json` と `~/.claude/mcp-servers.json` の自動編集ロジック (既存設定の保持・バックアップ・衝突確認)
-- npm パッケージ `@paps-jp/passist-mcp` を並行公開 (CI / 開発者用)
-- LP に「Claude 連携機能」 セクション、 ja / en 両対応 (i18n.js に `lp.mcp.*` キーを追加)
+- 各クライアント設定ファイルの自動編集ロジック (既存設定の保持・バックアップ・衝突確認)
+- npm パッケージ `@paps-jp/passist-mcp` を並行公開 (CI / 開発者用、 `passist-mcp install --target <name>` で個別指定可)
+- LP に「AI アシスタント連携対応」 セクション (ベンダー名は明示しない方針)、 ja / en 両対応 (i18n.js に `lp.mcp.*` キーを追加)
 - 一般ユーザー向け解説ページ `docs/mcp.html` (`docs/mcp.md` を簡易化・i18n 対応)
 
 ### Phase 4 — 拡張 (将来)
@@ -572,7 +636,7 @@ PAssist は残したまま連携だけ解除する場合:
 
 ## 11. 範囲外 (本ドキュメントでは扱わない)
 
-- AI による画面内容の理解・判断 (別ドキュメント候補: 「Claude 連携 Phase 2: 画面理解」)
+- AI による画面内容の理解・判断 (別ドキュメント候補: 「AI 連携 拡張案: 画面理解」)
 - 音声・字幕の通訳機能
 - ビューア側の AI 連携 (今は host 側のみ)
 - 自動共有判断 (AI が勝手に画面を見て選ぶ)
@@ -581,7 +645,11 @@ PAssist は残したまま連携だけ解除する場合:
 
 - Model Context Protocol 仕様: <https://modelcontextprotocol.io>
 - `@modelcontextprotocol/sdk` (Node): <https://github.com/modelcontextprotocol/typescript-sdk>
-- Claude Desktop 設定ファイル仕様: <https://docs.claude.com/en/docs/claude-code/mcp>
+- MCP クライアント別 設定ファイル仕様:
+  - Claude Desktop: <https://docs.claude.com/en/docs/claude-code/mcp>
+  - Cursor: <https://docs.cursor.com/context/model-context-protocol>
+  - Cline: <https://docs.cline.bot/mcp/configuring-mcp-servers>
+  - OpenAI Agents SDK: <https://openai.github.io/openai-agents-python/mcp/>
 - 既存 PAssist 構成: [`docs/docs.html`](docs.html), [`docs/verification.html`](verification.html)
 
 ## 13. 次のアクション
