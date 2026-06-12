@@ -91,8 +91,8 @@
             <div class="set-row">
               <span class="set-label">Language</span>
               <div class="set-field">
-                <button class="lang-btn" data-lang-btn="ja" onclick="setLang('ja')">日本語</button>
-                <button class="lang-btn" data-lang-btn="en" onclick="setLang('en')">English</button>
+                <button class="lang-btn" data-lang-btn="ja">日本語</button>
+                <button class="lang-btn" data-lang-btn="en">English</button>
               </div>
             </div>
           </div>
@@ -187,15 +187,5 @@
 
     <script src="i18n.js"></script>
     <script src="renderer.js"></script>
-    <script>
-      // 現在の言語ボタンに .active を付与
-      (function () {
-        if (!window.getLang) return;
-        const cur = window.getLang();
-        document.querySelectorAll('[data-lang-btn]').forEach(function (b) {
-          b.classList.toggle('active', b.dataset.langBtn === cur);
-        });
-      })();
-    </script>
   </body>
 </html>
