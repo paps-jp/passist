@@ -647,16 +647,24 @@
     // 合わない」現象になる。 多くのケースで CSS px ≒ ホスト Win32 のスクリーン px。
     const w = Math.round(r.width);
     const h = Math.round(r.height);
-    if (w > 0 && h > 0) {
-      send({ t: 'resize', w, h });
-      // 何が送られたか viewer 側でも見えるよう、 ステータスに 2秒だけ表示。
-      // 動作不良の切り分け用（ログを取れない実環境向け）。
+    if (w <= 0 || h <= 0) { setStatus(`📐 サイズ取得失敗 (stage=${w}×${h})`); return; }
+    const dpr = (window.devicePixelRatio || 1).toFixed(2);
+    // 実際に送られたかを判定（send は controlEnabled false や dc 未確立で黙って捨てる）
+    let status = '';
+    if (!controlEnabled) {
+      status = `📐 送信できません（閲覧のみモード／操作権がありません）`;
+    } else if (!dc || dc.readyState !== 'open') {
+      status = `📐 送信できません（接続未確立 dc=${dc ? dc.readyState : 'null'}）`;
+    } else {
       try {
-        const dpr = (window.devicePixelRatio || 1).toFixed(2);
-        setStatus(`📐 送信 ${w}×${h} (CSS px, DPR ${dpr})`);
-        setTimeout(() => { if (syncSizeOn) setStatus('', false); }, 2000);
-      } catch {}
+        dc.send(JSON.stringify({ t: 'resize', w, h }));
+        status = `📐 送信 ${w}×${h} (DPR ${dpr})`;
+      } catch (e) {
+        status = `📐 送信失敗: ${e.message}`;
+      }
     }
+    setStatus(status);
+    setTimeout(() => { if (syncSizeOn) setStatus('', false); }, 3000);
   }
   function onResize() {
     if (!syncSizeOn) return;
@@ -692,6 +700,8 @@
   function applyMode(m) {
     controlEnabled = !(m && m.readonly);
     const badge = document.getElementById('badge');
+    // 📐 同期は操作権が必要（ホスト窓を実際に操作するため）。 閲覧のみ では明示的に disable+grayout
+    if (syncSizeBtn) syncSizeBtn.disabled = !controlEnabled;
     if (controlEnabled) {
       if (badge) { badge.textContent = tr('viewer.badge.active'); badge.classList.remove('readonly'); }
       document.body.classList.remove('view-only');
@@ -704,6 +714,13 @@
       hideCtxMenu();
       if (keybar) keybar.classList.add('hidden'); // 閲覧のみ：キーバーも隠す
       clearSticky();
+      // 同期 ON 状態だった場合は自動でOFFにし、 ユーザーに伝える
+      if (syncSizeOn) {
+        syncSizeOn = false;
+        if (syncSizeBtn) syncSizeBtn.classList.remove('active');
+        setStatus('📐 同期は操作権が必要です（閲覧のみモードでは使えません）');
+        setTimeout(() => setStatus('', false), 3000);
+      }
     }
   }
 
