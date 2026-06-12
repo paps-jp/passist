@@ -18,6 +18,44 @@ PAssist — アカウント不要で、単一ウィンドウをブラウザか�
   - author / committer も実ユーザーのみとし、Claude を contributor として記載しない。
 - コミットメッセージは作業内容のみを簡潔に記述する。
 
+## i18n（多言語化）
+
+ユーザー向け表示文言は `ja` / `en` の 2 言語で提供する。複数セッションで並行作業しても整合性が崩れないよう、運用ルールを明文化しておく。
+
+### 辞書ファイル
+
+| ファイル | 対象 |
+|---|---|
+| `host/renderer/i18n.js` | ホスト Electron アプリの全画面（about, picker, session, settings 等） |
+| `server/public/i18n.js`（または同等） | viewer（ブラウザ側） |
+| `docs/i18n.js` | GitHub Pages（LP, stats, docs, verification, privacy） |
+
+各辞書は **`ja: { ... }` と `en: { ... }` を両方持つ**構造。
+
+### 文言追加・変更のルール
+
+1. **新規キー追加時は ja / en 両方に同時追加する**。片方だけだとフォールバックでキーがそのまま表示され、不格好になる。
+2. HTML には `data-i18n="key"`（textContent 置換）、`data-i18n-html="key"`（innerHTML 置換）、`data-i18n-attr="attrName:key"`（属性置換）で参照する。動的に組み立てる文言は `tr('key', { var: value })` を使い、テンプレ `{var}` を変数で置換する。
+3. **CSP の制約**でインライン `onclick` は使えない。`addEventListener` で接続すること（言語切替ボタン等）。
+4. **動的文言（`tr()` 呼び出し）を追加した時は、必ず ja / en 両方の辞書にキーを追加した上でコミットする**。CI で構文チェックは通っても i18n キー不足は実行時にしか分からない。
+
+### 翻訳の方針
+
+- 英語は**簡潔・明瞭**に。1〜2 文で完結させる。
+- 絵文字（⚙ / ✓ / ⚠ / 📷 等）は ja / en で同じものを使う（ブランド統一）。
+- パスやコード（`turn:turn.example.com:3478` 等）は両言語で同じ。
+
+## バージョンと配布
+
+- 配布バージョンは `host/package.json` の `version` を Single Source of Truth とする。
+- Electron の `app.getVersion()` がこの値を返し、About モーダルに表示される。
+- **リリース手順**:
+  1. `host/package.json` の `version` を上げる（例: 0.2.7.4 → 0.2.7.5）。
+  2. `host/renderer/i18n.js` の `lp.dl.latest`（ja / en）の表記も同時に更新する。
+  3. ビルドして検証 → `git tag vX.Y.Z` → `git push origin vX.Y.Z` で署名ワークフロー起動。
+  4. `gh release upload` で Windows 配布物を差し替え。
+- リリースタグ・配布物・`package.json` の **3 つを必ず一致**させる（過去に乖離して about 画面が古い版を表示していた事例あり）。
+
 ## 依存バージョン管理
 
 - **lock ファイル必須**: `server/package-lock.json` と `host/package-lock.json` を必ずコミット。
