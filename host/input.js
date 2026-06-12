@@ -192,6 +192,13 @@ async function handle(ev) {
         // viewer が「自分の表示エリア（CSSピクセル）」を送ってきた → 共有ウィンドウをそのサイズに合わせる。
         // 操作座標と画面ピクセルが 1:1 に近づき、レターボックスが消える。
         // 上限/下限は platform.windows.setWindowSize 内で clamp する。
+        //
+        // U-3: 段階的縮小（150ms 間隔で 4 回呼ぶ）。
+        //   Chrome は WM_GETMINMAXINFO で「現在のレイアウトでの最小幅」を返すので、
+        //   一発の SetWindowPos では「タブ/アドレスバー/ブックマーク/拡張機能アイコン」が
+        //   全部広がった状態の最小値（例 990px）で止まる。
+        //   ウィンドウが縮んだ後 Chrome がツールバーを折りたためば次の最小値が下がるため、
+        //   連続して呼ぶことで手動ドラッグと同じ「段階的縮小」をシミュレートする。
         const log = (m) => {
           console.log('[host] ' + m);
           try { if (platform.windows && platform.windows._logResize) platform.windows._logResize(m); } catch {}
@@ -199,8 +206,14 @@ async function handle(ev) {
         log(`resize event: target=${targetHandle} request=${ev.w}x${ev.h}`);
         if (targetHandle == null) { log('resize skipped (no target)'); break; }
         if (!(platform.windows && platform.windows.setWindowSize)) { log('resize skipped (no API)'); break; }
-        const ok = platform.windows.setWindowSize(targetHandle, ev.w, ev.h);
-        if (!ok) log('resize: setWindowSize returned false');
+        const handle = targetHandle;
+        const w = ev.w, h = ev.h;
+        for (let i = 0; i < 4; i++) {
+          log(`resize step ${i + 1}/4`);
+          const ok = platform.windows.setWindowSize(handle, w, h);
+          if (i === 0 && !ok) log('resize: setWindowSize returned false');
+          if (i < 3) await new Promise((r) => setTimeout(r, 150));
+        }
         // region キャッシュを次回 maybeRefresh で更新（古い region で座標が外れるのを防ぐ）
         region = null;
         lastRegionAt = 0;
