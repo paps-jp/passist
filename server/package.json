@@ -1,6 +1,6 @@
 {
   "name": "passist-server",
-  "version": "0.2.7-4",
+  "version": "0.2.7-5",
   "private": true,
   "license": "MIT",
   "main": "server.js",
