@@ -8,6 +8,14 @@
 //
 // 失敗時の方針: koffi のロード/呼び出しに失敗しても enumerate() は [] を返す（呼び出し側は通常動作）。
 
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const RESIZE_LOG = path.join(os.tmpdir(), 'passist-resize.log');
+function logResize(line) {
+  try { fs.appendFileSync(RESIZE_LOG, new Date().toISOString() + ' ' + line + '\n'); } catch {}
+}
+
 let enumerate = () => [];
 let bringToFront = () => false; // 対象ウィンドウを最前面へ（koffi 失敗時は no-op）
 let typeUnicode = () => false; // Unicode文字列を直接入力（koffi 失敗時は no-op）
@@ -176,7 +184,9 @@ try {
         const r = {};
         if (GetWindowRectV(hwnd, r)) { afterW = r.right - r.left; afterH = r.bottom - r.top; }
       } catch {}
-      console.log(`[host] setWindowSize hwnd=${hwnd} screen=${screenW}x${screenH} want=${width}x${height} at=(${newX},${newY}) before=${prevW}x${prevH}@(${prevX},${prevY}) after=${afterW}x${afterH} swp=${okSwp} mv=${okMv}`);
+      const summary = `setWindowSize hwnd=${hwnd} screen=${screenW}x${screenH} want=${width}x${height} at=(${newX},${newY}) before=${prevW}x${prevH}@(${prevX},${prevY}) after=${afterW}x${afterH} swp=${okSwp} mv=${okMv}`;
+      console.log('[host] ' + summary);
+      logResize(summary); // 配布exeでもファイルから確認できるよう %TEMP%\passist-resize.log にも追記
       return okSwp || okMv;
     } catch (e) {
       console.warn('[host] setWindowSize threw:', e && e.message);
@@ -187,4 +197,4 @@ try {
   console.warn('[host] winenum 無効（koffi ロード失敗 → owned 窓掲載/前面化なし）:', e && e.message);
 }
 
-module.exports = { enumerate, bringToFront, typeUnicode, setWindowSize };
+module.exports = { enumerate, bringToFront, typeUnicode, setWindowSize, _logResize: logResize, _RESIZE_LOG: RESIZE_LOG };

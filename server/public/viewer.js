@@ -647,7 +647,16 @@
     // 合わない」現象になる。 多くのケースで CSS px ≒ ホスト Win32 のスクリーン px。
     const w = Math.round(r.width);
     const h = Math.round(r.height);
-    if (w > 0 && h > 0) send({ t: 'resize', w, h });
+    if (w > 0 && h > 0) {
+      send({ t: 'resize', w, h });
+      // 何が送られたか viewer 側でも見えるよう、 ステータスに 2秒だけ表示。
+      // 動作不良の切り分け用（ログを取れない実環境向け）。
+      try {
+        const dpr = (window.devicePixelRatio || 1).toFixed(2);
+        setStatus(`📐 送信 ${w}×${h} (CSS px, DPR ${dpr})`);
+        setTimeout(() => { if (syncSizeOn) setStatus('', false); }, 2000);
+      } catch {}
+    }
   }
   function onResize() {
     if (!syncSizeOn) return;
