@@ -12,6 +12,7 @@ module.exports = {
     enumerate: winenum.enumerate,
     bringToFront: winenum.bringToFront,
     typeUnicode: winenum.typeUnicode,
+    setWindowSize: winenum.setWindowSize, // viewer 画面比率にホスト窓を合わせる（S-2）
     // desktopCapturer の sourceId は Win では "window:<HWND>:0"。HWND を数値で取り出す。
     parseHandle(sourceId) {
       const m = /^window:(\d+):/.exec(String(sourceId || ''));

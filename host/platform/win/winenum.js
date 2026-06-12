@@ -38,6 +38,8 @@ try {
   const GetWTPID = user32.func('uint32 __stdcall GetWindowThreadProcessId(intptr_t hwnd, _Out_ uint32 *pid)');
   const AttachThreadInput = user32.func('bool __stdcall AttachThreadInput(uint32 idAttach, uint32 idAttachTo, bool fAttach)');
   const GetCurrentThreadId = kernel32.func('uint32 __stdcall GetCurrentThreadId()');
+  // ウィンドウのサイズ変更（位置は維持）。 SWP_NOMOVE=2 SWP_NOZORDER=4 SWP_NOACTIVATE=0x10
+  const SetWindowPos = user32.func('bool __stdcall SetWindowPos(intptr_t hwnd, intptr_t insertAfter, int x, int y, int cx, int cy, uint flags)');
 
   // Unicode テキスト入力（SendInput + KEYEVENTF_UNICODE）。キーボードレイアウト非依存で日本語等を正しく入力。
   const MOUSEINPUT = koffi.struct('MOUSEINPUT', { dx: 'int32', dy: 'int32', mouseData: 'uint32', dwFlags: 'uint32', time: 'uint32', dwExtraInfo: 'uintptr_t' });
@@ -126,4 +128,25 @@ try {
   console.warn('[host] winenum 無効（koffi ロード失敗 → owned 窓掲載/前面化なし）:', e && e.message);
 }
 
-module.exports = { enumerate, bringToFront, typeUnicode };
+// 対象ウィンドウのサイズを指定（位置は維持・最前面化しない・アクティブ化しない）。
+// viewer から「自分の表示エリアの幅×高さ」を受け取ってホスト窓を合わせるのに使う(S-2)。
+// koffi 読み込み失敗時は no-op。
+let setWindowSize = () => false;
+try {
+  if (typeof SetWindowPos !== 'undefined') {
+    setWindowSize = function (hwnd, width, height) {
+      try {
+        hwnd = Number(hwnd);
+        if (!hwnd) return false;
+        if (!IsWindowValid(hwnd)) return false; // 既に閉じている
+        width  = Math.max(120, Math.min(8192, Math.round(Number(width)  || 0)));
+        height = Math.max(80,  Math.min(8192, Math.round(Number(height) || 0)));
+        if (!width || !height) return false;
+        // SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE = 0x2 | 0x4 | 0x10 = 0x16
+        return !!SetWindowPos(hwnd, 0, 0, 0, width, height, 0x16);
+      } catch { return false; }
+    };
+  }
+} catch {}
+
+module.exports = { enumerate, bringToFront, typeUnicode, setWindowSize };

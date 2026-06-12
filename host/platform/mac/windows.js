@@ -19,4 +19,9 @@ function typeUnicode(_str) {
   return false;
 }
 
-module.exports = { enumerate, bringToFront, typeUnicode };
+// S-2: ウィンドウサイズ変更（mac 未実装、 no-op）。将来 osascript や ApplicationServices で実装する想定。
+function setWindowSize(_handle, _width, _height) {
+  return false;
+}
+
+module.exports = { enumerate, bringToFront, typeUnicode, setWindowSize };

@@ -634,6 +634,37 @@
     else stage.requestFullscreen();
   };
 
+  // 📐 サイズ同期: viewer 表示エリアの幅×高さ(CSSピクセル)をホストへ送り、 共有ウィンドウをそのサイズへ。
+  // 操作座標が画面ピクセルに 1:1 で近づき、 レターボックスも消える。 ON/OFF トグル。 ON中はリサイズに追従。
+  const syncSizeBtn = $('syncSizeBtn');
+  let syncSizeOn = false;
+  let syncDebounce = null;
+  function sendCurrentSize() {
+    if (!syncSizeOn) return;
+    const r = stage.getBoundingClientRect();
+    const w = Math.round(r.width * (window.devicePixelRatio || 1));
+    const h = Math.round(r.height * (window.devicePixelRatio || 1));
+    if (w > 0 && h > 0) send({ t: 'resize', w, h });
+  }
+  function onResize() {
+    if (!syncSizeOn) return;
+    if (syncDebounce) clearTimeout(syncDebounce);
+    syncDebounce = setTimeout(() => { syncDebounce = null; sendCurrentSize(); }, 250); // 連続リサイズを丸める
+  }
+  if (syncSizeBtn) {
+    syncSizeBtn.onclick = () => {
+      syncSizeOn = !syncSizeOn;
+      syncSizeBtn.classList.toggle('active', syncSizeOn);
+      if (syncSizeOn) {
+        sendCurrentSize(); // 即時1回
+        window.addEventListener('resize', onResize);
+      } else {
+        window.removeEventListener('resize', onResize);
+        if (syncDebounce) { clearTimeout(syncDebounce); syncDebounce = null; }
+      }
+    };
+  }
+
   function teardown() {
     shouldReconnect = false; // 明示的撤収＝自動再接続を止める
     clearReconnect();

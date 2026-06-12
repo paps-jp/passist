@@ -15,6 +15,7 @@ module.exports = {
     enumerate: windows.enumerate,
     bringToFront: windows.bringToFront,
     typeUnicode: windows.typeUnicode,
+    setWindowSize: windows.setWindowSize, // mac は no-op
     parseHandle(sourceId) {
       // macOS の desktopCapturer も "window:<id>:0" 形式。中身は CGWindowID。
       const m = /^window:(\d+):/.exec(String(sourceId || ''));

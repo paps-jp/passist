@@ -232,9 +232,10 @@
         return;
       }
       sendWs({ type: 'host:end' });
-      // 終了＝次回起動時に同じURLで復元しない（lastHostToken/Secretも破棄）。activeShareName も解除。
-      window.host.settingsSet({ activeShareName: '', lastHostToken: '', lastHostSecret: '' });
-      if (cfg.settings) { cfg.settings.lastHostToken = ''; cfg.settings.lastHostSecret = ''; }
+      // 「終了」=現在の接続を全て切るが、 同じ URL で「もう一度共有」できるよう
+      // token/hostSecret は保持する（M-2 の復元経路で同 token のセッションが再作成される）。
+      // 「自動再開（前回ウィンドウを起動時に拾う）」だけは無効化する（再起動後の意図しない再共有を防ぐ）。
+      window.host.settingsSet({ activeShareName: '' });
       shouldReconnect = false; // 明示的終了 = WS が閉じても自動再接続しない
       clearReconnect();
       stopWatch();

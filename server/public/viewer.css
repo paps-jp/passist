@@ -119,8 +119,11 @@ body.view-only #video { cursor: default; }
 body.view-only #modeBtn,
 body.view-only #kbBtn { display: none !important; }
 .toolbar button { background: #2a313b; padding: 6px 10px; font-size: 13px; }
+.toolbar button.active { background: #2b6cff; border-color: #2b6cff; } /* S-2: 📐 同期 ON 状態など */
 #modeBtn { display: inline-flex; align-items: center; gap: 5px; }
 #modeBtn svg { flex: 0 0 auto; display: block; }
+/* 操作可のときだけ表示。閲覧のみではホスト窓を勝手にリサイズさせない */
+body.view-only #syncSizeBtn { display: none !important; }
 
 /* 画面上キーバー（スマホ用の特殊キー/修飾キー） */
 .keybar {

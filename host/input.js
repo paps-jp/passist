@@ -188,6 +188,18 @@ async function handle(ev) {
       case 'u':
         await mouse.releaseButton(btn(ev.b));
         break;
+      case 'resize': {
+        // viewer が「自分の表示エリア（CSSピクセル）」を送ってきた → 共有ウィンドウをそのサイズに合わせる。
+        // 操作座標と画面ピクセルが 1:1 に近づき、レターボックスが消える。
+        // 上限/下限は platform.windows.setWindowSize 内で clamp する。
+        if (targetHandle != null && platform.windows && platform.windows.setWindowSize) {
+          platform.windows.setWindowSize(targetHandle, ev.w, ev.h);
+          // region キャッシュを次回 maybeRefresh で更新（古い region で座標が外れるのを防ぐ）
+          region = null;
+          lastRegionAt = 0;
+        }
+        break;
+      }
       case 'w': {
         if (targetHandle != null) platform.windows.bringToFront(targetHandle); // スクロール先を対象ウィンドウに（既に最前面ならskip）
         if (ev.dy) {
