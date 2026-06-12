@@ -297,9 +297,23 @@ ipcMain.handle('qr:make', async (_e, text) => {
 });
 ipcMain.handle('settings:get', () => settings.get());
 ipcMain.handle('settings:set', (_e, patch) => {
+  const prev = settings.get();
   const res = settings.set(patch || {});
   signalWs = computeSignalWs(); // serverMode/centralServerUrl の変更を反映（再起動で完全反映）
+  // V-6: language が変わったらアプリメニューを再構築（renderer は location.reload で自身を直す）
+  if (patch && 'language' in patch && patch.language !== prev.language) {
+    try { buildAppMenu(); } catch {}
+  }
   return res;
+});
+// V-6: renderer の setLang() からの言語切替通知。 settings に保存 + メニュー再構築。
+ipcMain.handle('app:setMenuLang', (_e, lang) => {
+  if (lang !== 'ja' && lang !== 'en' && lang !== 'auto') return false;
+  try {
+    settings.set({ language: lang });
+    buildAppMenu();
+    return true;
+  } catch { return false; }
 });
 
 // Windows のテーマ/アクセント色が変わったらレンダラへ新パレットを送る
@@ -606,43 +620,74 @@ ipcMain.handle('about:open-external', (_e, url) => {
   if (typeof url === 'string' && /^https?:\/\//i.test(url)) shell.openExternal(url);
 });
 
+// V-6: アプリメニューの i18n。 main プロセスは renderer の i18n.js を読めないため、
+//   ここに最小辞書を持つ。 言語選択は settings.language ('auto'/'ja'/'en')、
+//   'auto' のときは app.getLocale() で OS ロケールから判定。
+const MENU_I18N = {
+  ja: {
+    file: 'ファイル', exportSettings: '設定のエクスポート…', importSettings: '設定のインポート…',
+    quit: '終了',
+    view: '表示', reload: '再読み込み', toggleFs: '全画面表示の切替',
+    window: 'ウィンドウ', minimize: '最小化', tray: 'トレイに格納',
+    help: 'ヘルプ', home: 'ホームページ（paps.jp）', about: 'バージョン情報',
+  },
+  en: {
+    file: 'File', exportSettings: 'Export settings…', importSettings: 'Import settings…',
+    quit: 'Quit',
+    view: 'View', reload: 'Reload', toggleFs: 'Toggle full screen',
+    window: 'Window', minimize: 'Minimize', tray: 'Hide to tray',
+    help: 'Help', home: 'Homepage (paps.jp)', about: 'About',
+  },
+};
+function getMenuLang() {
+  try {
+    const l = settings.get().language;
+    if (l === 'ja' || l === 'en') return l;
+    return String(app.getLocale() || '').toLowerCase().startsWith('ja') ? 'ja' : 'en';
+  } catch { return 'ja'; }
+}
+function mt(key) {
+  const dict = MENU_I18N[getMenuLang()] || MENU_I18N.ja;
+  return dict[key] || key;
+}
+
 // カスタムのアプリメニュー（Edit / 開発者ツール / ズームは付けない）
 function buildAppMenu() {
   const template = [
     {
-      label: 'ファイル',
+      label: mt('file'),
       submenu: [
-        { label: '設定のエクスポート…', click: exportSettings },
-        { label: '設定のインポート…', click: importSettings },
+        { label: mt('exportSettings'), click: exportSettings },
+        { label: mt('importSettings'), click: importSettings },
         { type: 'separator' },
-        { label: '終了', click: () => { isQuitting = true; app.quit(); } },
+        { label: mt('quit'), click: () => { isQuitting = true; app.quit(); } },
       ],
     },
     {
-      label: '表示',
+      label: mt('view'),
       submenu: [
-        { label: '再読み込み', role: 'reload' },
+        { label: mt('reload'), role: 'reload' },
         { type: 'separator' },
         {
-          label: '全画面表示の切替',
+          label: mt('toggleFs'),
           accelerator: 'F11',
           click: (_item, win) => { if (win) win.setFullScreen(!win.isFullScreen()); },
         },
       ],
     },
     {
-      label: 'ウィンドウ',
+      label: mt('window'),
       submenu: [
-        { label: '最小化', role: 'minimize' },
-        { label: 'トレイに格納', click: () => { if (mainWindow) mainWindow.hide(); } },
+        { label: mt('minimize'), role: 'minimize' },
+        { label: mt('tray'), click: () => { if (mainWindow) mainWindow.hide(); } },
       ],
     },
     {
-      label: 'ヘルプ',
+      label: mt('help'),
       submenu: [
-        { label: 'ホームページ（paps.jp）', click: () => shell.openExternal('https://paps.jp') },
+        { label: mt('home'), click: () => shell.openExternal('https://paps.jp') },
         { type: 'separator' },
-        { label: 'バージョン情報', click: showAbout },
+        { label: mt('about'), click: showAbout },
       ],
     },
   ];

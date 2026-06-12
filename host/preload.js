@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('host', {
   trustClear: () => ipcRenderer.invoke('trust:clear'),
   settingsGet: () => ipcRenderer.invoke('settings:get'),
   settingsSet: (patch) => ipcRenderer.invoke('settings:set', patch),
+  setMenuLang: (lang) => ipcRenderer.invoke('app:setMenuLang', lang), // V-6 アプリメニュー i18n
   onClipHost: (cb) => ipcRenderer.on('clip:host', (_e, text) => cb(text)),
   clipSet: (text) => ipcRenderer.send('clip:set', text),
   onThemePalette: (cb) => ipcRenderer.on('theme:palette', (_e, p) => cb(p)),

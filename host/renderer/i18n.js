@@ -1275,6 +1275,14 @@
   function setLang(newLang) {
     if (newLang !== 'ja' && newLang !== 'en') return;
     try { if (typeof localStorage !== 'undefined') localStorage.setItem('passist-lang', newLang); } catch {}
+    // V-6: Electron ホスト内で開いているなら、 ネイティブアプリメニュー (File/View/...)
+    // のラベルも追従させるため main プロセスへ通知。 docs/viewer では window.host が
+    // 無いので何もしない（fail-silent）。
+    try {
+      if (typeof window !== 'undefined' && window.host && typeof window.host.setMenuLang === 'function') {
+        window.host.setMenuLang(newLang);
+      }
+    } catch {}
     if (typeof location !== 'undefined' && location.reload) location.reload();
   }
 
