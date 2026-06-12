@@ -102,6 +102,17 @@
       case 'denied': shouldReconnect = false; setStatus(msg.message); teardown(); break;
       case 'ended': shouldReconnect = false; setStatus(msg.message); teardown(); break;
       case 'expired': shouldReconnect = false; setStatus(tr('viewer.status.expired')); teardown(); break;
+      // ホスト側が切断したが、 同URLで戻ってこられる状態（M-2/3 + R-1）。 WS は維持して映像だけ落とす。
+      case 'host:gone':
+        try { if (pc) { pc.close(); pc = null; } } catch {}
+        try { video.srcObject = null; } catch {}
+        setStatus(msg.message || 'ホストの接続が切れました。再接続を待っています…');
+        break;
+      // ホストが戻ってきた。同じ WS で再度 viewer:join を送る → 通常の accept フローに乗る。
+      case 'host:back':
+        setStatus(msg.message || 'ホストが戻りました。再接続します…');
+        try { join(); } catch (e) { console.warn('rejoin failed', e); }
+        break;
       case 'error':
         if (msg.code === 'pin') showPin(tr('viewer.pin.label'));
         else setStatus(msg.message);

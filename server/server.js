@@ -160,6 +160,22 @@ function send(ws, obj) {
   if (ws && ws.readyState === ws.OPEN) ws.send(JSON.stringify(obj));
 }
 
+// ホスト再接続時に「待機していた viewer」全員に host:back を通知 → viewer は再join する。
+// 既に WS が閉じている viewer は飛ばす。
+function notifyKeptViewers(s) {
+  if (!s.keptViewers || !s.keptViewers.size) return;
+  let alive = 0;
+  for (const [, v] of s.keptViewers) {
+    if (v && v.readyState === v.OPEN) {
+      send(v, { type: 'host:back', message: 'ホストが戻りました。再接続します…' });
+      alive++;
+    }
+  }
+  console.log(`[server] notified ${alive} kept viewers about host:back`);
+  // 通知した viewer は再 join してくる想定。s.viewers/pending に入り直すまでは keptViewers に残しておく
+  // → viewer:join を受けたら remove。close で消えた WS は次の onClose 経路で remove される。
+}
+
 // --- HTTP: ビューア(ブラウザ)配信。アカウント不要。 ---
 const app = express();
 // ビューアの資産はキャッシュさせない（CDN/ブラウザに古い viewer.js/css が残るのを防ぐ）
@@ -364,6 +380,7 @@ function route(ws, msg) {
     case 'host:approve': return hostDecision(ws, true, msg);
     case 'host:deny': return hostDecision(ws, false, msg);
     case 'host:end': return hostEnd(ws);
+    case 'host:kick': return hostKick(ws, msg); // ホストが個別の viewer を切断
     case 'signal': return relaySignal(ws, msg);
     case 'peer-route': return peerRoute(ws, msg); // host が viewer の経路(relay/p2p)を通知
     default: return;
@@ -398,6 +415,11 @@ function hostCreate(ws, msg) {
         });
         send(ws, { type: 'bitrate-policy', maxBpsRelay: calcRelayBitrate(), relayCount: relayCount() });
         audit.log({ type: 'host_reattach', ip: ws.auditIp, ua: ws.auditUa, token: existingToken });
+        // 「ホスト切断中に WSを待たせていた viewer」 全員に host:back を送って再 join を促す。
+        // viewer 側は受信したら viewer:join をやり直す → 通常の accept フローに乗る。
+        if (old.keptViewers && old.keptViewers.size) {
+          notifyKeptViewers(old);
+        }
         console.log(`[server] host re-attached to session: ${existingToken}`);
         return;
       }
@@ -474,6 +496,8 @@ function viewerJoin(ws, msg) {
     sessions.delete(s.token);
     return send(ws, { type: 'error', code: 'expired', message: 'セッションの有効期限が切れています' });
   }
+  // host:back を受けて再 join してきた viewer の場合、 keptViewers から外す（新しい viewerId で扱う）
+  if (s.keptViewers && ws.viewerId != null) s.keptViewers.delete(ws.viewerId);
   if (s.viewers.size + s.pending.size >= s.maxViewers) {
     stats.event('viewer_denied', { reason: 'busy' });
     audit.log({ type: 'viewer_denied', ip: ws.auditIp, ua: ws.auditUa, token: s.token, meta: { reason: 'busy' } });
@@ -502,7 +526,9 @@ function viewerJoin(ws, msg) {
     s.status = 'pending';
     send(ws, { type: 'waiting', message: 'ホストの承認を待っています…' });
     // ビューア提示の信頼クレデンシャル(auth)はそのままホストへ中継（サーバは保存・検証しない）
-    send(s.host, { type: 'viewer:request', viewerId: ws.viewerId, auth: msg.auth || null, mode: s.accessMode });
+    // 接続元情報をホスト UI で表示する用に同送（透明性・個別切断UIで使用）。
+    // 監査ログとは別目的：ホストが自分のセッションへの接続を把握できるようにするため。
+    send(s.host, { type: 'viewer:request', viewerId: ws.viewerId, auth: msg.auth || null, mode: s.accessMode, ip: ws.auditIp || '', ua: ws.auditUa || '', joinedAt: Date.now() });
   } else {
     acceptViewer(s, ws);
   }
@@ -532,7 +558,7 @@ function acceptViewer(s, v, issue) {
   // issue があれば、ホストが新規発行した信頼クレデンシャルをビューアへ渡す（localStorage 保存用）
   // turn があれば viewer は STUN だけでなく TURN にも relay candidate を提示できる（NAT越え強化）
   send(v, { type: 'accepted', issue: issue || null, turn: turnForViewer() });
-  send(s.host, { type: 'viewer:joined', viewerId: v.viewerId }); // 当該ビューア向けにホストがオファー作成
+  send(s.host, { type: 'viewer:joined', viewerId: v.viewerId, ip: v.auditIp || '', ua: v.auditUa || '', joinedAt: Date.now() }); // 当該ビューア向けにホストがオファー作成
   stats.event('viewer_accepted', { accessMode: s.accessMode });
   audit.log({ type: 'viewer_accepted', ip: v.auditIp, ua: v.auditUa, token: s.token, viewerId: v.viewerId, meta: { accessMode: s.accessMode } });
 }
@@ -558,6 +584,24 @@ function relaySignal(ws, msg) {
   }
 }
 
+// ホストが個別の viewer を切断する。 ホスト自身が「⛔ 切断」ボタンを押した場合に使う。
+function hostKick(ws, msg) {
+  const s = sessions.get(ws.token);
+  if (!s || s.host !== ws) return; // ホストからのみ受け付け
+  const vid = msg && msg.viewerId;
+  if (vid == null) return;
+  const target = s.viewers.get(vid) || s.pending.get(vid);
+  if (!target) return;
+  send(target, { type: 'ended', message: 'ホストが接続を切断しました' });
+  try { target.close(); } catch {}
+  s.viewers.delete(vid);
+  s.pending.delete(vid);
+  if (s.relayViewers.delete(vid)) broadcastBitratePolicy();
+  send(ws, { type: 'viewer:kicked', viewerId: vid });
+  audit.log({ type: 'viewer_kicked', ip: ws.auditIp, ua: ws.auditUa, token: s.token, viewerId: vid });
+  console.log(`[server] host kicked viewer ${vid} from ${s.token}`);
+}
+
 function hostEnd(ws) {
   const s = sessions.get(ws.token);
   if (!s || s.host !== ws) return;
@@ -581,16 +625,19 @@ function onClose(ws) {
     // 既存 viewers/pending はホストが消えたので解放。s.host を null にして「ホスト不在」状態に。
     // 完全削除は expiresAt の期限切れタイマー（または明示的な host:end）で行われる。
     if (s.host !== ws) return; // 既に新しいホストに張り替え済みなら何もしない
-    for (const v of [...s.viewers.values(), ...s.pending.values()]) {
-      send(v, { type: 'ended', message: 'ホストが切断しました' });
-      v.close();
+    // 「ホスト切断 != セッション終了」。 viewer のWSは閉じず host:gone 通知だけ送って待機させる。
+    // ホストが同 token+secret で戻ってきたら host:back で各 viewer に再 join を促す。
+    if (!s.keptViewers) s.keptViewers = new Map(); // viewerId -> ws
+    for (const [vid, v] of [...s.viewers.entries(), ...s.pending.entries()]) {
+      send(v, { type: 'host:gone', message: 'ホストの接続が切れました。再接続を待っています…' });
+      s.keptViewers.set(vid, v); // WSは閉じない（M-2/3 で同URLで戻ってくる前提）
     }
     s.viewers.clear();
     s.pending.clear();
     s.relayViewers.clear();
     s.host = null;
     s.status = 'idle';
-    console.log(`[server] host disconnected (session kept for reattach): ${s.token}`);
+    console.log(`[server] host disconnected (session kept, viewers parked): ${s.token} (${s.keptViewers.size} viewers parked)`);
     audit.log({ type: 'host_disconnect', ip: ws.auditIp, ua: ws.auditUa, token: s.token });
     broadcastBitratePolicy();
     stats.event('session_closed', { durationSec: Math.floor((Date.now() - s.createdAt) / 1000) });
@@ -601,6 +648,7 @@ function onClose(ws) {
       send(s.host, { type: 'viewer:left', viewerId: ws.viewerId });
     }
     if (ws.viewerId != null) s.pending.delete(ws.viewerId);
+    if (ws.viewerId != null && s.keptViewers) s.keptViewers.delete(ws.viewerId); // 待機中だった viewer も掃除
     if (ws.viewerId != null && s.relayViewers.delete(ws.viewerId)) broadcastBitratePolicy();
     if (wasViewer) { stats.event('viewer_left'); audit.log({ type: 'viewer_left', ip: ws.auditIp, ua: ws.auditUa, token: s.token, viewerId: ws.viewerId }); }
     if (!s.viewers.size && !s.pending.size) s.status = 'idle';

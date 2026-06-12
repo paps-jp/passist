@@ -192,6 +192,22 @@ button.small { padding: 6px 12px; font-size: 13px; border-radius: 8px; }
 .set-field select { padding: 4px 8px; border-radius: 8px; border: 1px solid var(--btn-border); background: var(--field-bg); color: var(--fg); font: inherit; }
 .radio { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
 .danger-hint { color: var(--danger); }
+
+/* 接続中/過去 viewer 一覧（R-2: 透明性・安心感）。 IPと接続時刻を表示し、 個別切断ボタンを並べる。 */
+.viewer-list { margin: 12px 0 16px; }
+.viewer-list:empty { display: none; }
+.viewer-list .vl-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); overflow: hidden; }
+.viewer-list .vl-row {
+  display: grid; grid-template-columns: auto 1fr auto auto; gap: 10px;
+  align-items: center; padding: 8px 12px; font-size: 13px;
+  border-top: 1px solid var(--border);
+}
+.viewer-list .vl-row:first-child { border-top: 0; }
+.viewer-list .vl-row[data-state="left"], .viewer-list .vl-row[data-state="kicked"] { color: var(--muted); background: rgba(0,0,0,0.015); }
+.viewer-list .vl-state { font-weight: 600; white-space: nowrap; }
+.viewer-list .vl-ip { font-family: ui-monospace, "SF Mono", "Consolas", monospace; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; }
+.viewer-list .vl-time { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.viewer-list .vl-row button { padding: 4px 10px; font-size: 12px; border-radius: 6px; }
 /* 接続方法のラジオ4つは長さがバラバラで折り返しが汚いので 2x2 グリッドで揃える */
 .set-field:has(input[name="access"]) { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 14px; align-items: center; }
 .set-field:has(input[name="access"]) .radio { font-size: 13.5px; }

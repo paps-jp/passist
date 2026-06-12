@@ -10,6 +10,11 @@
   let cfg, ws, stream;
   let serverIceServers = null; // サーバ host:create レスポンスで配布される iceServers（STUN/TURN）
   const peers = new Map(); // viewerId -> { pc, dc, viaRelay, routeReported }
+  // 接続中/過去 viewer の audit 情報（ホスト UI で「いま誰がどこから繋がっているか」を見せる）。
+  // viewerId -> { ip, ua, joinedAt, leftAt?, state: 'pending'|'connected'|'left'|'kicked' }
+  // セッション中はメモリ保持。 ホスト終了 or 別画面選択で初期化（プライバシー上、永続化しない）。
+  const viewerAudit = new Map();
+  const VIEWER_AUDIT_MAX = 50; // 履歴は最大50件で古いものから消す（メモリ節約）
   let controllerId = null; // 操作権を持つビューアID（1人）。null=全員閲覧のみ
   let cursorStarted = false; // ホストのカーソル形状追跡を一度だけ開始するためのフラグ
   const reqQueue = []; // 承認待ちリクエストのキュー [{ viewerId, auth }]
@@ -638,6 +643,60 @@
     return `接続中: ${n}人` + (controllerId && peers.has(controllerId) ? '（操作: 1人 / 他は閲覧）' : '（全員閲覧のみ）');
   }
 
+  // viewerAudit に情報を追記/更新。 max 件超過したら最古を削除（過去履歴の上限）。
+  function updateAuditInfo(viewerId, patch) {
+    if (viewerId == null) return;
+    const cur = viewerAudit.get(viewerId) || {};
+    viewerAudit.set(viewerId, { ...cur, ...patch });
+    // 削除候補は state=left|kicked のうち最古の leftAt から（接続中の人を消さない）
+    if (viewerAudit.size > VIEWER_AUDIT_MAX) {
+      const candidates = [...viewerAudit.entries()].filter(([, a]) => a.state === 'left' || a.state === 'kicked');
+      candidates.sort((a, b) => (a[1].leftAt || 0) - (b[1].leftAt || 0));
+      while (viewerAudit.size > VIEWER_AUDIT_MAX && candidates.length) {
+        viewerAudit.delete(candidates.shift()[0]);
+      }
+    }
+  }
+
+  // ホストUI に「接続中の viewer 一覧 + 個別切断ボタン + 過去履歴」を描画。
+  // IP / 接続時刻を表示することで「いま誰が見ているか」をホスト自身が把握できる（透明性）。
+  function renderViewerList() {
+    const el = document.getElementById('viewerList');
+    if (!el) return;
+    const items = [...viewerAudit.entries()];
+    if (!items.length) { el.innerHTML = ''; return; }
+    // 接続中→ pending → 過去 の順で
+    const order = { connected: 0, pending: 1, left: 2, kicked: 3 };
+    items.sort((a, b) => (order[a[1].state] ?? 9) - (order[b[1].state] ?? 9) || (b[1].joinedAt || 0) - (a[1].joinedAt || 0));
+    const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+    const fmt = (ts) => { if (!ts) return ''; const d = new Date(ts); return ('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2)+':'+('0'+d.getSeconds()).slice(-2); };
+    const stateLabel = (a) =>
+      a.state === 'connected' ? tr('host.viewerList.connected')
+      : a.state === 'pending' ? tr('host.viewerList.pending')
+      : a.state === 'kicked'  ? tr('host.viewerList.kicked')
+      :                          tr('host.viewerList.left');
+    const rows = items.map(([vid, a]) => {
+      const isActive = a.state === 'connected' || a.state === 'pending';
+      const kickBtn = isActive ? `<button class="ghost small" data-kick="${esc(vid)}" title="${esc(tr('host.viewerList.kickTitle'))}">${esc(tr('host.viewerList.kickBtn'))}</button>` : '';
+      const time = a.state === 'connected' || a.state === 'pending'
+        ? tr('host.viewerList.timeIn',  { t: fmt(a.joinedAt) })
+        : tr('host.viewerList.timeOut', { t: fmt(a.leftAt || a.joinedAt) });
+      return `<li class="vl-row" data-state="${esc(a.state)}">
+        <span class="vl-state">${esc(stateLabel(a))}</span>
+        <span class="vl-ip" title="${esc(a.ua)}">${esc(a.ip || tr('host.viewerList.unknownIp'))}</span>
+        <span class="vl-time">${esc(time)}</span>
+        ${kickBtn}
+      </li>`;
+    }).join('');
+    el.innerHTML = '<ul class="vl-list">' + rows + '</ul>';
+    el.querySelectorAll('button[data-kick]').forEach((b) => { b.onclick = () => kickViewer(b.dataset.kick); });
+  }
+
+  function kickViewer(viewerId) {
+    sendWs({ type: 'host:kick', viewerId });
+    // UI は viewer:kicked で更新される（サーバ側からのエコー）
+  }
+
   function onMsg(msg) {
     switch (msg.type) {
       case 'session':
@@ -658,14 +717,25 @@
         setStatus(msg.resumed ? tr('host.dyn.resumed') : tr('host.dyn.waitingViewer'));
         break;
       case 'viewer:request':
-        reqQueue.push({ viewerId: msg.viewerId, auth: msg.auth || null });
+        reqQueue.push({ viewerId: msg.viewerId, auth: msg.auth || null, ip: msg.ip || '', ua: msg.ua || '' });
+        updateAuditInfo(msg.viewerId, { ip: msg.ip, ua: msg.ua, joinedAt: msg.joinedAt || Date.now(), state: 'pending' });
         processReqQueue();
         break;
       case 'viewer:joined':
+        updateAuditInfo(msg.viewerId, { ip: msg.ip, ua: msg.ua, joinedAt: msg.joinedAt || Date.now(), state: 'connected' });
         startPeerFor(msg.viewerId);
+        renderViewerList();
         break;
       case 'viewer:left':
         closePeerFor(msg.viewerId);
+        // 履歴は残しつつ、 接続状態だけ切替
+        if (viewerAudit.has(msg.viewerId)) { const a = viewerAudit.get(msg.viewerId); a.state = 'left'; a.leftAt = Date.now(); }
+        renderViewerList();
+        break;
+      case 'viewer:kicked':
+        // 自分が host:kick した結果。 既に closePeerFor で対応済みなので UI更新だけ
+        if (viewerAudit.has(msg.viewerId)) { const a = viewerAudit.get(msg.viewerId); a.state = 'kicked'; a.leftAt = Date.now(); }
+        renderViewerList();
         break;
       case 'signal':
         handleSignal(msg.from, msg.data);
@@ -976,6 +1046,8 @@
     $('request').classList.add('hidden');
     activeReq = null;
     reqQueue.length = 0;
+    viewerAudit.clear(); // viewer 一覧（IP/接続時刻の表示）もリセット
+    renderViewerList();
   }
 
   // 共有終了：終了ボタンを「▶ もう一度共有」 に切り替え、同じウィンドウで再開できる状態にする
