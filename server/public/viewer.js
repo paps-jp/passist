@@ -4,7 +4,7 @@
   'use strict';
   // バージョン文字列。 ボタン押下時の status に含めることで、 ユーザーが「最新版を読めているか」
   // を画面上で確認できる（古いキャッシュの可能性を切り分けるため）。
-  const VIEWER_VERSION = 'v39';
+  const VIEWER_VERSION = 'v40';
   console.log('[viewer]', VIEWER_VERSION, 'loaded');
   const token = location.pathname.split('/').filter(Boolean).pop();
 
@@ -25,7 +25,7 @@
   };
   // 起動直後にバージョンを 3 秒だけ表示。 古いキャッシュなら表示されない or 古い番号が出る。
   // ホスト側 PAssist と viewer 両方が最新かをユーザー自身で確認できるようにする。
-  try { statusEl.textContent = '📐 viewer v39 loaded'; statusEl.classList.remove('hidden'); } catch {}
+  try { statusEl.textContent = '📐 viewer v40 loaded'; statusEl.classList.remove('hidden'); } catch {}
   setTimeout(() => { try { if (statusEl.textContent && statusEl.textContent.indexOf('loaded') >= 0) statusEl.textContent = ''; } catch {} }, 3000);
   // i18n ヘルパ (window.t は i18n.js が定義。 未ロードならキーをそのまま返す)
   const tr = (k) => (window.t ? window.t(k) : k);
@@ -326,6 +326,11 @@
     attachTouch(); // スマホ: タップ=クリック / 1本指ドラッグ=移動 / 長押し=メニュー
   }
 
+  // V-2: 文字選択モード。 ctxMenu の「文字を選択」 押下で true に。 次のドラッグ 1 回で
+  //   touchstart → mouse down、 touchmove → mouse move、 touchend → mouse up を送信して
+  //   ホスト側のテキスト選択ドラッグをシミュレートする。 終了で自動 OFF。
+  let selectMode = false;
+
   // スマホ向けタッチ操作（タッチネイティブ方式）:
   //  1本指: タップ=クリック / ドラッグ=スクロール(縦横) / 長押し=コピー等メニュー
   //         （連続タップ=2クリック→ホスト側でOSがダブルクリック判定）
@@ -355,9 +360,16 @@
       const t = e.touches[0];
       sx = t.clientX; sy = t.clientY; lastX = t.clientX; lastY = t.clientY;
       moved = false; longFired = false; accX = 0; accY = 0;
-      if (controlEnabled) { const p = norm(sx, sy); if (p) send({ t: 'm', x: p.x, y: p.y }); } // 触れた場所へカーソル＝スクロール/操作の対象を共有窓に確定（ホスト側で前面化）
+      if (controlEnabled) {
+        const p = norm(sx, sy);
+        if (p) {
+          send({ t: 'm', x: p.x, y: p.y }); // 触れた場所へカーソル＝スクロール/操作の対象を共有窓に確定（ホスト側で前面化）
+          if (selectMode) send({ t: 'd', b: 0 }); // V-2: 文字選択開始（マウス左ボタン押下）
+        }
+      }
       clearLP();
-      if (controlEnabled) lpTimer = setTimeout(() => { longFired = true; showCtxMenu(sx, sy); }, LONG_MS); // 長押し=メニュー
+      // 文字選択モード中は長押しメニュー抑制（ドラッグで選択する動作優先）
+      if (controlEnabled && !selectMode) lpTimer = setTimeout(() => { longFired = true; showCtxMenu(sx, sy); }, LONG_MS);
       e.preventDefault();
     }, { passive: false });
 
@@ -385,7 +397,10 @@
       }
       if (moved) { // 1本指ドラッグ: モードで挙動が変わる
         const dx = t.clientX - lastX, dy = t.clientY - lastY;
-        if (touchMode === 'pan') { zTx += dx; zTy += dy; applyZoom(); } // ①拡大画面の移動（閲覧のみでも可）
+        if (selectMode && controlEnabled) {
+          // V-2: 文字選択ドラッグ中はカーソル移動のみ送る（mouse down は touchstart で済み）
+          const p = norm(t.clientX, t.clientY); if (p) queueMove(p);
+        } else if (touchMode === 'pan') { zTx += dx; zTy += dy; applyZoom(); } // ①拡大画面の移動（閲覧のみでも可）
         else if (controlEnabled) {
           if (touchMode === 'mouse') { const p = norm(t.clientX, t.clientY); if (p) queueMove(p); } // ③ポインタを指の位置へ
           else { accX += dx; accY += dy; flushScroll(); } // ②共有窓の中身スクロール（縦横）
@@ -398,6 +413,16 @@
     const end = (e) => {
       if (pinch) { if (e.touches.length < 2) pinch = null; clearLP(); e.preventDefault(); return; }
       clearLP();
+      if (selectMode && controlEnabled) {
+        // V-2: 文字選択モードの終了。 ドラッグした範囲が選択された状態でホスト側の mouse up。
+        // タップ（!moved）でも一度押下したボタンは必ず離す。 終了後はモード自動 OFF。
+        send({ t: 'u', b: 0 });
+        selectMode = false;
+        setStatus('', false);
+        longFired = false;
+        e.preventDefault();
+        return;
+      }
       if (longFired) { longFired = false; e.preventDefault(); return; } // メニュー表示済み
       if (!moved && controlEnabled) { // タップ=その位置を左クリック（連続タップはOSがダブルクリック判定）
         const p = norm(sx, sy);
@@ -530,6 +555,10 @@
         } catch {}
         if (text) send({ t: 'text', s: text }); // 自分のクリップボードを相手に入力
         else send({ t: 'edit', a: 'paste' }); // 取得不可ならホスト側 Ctrl+V
+      } else if (act === 'select') {
+        // V-2: 文字選択モード。 次のドラッグで mouse down→move→up を送ってホスト側の選択ドラッグを起こす。
+        selectMode = true;
+        setStatus(tr('viewer.status.selectMode'));
       } else if (act === 'text') {
         openTextDialog();
       }
@@ -654,6 +683,35 @@
     if (document.fullscreenElement) document.exitFullscreen();
     else stage.requestFullscreen();
   };
+
+  // V-1: 「⋮ その他」 メニューの開閉。 全画面・サイズ調整・情報をここに集約して toolbar を整理。
+  const moreBtn = $('moreBtn');
+  const moreMenu = $('moreMenu');
+  const hideMoreMenu = () => { if (moreMenu) moreMenu.classList.add('hidden'); };
+  if (moreBtn && moreMenu) {
+    moreBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      // 全画面表示中は fullscreenElement に append しないと見えない
+      const host = document.fullscreenElement || document.body;
+      if (moreMenu.parentNode !== host) host.appendChild(moreMenu);
+      moreMenu.classList.toggle('hidden');
+    });
+    // 外側クリックで閉じる（メニュー内・ボタン自身は除外）
+    document.addEventListener('click', (e) => {
+      if (moreMenu.classList.contains('hidden')) return;
+      if (moreMenu.contains(e.target) || moreBtn.contains(e.target)) return;
+      hideMoreMenu();
+    });
+    // メニュー内のボタンを押したら自動で閉じる（onclick が走った後）
+    moreMenu.addEventListener('click', (e) => {
+      const b = e.target.closest && e.target.closest('button');
+      if (b) setTimeout(hideMoreMenu, 50);
+    });
+    document.addEventListener('fullscreenchange', () => {
+      const host = document.fullscreenElement || document.body;
+      if (moreMenu.parentNode !== host) host.appendChild(moreMenu);
+    });
+  }
 
   // 📐 サイズ同期: viewer 表示エリアの幅×高さ(CSSピクセル)をホストへ送り、 共有ウィンドウをそのサイズへ。
   // 操作座標が画面ピクセルに 1:1 で近づき、 レターボックスも消える。 ON/OFF トグル。 ON中はリサイズに追従。
