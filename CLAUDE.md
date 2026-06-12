@@ -10,6 +10,10 @@ PAssist — アカウント不要で、単一ウィンドウをブラウザか�
 - `docs/` — GitHub Pages（`paps-jp.github.io/passist/`）。LP・ドキュメント・統計・検証手順。
 - `deploy/` — `docker-compose.yml`（Caddy + signaling + coturn）と VPS bootstrap。
 
+## 検討中の設計
+
+- `docs/mcp.md` — Claude (MCP クライアント) から PAssist を操作する仕組みの設計案。 Local HTTP API + `passist-mcp` (npm) で「画面 X を相手に共有して」 を自然言語化する。 未着手・要レビュー。
+
 ## Git のルール
 
 - **コミットに Claude / Anthropic を共同作成者として含めない。**
