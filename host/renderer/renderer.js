@@ -151,21 +151,40 @@
       renderChips();
     });
     // ⚙ 設定 / ⋯ くわしい設定 モーダル: 開く/閉じる（×ボタン・背景クリック・ESC）
-    const openSettings = () => $('settingsModal').classList.remove('hidden');
-    const closeSettings = () => $('settingsModal').classList.add('hidden');
+    // sessionStorage に開閉状態とアクティブタブを保存し、 language 切替リロード後も復元する。
+    const SETTINGS_OPEN_KEY = 'passist-settings-open';
+    const SETTINGS_TAB_KEY = 'passist-settings-tab';
+    const openSettings = () => {
+      $('settingsModal').classList.remove('hidden');
+      try { sessionStorage.setItem(SETTINGS_OPEN_KEY, '1'); } catch {}
+    };
+    const closeSettings = () => {
+      $('settingsModal').classList.add('hidden');
+      try { sessionStorage.removeItem(SETTINGS_OPEN_KEY); } catch {}
+    };
     $('settingsBtn').onclick = openSettings;
     $('settingsClose').onclick = closeSettings;
     $('settingsModal').addEventListener('click', (e) => { if (e.target.id === 'settingsModal') closeSettings(); });
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && !$('settingsModal').classList.contains('hidden')) closeSettings();
     });
-    // 設定モーダル内のタブ切替（基本 / くわしい設定）
+    // 設定モーダル内のタブ切替（基本 / くわしい設定）。 タブ選択も sessionStorage に保存。
+    const activateTab = (tabName) => {
+      document.querySelectorAll('#settingsModal .tabs .tab').forEach((b) => b.classList.toggle('active', b.dataset.tab === tabName));
+      document.querySelectorAll('#settingsModal .tab-content').forEach((c) => c.classList.toggle('hidden', c.id !== 'tab-' + tabName));
+    };
     document.querySelectorAll('#settingsModal .tabs .tab').forEach((tab) => {
       tab.onclick = () => {
-        document.querySelectorAll('#settingsModal .tabs .tab').forEach((b) => b.classList.toggle('active', b === tab));
-        document.querySelectorAll('#settingsModal .tab-content').forEach((c) => c.classList.toggle('hidden', c.id !== 'tab-' + tab.dataset.tab));
+        activateTab(tab.dataset.tab);
+        try { sessionStorage.setItem(SETTINGS_TAB_KEY, tab.dataset.tab); } catch {}
       };
     });
+    // リロード前の状態を復元 (言語切替リロード後など)
+    try {
+      const savedTab = sessionStorage.getItem(SETTINGS_TAB_KEY);
+      if (savedTab) activateTab(savedTab);
+      if (sessionStorage.getItem(SETTINGS_OPEN_KEY) === '1') $('settingsModal').classList.remove('hidden');
+    } catch {}
     // 言語切替ボタンの bind は i18n.js の applyI18n が自動でやる (CSP 制約下でも動く)。
     // QRコードの開閉（既定は開）。相手はスマホのカメラで読み取って接続できる。
     $('qrToggle').onclick = () => {

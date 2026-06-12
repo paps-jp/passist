@@ -9,13 +9,11 @@
 // DOMContentLoaded で自動適用。 動的追加は applyI18n(rootElement) を呼ぶ。
 (function () {
   'use strict';
-  console.log('[i18n] script loaded, document.readyState =', document.readyState);
   const navRaw = (typeof navigator !== 'undefined' && navigator.language) || 'en';
   const navLang = String(navRaw).toLowerCase().split('-')[0];
   let stored = null;
   try { stored = (typeof localStorage !== 'undefined') ? localStorage.getItem('passist-lang') : null; } catch {}
   const lang = (stored === 'ja' || stored === 'en') ? stored : (navLang === 'ja' ? 'ja' : 'en');
-  console.log('[i18n] navLang=' + navLang + ', stored=' + stored + ', chosen lang=' + lang);
 
   const M = {
     ja: {
@@ -1193,32 +1191,18 @@
     }
     // [data-lang-btn] 言語切替ボタン: 現在の言語に .active を付与し、 クリックで setLang。
     // CSP がインライン onclick を弾く環境 (Electron) でも i18n.js のロードだけで動く。
-    const langBtns = r.querySelectorAll('[data-lang-btn]');
-    for (const el of langBtns) {
+    for (const el of r.querySelectorAll('[data-lang-btn]')) {
       el.classList.toggle('active', el.dataset.langBtn === lang);
       el.onclick = (e) => {
         if (e && e.preventDefault) e.preventDefault();
-        console.log('[i18n] lang-btn clicked:', el.dataset.langBtn);
         setLang(el.dataset.langBtn);
       };
     }
-    console.log('[i18n] applyI18n: lang=' + lang + ', bound ' + langBtns.length + ' lang-btn elements');
   }
 
   function setLang(newLang) {
-    console.log('[i18n] setLang called with:', newLang);
-    if (newLang !== 'ja' && newLang !== 'en') { console.warn('[i18n] invalid lang, abort'); return; }
-    try {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('passist-lang', newLang);
-        console.log('[i18n] localStorage[passist-lang] now =', localStorage.getItem('passist-lang'));
-      } else {
-        console.warn('[i18n] localStorage unavailable');
-      }
-    } catch (e) {
-      console.error('[i18n] localStorage error:', e);
-    }
-    console.log('[i18n] reloading page...');
+    if (newLang !== 'ja' && newLang !== 'en') return;
+    try { if (typeof localStorage !== 'undefined') localStorage.setItem('passist-lang', newLang); } catch {}
     if (typeof location !== 'undefined' && location.reload) location.reload();
   }
 
