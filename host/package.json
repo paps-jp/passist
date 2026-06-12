@@ -18,10 +18,10 @@
   },
   "devDependencies": {
     "@electron/rebuild": "^4.0.4",
-    "electron": "42.3.3",
+    "electron": "42.4.0",
     "electron-builder": "26.15.2",
     "png-to-ico": "^3.0.1",
-    "sharp": "^0.34.5"
+    "sharp": "^0.35.1"
   },
   "build": {
     "appId": "jp.paps.passist",
