@@ -318,6 +318,10 @@ const wss = new WebSocketServer({ server, path: '/ws' });
 wss.on('connection', (ws, req) => {
   ws.role = null;
   ws.token = null;
+  // heartbeat: 死んだ接続（ブラウザを閉じても TCP RST が来ない・モバイル画面ロック等）を
+  // ping/pong で検出し、 viewer slot を確実に解放するための前提フラグ。
+  ws.isAlive = true;
+  ws.on('pong', () => { ws.isAlive = true; });
   // 監査ログ用: 接続元 IP / User-Agent を ws に保存（X-Forwarded-For 経由対応）。
   // ※ stats（公開集計）には載せない。/api/stats は匿名のまま。
   ws.auditIp = audit.extractIp(req);
@@ -334,6 +338,24 @@ wss.on('connection', (ws, req) => {
   });
   ws.on('close', () => onClose(ws));
 });
+
+// WebSocket heartbeat: 30秒ごとに ping を送り、 次の周期までに pong が返らない接続を
+// terminate する。 terminate すると ws.on('close') 経由で onClose() が呼ばれて
+// s.viewers / s.pending から viewerId が外れ、 maxViewers 枠が解放される。
+// → 「4人占有のまま誰かがブラウザを閉じても新規接続が拒否される」 問題への対策。
+const WS_HEARTBEAT_MS = parseInt(process.env.WS_HEARTBEAT_MS || '30000', 10);
+const wsHeartbeat = setInterval(() => {
+  for (const ws of wss.clients) {
+    if (ws.isAlive === false) {
+      try { ws.terminate(); } catch {}
+      continue;
+    }
+    ws.isAlive = false;
+    try { ws.ping(); } catch {}
+  }
+}, WS_HEARTBEAT_MS);
+if (wsHeartbeat.unref) wsHeartbeat.unref(); // テスト/CLI 終了をブロックしないように
+wss.on('close', () => clearInterval(wsHeartbeat));
 
 function route(ws, msg) {
   switch (msg.type) {
