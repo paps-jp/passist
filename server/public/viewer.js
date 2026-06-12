@@ -4,7 +4,7 @@
   'use strict';
   // バージョン文字列。 ボタン押下時の status に含めることで、 ユーザーが「最新版を読めているか」
   // を画面上で確認できる（古いキャッシュの可能性を切り分けるため）。
-  const VIEWER_VERSION = 'v41';
+  const VIEWER_VERSION = 'v42';
   console.log('[viewer]', VIEWER_VERSION, 'loaded');
   const token = location.pathname.split('/').filter(Boolean).pop();
 
@@ -25,7 +25,7 @@
   };
   // 起動直後にバージョンを 3 秒だけ表示。 古いキャッシュなら表示されない or 古い番号が出る。
   // ホスト側 PAssist と viewer 両方が最新かをユーザー自身で確認できるようにする。
-  try { statusEl.textContent = '📐 viewer v41 loaded'; statusEl.classList.remove('hidden'); } catch {}
+  try { statusEl.textContent = '📐 viewer v42 loaded'; statusEl.classList.remove('hidden'); } catch {}
   setTimeout(() => { try { if (statusEl.textContent && statusEl.textContent.indexOf('loaded') >= 0) statusEl.textContent = ''; } catch {} }, 3000);
   // i18n ヘルパ (window.t は i18n.js が定義。 未ロードならキーをそのまま返す)
   const tr = (k) => (window.t ? window.t(k) : k);
@@ -784,7 +784,11 @@
         if (controlEnabled && dc && dc.readyState === 'open') {
           try { dc.send(JSON.stringify({ t: 'restore' })); restored = true; } catch {}
         }
-        setTimeout(() => setStatus(`📐 ${VIEWER_VERSION} 同期 OFF${restored ? '（元のサイズに復元）' : ''}`), 50);
+        // V-3.1: ユーザー向け文言を i18n から取り、 3 秒で自動的に消す
+        setTimeout(() => {
+          setStatus(restored ? tr('viewer.status.syncRestored') : tr('viewer.status.syncOff'));
+          setTimeout(() => setStatus('', false), 3000);
+        }, 50);
       }
     };
   } else {
