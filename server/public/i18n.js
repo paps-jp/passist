@@ -283,6 +283,17 @@
       'host.dyn.resumePrev': '前回共有していた「{name}」を再開できます。 ',
       'host.dyn.urlFirst': '先にウィンドウを選択してURLを発行してください',
 
+      // 接続中のビューア一覧 (R-2)
+      'host.viewerList.connected': '接続中',
+      'host.viewerList.pending': '接続待ち',
+      'host.viewerList.kicked': '切断（管理者）',
+      'host.viewerList.left': '切断',
+      'host.viewerList.kickBtn': '切断',
+      'host.viewerList.kickTitle': 'この接続を切断する',
+      'host.viewerList.timeIn': '接続 {t}',
+      'host.viewerList.timeOut': '切断 {t}',
+      'host.viewerList.unknownIp': '(IP不明)',
+
       // === 統計ページ (docs/stats.html) ===
       'stats.docTitle': 'PAssist 運用統計',
       'stats.crumbs.top': 'トップ',
@@ -876,6 +887,17 @@
       'host.dyn.ttl.hours': '{n}h',
       'host.dyn.resumePrev': 'You can resume the previous share of "{name}". ',
       'host.dyn.urlFirst': 'Pick a window first to issue a URL',
+
+      // Connected viewers list (R-2)
+      'host.viewerList.connected': 'Connected',
+      'host.viewerList.pending': 'Pending',
+      'host.viewerList.kicked': 'Kicked',
+      'host.viewerList.left': 'Left',
+      'host.viewerList.kickBtn': 'Disconnect',
+      'host.viewerList.kickTitle': 'Disconnect this viewer',
+      'host.viewerList.timeIn': 'Joined {t}',
+      'host.viewerList.timeOut': 'Left {t}',
+      'host.viewerList.unknownIp': '(unknown IP)',
 
       // === Stats page (docs/stats.html) ===
       'stats.docTitle': 'PAssist live stats',
