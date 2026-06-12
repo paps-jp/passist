@@ -91,10 +91,18 @@ async function main() {
   v2.close();
 
   // --- ホスト終了 → ビューアに通知 ---
+  // 注: 「host:end」 は viewers 切断 + 受付停止だが session 自体は残す仕様 (S-1.1)。
+  //     ホストが existingToken+hostSecret で host:create を送れば張り替えで同 URL を取り戻せる。
+  //     (B のセッションが server.js に追加した v0.2.7 系の挙動)。
   send(host, { type: 'host:end' });
   const ended = await waitFor(v1, type('ended'), 'v1 ended');
   ok(ended.type === 'ended', 'host:end でビューアに通知');
   v1.close();
+
+  // ホストを同 token で復帰させて次の test (信頼済み再接続) に備える。
+  send(host, { type: 'host:create', existingToken: sess.token, hostSecret: sess.hostSecret });
+  const reattached = await waitFor(host, type('session'), 'host reattach session');
+  ok(reattached.resumed === true && reattached.token === sess.token, 'host:end 後でも existingToken+hostSecret で同 URL に復帰');
 
   // --- 信頼済み再接続: auth を提示 → サーバはそのままホストへ中継 ---
   const v3 = await open();
