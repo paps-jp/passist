@@ -100,11 +100,24 @@ cp docs/i18n.js host/renderer/i18n.js && cp docs/i18n.js server/public/i18n.js
    curl -sI -L https://github.com/paps-jp/passist/releases/latest/download/PAssist.exe \
      | grep -E "HTTP/|Location:"                          # DL URL 200 OK 確認
    ```
-6. **VPS の signaling コンテナを反映**:
+6. **VPS の signaling コンテナを反映** (接続情報の詳細は「サーバ運用」セクション参照):
    ```bash
-   ssh www@<vps-ip> 'cd /www/passist && docker compose pull && docker compose up -d'
+   TAG=v0.2.7.X   # 新リリースタグに置換
+   ssh -i ~/.ssh/passist www@160.16.206.193 "
+     set -e
+     cd /home/www/passist/deploy
+     sed -i 's|^SIGNALING_VERSION=.*\$|SIGNALING_VERSION=${TAG}|' .env
+     docker compose pull signaling
+     NEW_DIGEST=\$(docker image inspect ghcr.io/paps-jp/passist-signaling:${TAG} --format='{{index .RepoDigests 0}}' | sed 's|.*@||')
+     sed -i \"s|^SIGNALING_IMAGE_DIGEST=.*\$|SIGNALING_IMAGE_DIGEST=\$NEW_DIGEST|\" .env
+     docker compose up -d
+     docker compose ps
+   "
    ```
    これで `passist.paps.jp/s/<token>` の viewer に新しいサーバが反映される。
+   **注意**: `SIGNALING_VERSION` と `SIGNALING_IMAGE_DIGEST` の両方の .env 更新を忘れると、
+   `docker compose pull` しても古いタグが参照され続けたり、 `/api/build` が古い digest を
+   公開して viewer の「サーバの真正性」 検証 (`digestMatch`) が失敗する。
 
 ### ダウンロード URL の方針
 
@@ -271,10 +284,40 @@ cosign verify ghcr.io/paps-jp/passist-signaling:vX.Y.Z \
 
 ## サーバ運用（passist.paps.jp）
 
-- VPS で `deploy/docker-compose.yml` を起動: Caddy が自動 TLS、signaling は GHCR から pull、coturn は同居。
-- `.env` に `DOMAIN=passist.paps.jp` と `ICE_TURN_*`（TURN 認証）を設定。
+### 接続情報
+
+- **ホスト**: `passist.paps.jp` (= **`160.16.206.193`**、 さくらインターネット VPS、 ホスト名 `tk2-245-32189`、 Ubuntu 24.04 amd64)
+- **SSH ユーザー**: `www`
+- **SSH 鍵**: ローカル `~/.ssh/passist` (公開鍵が VPS の `~www/.ssh/authorized_keys` に登録済み)
+- **deploy ディレクトリ**: `/home/www/passist/deploy` (← `/www/passist` ではない)
+- **接続コマンド**: `ssh -i ~/.ssh/passist www@160.16.206.193`
+- 旧 VPS `paps.5432.jp` (160.16.108.100) は PAssist では使われていない。 ローカルの `~/.ssh/config` の `Host paps` はそちら用の別エイリアスなので、 PAssist の運用作業では使わない。
+
+### 構成 (`deploy/docker-compose.yml`)
+
+- 3 サービス: `signaling`（Node、 GHCR image）/ `caddy`（自動 TLS + リバプロ）/ `coturn`（TURN 中継、 host network）
+- `.env` で次の値を制御:
+  - `DOMAIN_SIGNALING=passist.paps.jp` (Caddy 用)
+  - `PUBLIC_BASE_URL=https://passist.paps.jp` (signaling が viewer に渡す URL のベース)
+  - `SIGNALING_VERSION=vX.Y.Z` — **GHCR image タグ**。 `image: ghcr.io/paps-jp/passist-signaling:${SIGNALING_VERSION:-v0.2.7.4}` に展開される
+  - `SIGNALING_IMAGE_DIGEST=sha256:...` — `/api/build` に公開される digest。 viewer の Cosign 検証で expected として使われるので、 pull 後の実 digest と一致させる
+  - `ACCESS_MODE=approve` (host が viewer 1 件ずつ承認)
+  - `TURN_AUTH_SECRET=...` (時限 TURN 認証用 master secret。 秘匿)
+  - `SIGN_TURN_URLS=turn:turn.passist.paps.jp:3478,turns:turn.passist.paps.jp:5349` 等
+  - `ACME_EMAIL=paps@paps.jp`
 - VPS 構成スクリプト: `deploy/bootstrap.sh`（UFW・Docker 導入・`.env` 雛形生成）。
-- アップデート: `docker compose pull && docker compose up -d`。
+
+### アップデート (新リリース反映)
+
+リリース手順の 6. を参照。 ポイント:
+
+1. `.env` の **`SIGNALING_VERSION`** を新タグに更新 (`sed -i 's|^SIGNALING_VERSION=.*$|SIGNALING_VERSION=vX.Y.Z|' .env`)
+2. `docker compose pull signaling` で新 image を取得
+3. `docker image inspect ghcr.io/paps-jp/passist-signaling:vX.Y.Z --format='{{index .RepoDigests 0}}' | sed 's|.*@||'` で新 digest を取得し `.env` の **`SIGNALING_IMAGE_DIGEST`** に反映
+4. `docker compose up -d` で再起動 (image タグが変わるので signaling コンテナだけ Recreated になる)
+5. `curl -s https://passist.paps.jp/api/build` で `tag` と `imageDigest` が新値になっていることを確認
+
+`SIGNALING_IMAGE_DIGEST` の更新を忘れると viewer の「PAssist について → サーバの真正性」 で `digestMatch ✗ expected=旧, got=新` で検証失敗する (V-11 の画面表示で原因が分かる)。
 
 ### server.js の重要な動作
 
