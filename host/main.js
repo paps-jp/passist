@@ -547,6 +547,16 @@ function showAbout() {
     },
   });
   aboutWindow.setMenu(null);
+  // V-8: setMenu(null) で F12 / Ctrl+Shift+I が無効化されるので before-input-event で
+  //   手動 toggle する。 公開版でも about の中身が空になった等のトラブルを Console で
+  //   調査できるようにする。
+  aboutWindow.webContents.on('before-input-event', (event, input) => {
+    const k = (input.key || '').toLowerCase();
+    if (input.type === 'keyDown' && (k === 'f12' || (input.control && input.shift && k === 'i'))) {
+      try { aboutWindow.webContents.toggleDevTools(); } catch {}
+      event.preventDefault();
+    }
+  });
   aboutWindow.loadFile(path.join(__dirname, 'renderer', 'about.html'));
   aboutWindow.on('closed', () => { aboutWindow = null; });
 }
@@ -721,9 +731,17 @@ function createWindow() {
     }
   });
   // 全画面の解除手段を確保：Esc で全画面を抜ける（F11 でも切替可）
+  // V-8: F12 / Ctrl+Shift+I でも DevTools を開けるようにする (Esc と同居)
   mainWindow.webContents.on('before-input-event', (e, input) => {
-    if (input.type === 'keyDown' && input.key === 'Escape' && mainWindow.isFullScreen()) {
+    if (input.type !== 'keyDown') return;
+    if (input.key === 'Escape' && mainWindow.isFullScreen()) {
       mainWindow.setFullScreen(false);
+      e.preventDefault();
+      return;
+    }
+    const k = (input.key || '').toLowerCase();
+    if (k === 'f12' || (input.control && input.shift && k === 'i')) {
+      try { mainWindow.webContents.toggleDevTools(); } catch {}
       e.preventDefault();
     }
   });
