@@ -24,10 +24,36 @@
     $('linkSecurity').textContent = t('about.security');
   }
 
+  // V-7: 致命的エラー時にウィンドウへ直接表示するヘルパ。 DevTools を開けない
+  //   ユーザーでも原因が分かるよう、 stack trace まで body 全体に出力する。
+  function showFatalError(label, e) {
+    const msg = (e && e.message) || String(e);
+    const stack = (e && e.stack) || '';
+    try {
+      document.body.innerHTML =
+        '<div style="padding:24px; font-family: system-ui, sans-serif; color:#c0392b;">' +
+        '<h1 style="margin-top:0">PAssist – ' + escHtml(label) + '</h1>' +
+        '<p>' + escHtml(msg) + '</p>' +
+        '<pre style="white-space:pre-wrap; background:#f3f3f3; padding:12px; border-radius:6px; font-size:11px; color:#444;">' +
+        escHtml(stack) + '</pre>' +
+        '<p style="margin-top:16px; font-size:11px; color:#76746e;">window.about=' + (typeof window.about) +
+        ' / window.t=' + (typeof window.t) + ' / about-preload loaded=' + (typeof window.about === 'object') + '</p>' +
+        '</div>';
+    } catch {}
+  }
+
   async function init() {
+    // V-7: preload と i18n.js のロード確認 (production の中身が空問題のデバッグ)
+    if (typeof window.about === 'undefined') {
+      throw new Error('window.about is undefined — about-preload.js が読み込まれていません');
+    }
+    if (typeof window.t === 'undefined') {
+      throw new Error('window.t is undefined — i18n.js が読み込まれていません');
+    }
     applyStaticI18n();
     const info = await window.about.getInfo();
-    $('appVersion').textContent = info.version;
+    if (!info) throw new Error('about:info IPC が null を返しました');
+    $('appVersion').textContent = info.version || '(version unknown)';
     if (info.iconDataUrl) $('logoImg').src = info.iconDataUrl;
     $('techInfo').innerHTML = `
       <b>Electron</b><code>${escHtml(info.electron)}</code>
@@ -114,6 +140,7 @@
   }
 
   init().catch((e) => {
-    $('cosignResult').innerHTML = `<span class="err-text">${escHtml(e.message)}</span>`;
+    // V-7: init 全体が落ちたら body 全体に分かりやすく表示
+    showFatalError('About init failed', e);
   });
 })();
