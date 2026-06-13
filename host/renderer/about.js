@@ -131,11 +131,34 @@
         </details>
       `;
     }
+    // V-11: 失敗時、 v.error が空でも v.checks から失敗チェックの詳細を組み立てて画面表示。
+    //   過去は label が空欄で原因不明になっていた。
+    let checksHtml = '';
+    if (v.checks && typeof v.checks === 'object') {
+      const rows = [];
+      for (const [name, c] of Object.entries(v.checks)) {
+        if (!c) { rows.push(`<b>${escHtml(name)}</b><span class="err-text">skipped</span>`); continue; }
+        if (c.ok === true) {
+          rows.push(`<b>${escHtml(name)}</b><span class="ok-text">✓ ok</span>`);
+        } else {
+          const reason = c.error
+            ? c.error
+            : (c.got || c.expected)
+              ? `got=${short(String(c.got || ''), 48)} / expected=${short(String(c.expected || ''), 48)}`
+              : 'failed';
+          rows.push(`<b>${escHtml(name)}</b><span class="err-text">✗ ${escHtml(reason)}</span>`);
+        }
+      }
+      if (rows.length) {
+        checksHtml = `<details open style="margin-top:8px"><summary class="muted" style="cursor:pointer">${escHtml(t('verify.details'))}</summary><div class="kv" style="margin-top:6px">${rows.join('')}</div></details>`;
+      }
+    }
     return `
       <div class="row">
         <span class="badge err">✗ ${escHtml(t('verify.failed'))}</span>
-        <span class="label">${escHtml(v.error || '')}</span>
+        <span class="label">${escHtml(v.error || '(no message)')}</span>
       </div>
+      ${checksHtml}
     `;
   }
 
