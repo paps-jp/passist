@@ -546,30 +546,33 @@ function showAbout() {
       sandbox: false, // main process が child_process で cosign を呼ぶ (preload 経由なら sandbox 可)
     },
   });
-  // V-9: about ウィンドウ専用の最小メニュー (表示 → 開発者ツール)。
-  //   公開版で「中身が空」 等の調査時に F12 でも メニューからでも DevTools を開けるよう、
-  //   親アプリのメニューを全消し (setMenu(null)) せずに 1 項目だけ残す。
-  aboutWindow.setMenu(Menu.buildFromTemplate([
-    {
-      label: mt('view'),
-      submenu: [
-        {
-          label: mt('devTools'),
-          accelerator: 'F12',
-          click: () => { try { if (aboutWindow) aboutWindow.webContents.toggleDevTools(); } catch {} },
-        },
-      ],
-    },
-  ]));
-  // V-8: setMenu でも Ctrl+Shift+I は role 経由でないと拾われない場合があるので、 念のため
-  //   before-input-event でも捕捉する。
-  aboutWindow.webContents.on('before-input-event', (event, input) => {
-    const k = (input.key || '').toLowerCase();
-    if (input.type === 'keyDown' && (k === 'f12' || (input.control && input.shift && k === 'i'))) {
-      try { aboutWindow.webContents.toggleDevTools(); } catch {}
-      event.preventDefault();
-    }
-  });
+  // V-9/V-10: about ウィンドウのメニュー。 dev のみ「表示 → 開発者ツール」 を出す。
+  //   配布 exe では setMenu(null) でメニュー自体を非表示にして一般ユーザにすっきり見せる。
+  if (IS_DEV) {
+    aboutWindow.setMenu(Menu.buildFromTemplate([
+      {
+        label: mt('view'),
+        submenu: [
+          {
+            label: mt('devTools'),
+            accelerator: 'F12',
+            click: () => { try { if (aboutWindow) aboutWindow.webContents.toggleDevTools(); } catch {} },
+          },
+        ],
+      },
+    ]));
+    // setMenu でも Ctrl+Shift+I は role 経由でないと拾われない場合があるので、 念のため
+    // before-input-event でも捕捉する (dev 限定)。
+    aboutWindow.webContents.on('before-input-event', (event, input) => {
+      const k = (input.key || '').toLowerCase();
+      if (input.type === 'keyDown' && (k === 'f12' || (input.control && input.shift && k === 'i'))) {
+        try { aboutWindow.webContents.toggleDevTools(); } catch {}
+        event.preventDefault();
+      }
+    });
+  } else {
+    aboutWindow.setMenu(null);
+  }
   aboutWindow.loadFile(path.join(__dirname, 'renderer', 'about.html'));
   aboutWindow.on('closed', () => { aboutWindow = null; });
 }
@@ -674,8 +677,29 @@ function mt(key) {
   return dict[key] || key;
 }
 
-// カスタムのアプリメニュー（Edit / 開発者ツール / ズームは付けない）
+// V-10: 開発者ツール系は dev (npm start) のみに出す。 配布 exe では一般ユーザに
+//   余計な機能を見せないため非表示にする。 app.isPackaged で判定。
+const IS_DEV = !app.isPackaged;
+
+// カスタムのアプリメニュー（Edit / ズームは付けない。 開発者ツールは dev のみ）
 function buildAppMenu() {
+  const viewSubmenu = [
+    { label: mt('reload'), role: 'reload' },
+    { type: 'separator' },
+    {
+      label: mt('toggleFs'),
+      accelerator: 'F11',
+      click: (_item, win) => { if (win) win.setFullScreen(!win.isFullScreen()); },
+    },
+  ];
+  if (IS_DEV) {
+    // V-9/V-10: 開発者ツール（dev 限定。 公開版にはこの項目自体出さない）
+    viewSubmenu.push({
+      label: mt('devTools'),
+      accelerator: 'F12',
+      click: (_item, win) => { if (win) win.webContents.toggleDevTools(); },
+    });
+  }
   const template = [
     {
       label: mt('file'),
@@ -688,21 +712,7 @@ function buildAppMenu() {
     },
     {
       label: mt('view'),
-      submenu: [
-        { label: mt('reload'), role: 'reload' },
-        { type: 'separator' },
-        {
-          label: mt('toggleFs'),
-          accelerator: 'F11',
-          click: (_item, win) => { if (win) win.setFullScreen(!win.isFullScreen()); },
-        },
-        {
-          // V-9: 開発者ツール（公開版でも about の空問題などを Console で調査できるよう常設）
-          label: mt('devTools'),
-          accelerator: 'F12',
-          click: (_item, win) => { if (win) win.webContents.toggleDevTools(); },
-        },
-      ],
+      submenu: viewSubmenu,
     },
     {
       label: mt('window'),
@@ -750,7 +760,8 @@ function createWindow() {
     }
   });
   // 全画面の解除手段を確保：Esc で全画面を抜ける（F11 でも切替可）
-  // V-8: F12 / Ctrl+Shift+I でも DevTools を開けるようにする (Esc と同居)
+  // V-10: F12 / Ctrl+Shift+I は dev (npm start) でのみ有効。 配布 exe では一般ユーザが
+  //   誤って DevTools を開かないように無効化。
   mainWindow.webContents.on('before-input-event', (e, input) => {
     if (input.type !== 'keyDown') return;
     if (input.key === 'Escape' && mainWindow.isFullScreen()) {
@@ -758,6 +769,7 @@ function createWindow() {
       e.preventDefault();
       return;
     }
+    if (!IS_DEV) return;
     const k = (input.key || '').toLowerCase();
     if (k === 'f12' || (input.control && input.shift && k === 'i')) {
       try { mainWindow.webContents.toggleDevTools(); } catch {}
