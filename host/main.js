@@ -546,10 +546,23 @@ function showAbout() {
       sandbox: false, // main process が child_process で cosign を呼ぶ (preload 経由なら sandbox 可)
     },
   });
-  aboutWindow.setMenu(null);
-  // V-8: setMenu(null) で F12 / Ctrl+Shift+I が無効化されるので before-input-event で
-  //   手動 toggle する。 公開版でも about の中身が空になった等のトラブルを Console で
-  //   調査できるようにする。
+  // V-9: about ウィンドウ専用の最小メニュー (表示 → 開発者ツール)。
+  //   公開版で「中身が空」 等の調査時に F12 でも メニューからでも DevTools を開けるよう、
+  //   親アプリのメニューを全消し (setMenu(null)) せずに 1 項目だけ残す。
+  aboutWindow.setMenu(Menu.buildFromTemplate([
+    {
+      label: mt('view'),
+      submenu: [
+        {
+          label: mt('devTools'),
+          accelerator: 'F12',
+          click: () => { try { if (aboutWindow) aboutWindow.webContents.toggleDevTools(); } catch {} },
+        },
+      ],
+    },
+  ]));
+  // V-8: setMenu でも Ctrl+Shift+I は role 経由でないと拾われない場合があるので、 念のため
+  //   before-input-event でも捕捉する。
   aboutWindow.webContents.on('before-input-event', (event, input) => {
     const k = (input.key || '').toLowerCase();
     if (input.type === 'keyDown' && (k === 'f12' || (input.control && input.shift && k === 'i'))) {
@@ -637,14 +650,14 @@ const MENU_I18N = {
   ja: {
     file: 'ファイル', exportSettings: '設定のエクスポート…', importSettings: '設定のインポート…',
     quit: '終了',
-    view: '表示', reload: '再読み込み', toggleFs: '全画面表示の切替',
+    view: '表示', reload: '再読み込み', toggleFs: '全画面表示の切替', devTools: '開発者ツール',
     window: 'ウィンドウ', minimize: '最小化', tray: 'トレイに格納',
     help: 'ヘルプ', home: 'ホームページ（paps.jp）', about: 'バージョン情報',
   },
   en: {
     file: 'File', exportSettings: 'Export settings…', importSettings: 'Import settings…',
     quit: 'Quit',
-    view: 'View', reload: 'Reload', toggleFs: 'Toggle full screen',
+    view: 'View', reload: 'Reload', toggleFs: 'Toggle full screen', devTools: 'Developer Tools',
     window: 'Window', minimize: 'Minimize', tray: 'Hide to tray',
     help: 'Help', home: 'Homepage (paps.jp)', about: 'About',
   },
@@ -682,6 +695,12 @@ function buildAppMenu() {
           label: mt('toggleFs'),
           accelerator: 'F11',
           click: (_item, win) => { if (win) win.setFullScreen(!win.isFullScreen()); },
+        },
+        {
+          // V-9: 開発者ツール（公開版でも about の空問題などを Console で調査できるよう常設）
+          label: mt('devTools'),
+          accelerator: 'F12',
+          click: (_item, win) => { if (win) win.webContents.toggleDevTools(); },
         },
       ],
     },
