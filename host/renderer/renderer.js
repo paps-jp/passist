@@ -111,6 +111,14 @@
         v === 'central'
           ? tr('host.set.server.hintCentral', { url: $('centralServerUrl').value || 'wss://passist.paps.jp/ws' })
           : tr('host.set.server.hintSelf');
+      // V-17: 中央モードでは publicBase は無視されるので、 フィールドを disabled にして混乱を防ぐ
+      const pb = $('publicBase');
+      if (pb) {
+        pb.disabled = (v === 'central');
+        pb.title = pb.disabled
+          ? '中央サーバー使用中: 公開URL は中央サーバー側の設定 (passist.paps.jp) が使われます'
+          : 'cloudflared 等のトンネル URL を入れて「URL を再発行」';
+      }
     }
     for (const r of document.querySelectorAll('input[name="serverMode"]')) {
       r.checked = r.value === smVal;
@@ -594,9 +602,14 @@
     ws = new WebSocket(cfg.signalWs);
     ws.onopen = () => {
       reconnectAttempt = 0; // 接続成功でカウンタをリセット
+      // V-17: 中央サーバーモード時は publicBaseUrl を送らない。
+      //   送ってしまうと中央サーバが override として採用し、 「くわしい設定」 に残った
+      //   古い cafe.paps.jp 等で viewer URL が組まれてしまう。 central は環境変数
+      //   PUBLIC_BASE_URL=passist.paps.jp に任せる。 self モードのときだけ送る。
+      const isCentral = ((cfg.settings && cfg.settings.serverMode) || 'central') === 'central';
       sendWs({
         type: 'host:create',
-        publicBaseUrl: $('publicBase').value.trim() || undefined, // 空欄なら server 側で LAN/環境変数にフォールバック
+        publicBaseUrl: isCentral ? undefined : ($('publicBase').value.trim() || undefined),
         maxViewers: (cfg.settings && cfg.settings.maxViewers) || 1,
         accessMode: (cfg.settings && cfg.settings.accessMode) || 'approve',
         ttlMinutes: cfg.settings && Number.isFinite(cfg.settings.sessionTtlMinutes) ? cfg.settings.sessionTtlMinutes : 30,
