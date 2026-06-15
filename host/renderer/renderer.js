@@ -127,7 +127,8 @@
         if (cfg.settings) cfg.settings.serverMode = r.value;
         window.host.settingsSet({ serverMode: r.value });
         renderServerModeUi();
-        $('serverRestartHint').classList.remove('hidden'); // 再起動が必要であることを明示
+        // V-18: 再起動 hint は出さない。 main 側 (settings:set ハンドラ) が
+        //   webContents.reload() で renderer を自動再読込するので、 ユーザー再起動は不要。
       });
     }
     $('centralServerUrl').addEventListener('change', () => {
@@ -135,7 +136,7 @@
       if (cfg.settings) cfg.settings.centralServerUrl = v;
       window.host.settingsSet({ centralServerUrl: v });
       renderServerModeUi();
-      $('serverRestartHint').classList.remove('hidden');
+      // V-18: 同上、 再起動 hint は不要 (main 側で自動 reload)
     });
     renderServerModeUi();
 

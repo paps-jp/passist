@@ -131,6 +131,7 @@ try {
 
 function maybeSpawnServer() {
   if (REMOTE_SERVER_URL) return; // 外部サーバを使う場合は起動しない
+  if (serverProc && !serverProc.killed && serverProc.exitCode === null) return; // V-18: 既に起動済みは重複起動しない
   // 開発時は ../server、パッケージ時は resources/server（extraResources で同梱）
   const serverEntry = app.isPackaged
     ? path.join(process.resourcesPath, 'server', 'server.js')
@@ -299,10 +300,29 @@ ipcMain.handle('settings:get', () => settings.get());
 ipcMain.handle('settings:set', (_e, patch) => {
   const prev = settings.get();
   const res = settings.set(patch || {});
-  signalWs = computeSignalWs(); // serverMode/centralServerUrl の変更を反映（再起動で完全反映）
+  signalWs = computeSignalWs(); // serverMode/centralServerUrl の変更を反映
   // V-6: language が変わったらアプリメニューを再構築（renderer は location.reload で自身を直す）
   if (patch && 'language' in patch && patch.language !== prev.language) {
     try { buildAppMenu(); } catch {}
+  }
+  // V-18: serverMode / centralServerUrl が変わったら自動反映 (再起動不要):
+  //   1. self モードに変わった場合は内蔵 signaling 子プロセスを起動 (既に動いていれば skip)
+  //   2. mainWindow を reload して renderer が新しい cfg.signalWs を取得して再接続
+  const serverChanged = patch && (
+    ('serverMode' in patch && patch.serverMode !== prev.serverMode) ||
+    ('centralServerUrl' in patch && patch.centralServerUrl !== prev.centralServerUrl)
+  );
+  if (serverChanged) {
+    try {
+      const cur = settings.get();
+      if (cur.serverMode === 'self' && !REMOTE_SERVER_URL) {
+        if (platform.portmap.supported) openPublicPort().catch(() => {});
+        maybeSpawnServer(); // 重複起動防止は内部で
+      }
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.reload(); // renderer を再読込 → 新 signalWs で接続
+      }
+    } catch (e) { console.warn('[host] auto-apply server change failed:', e && e.message); }
   }
   return res;
 });
