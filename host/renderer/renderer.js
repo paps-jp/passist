@@ -960,7 +960,8 @@
   async function startPeerFor(viewerId) {
     closePeerFor(viewerId); // 再接続時の取りこぼし防止
     const pc = new RTCPeerConnection({ iceServers: buildIceServers() });
-    const entry = { pc, dc: null, viaRelay: false, routeReported: null };
+    // V-14: ICE restart 自動復活用の状態。 disconnected を 8 秒待ってから再交渉、 2 回まで再試行。
+    const entry = { pc, dc: null, viaRelay: false, routeReported: null, disconnectTimer: null, iceRestartAttempts: 0 };
     peers.set(viewerId, entry);
     for (const track of stream.getTracks()) pc.addTrack(track, stream);
     const dc = pc.createDataChannel('input');
@@ -996,9 +997,43 @@
       const st = pc.connectionState;
       if (st === 'failed' || st === 'closed') closePeerFor(viewerId); // 死んだ接続を解放
     };
+    // V-14: viewer 切断の自動復活ロジック。
+    //   disconnected を 8 秒待ち、 戻らなければ ICE restart (pc.createOffer({iceRestart:true}))
+    //   で同じ peer のまま candidate を再交渉する。 2 回まで再試行、 全部失敗で closePeerFor。
+    //   iOS Safari のバックグラウンド遷移 (画面ロック) → 復帰時の再接続を救う狙い。
     pc.oniceconnectionstatechange = () => {
       const s = pc.iceConnectionState;
-      if (s === 'connected' || s === 'completed') detectAndReportRoute(viewerId); // 経路確定後にrelay/p2p判定
+      const e = peers.get(viewerId);
+      if (!e) return;
+      if (s === 'connected' || s === 'completed') {
+        detectAndReportRoute(viewerId); // 経路確定後にrelay/p2p判定
+        if (e.disconnectTimer) { clearTimeout(e.disconnectTimer); e.disconnectTimer = null; }
+        e.iceRestartAttempts = 0; // 復活したらリセット
+      } else if (s === 'disconnected') {
+        if (e.disconnectTimer) clearTimeout(e.disconnectTimer);
+        e.disconnectTimer = setTimeout(async () => {
+          const cur = peers.get(viewerId);
+          if (!cur || cur.pc !== pc) return; // 既に閉じられていたら何もしない
+          if (cur.iceRestartAttempts >= 2) {
+            console.log(`[host] viewer ${viewerId} disconnected (no recovery after ${cur.iceRestartAttempts} ICE restart attempts), closing`);
+            closePeerFor(viewerId);
+            return;
+          }
+          cur.iceRestartAttempts++;
+          try {
+            const offer = await pc.createOffer({ iceRestart: true });
+            await pc.setLocalDescription(offer);
+            sendWs({ type: 'signal', to: viewerId, data: { sdp: pc.localDescription } });
+            console.log(`[host] ICE restart offer sent to viewer ${viewerId} (attempt ${cur.iceRestartAttempts}/2)`);
+          } catch (err) {
+            console.warn(`[host] ICE restart failed for viewer ${viewerId}:`, err && err.message);
+            closePeerFor(viewerId);
+          }
+        }, 8000); // 8 秒の grace period (短時間の揺らぎは自然回復するので待つ)
+      } else if (s === 'failed' || s === 'closed') {
+        if (e.disconnectTimer) { clearTimeout(e.disconnectTimer); e.disconnectTimer = null; }
+        // failed/closed は onconnectionstatechange で closePeerFor が呼ばれる
+      }
     };
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
@@ -1024,6 +1059,8 @@
     if (!p) return;
     // 経路が relay 扱いだったらサーバ集計を確実に減らす（viewer 側 close を待たずに即時）
     if (p.viaRelay) sendWs({ type: 'peer-route', viewerId, via: 'p2p' });
+    // V-14: ICE restart の保留タイマがあれば解除
+    if (p.disconnectTimer) { clearTimeout(p.disconnectTimer); p.disconnectTimer = null; }
     // ハンドラを外してから閉じる（閉じた後のコールバックで古い参照を触らない）
     if (p.dc) {
       try { p.dc.onopen = null; p.dc.onmessage = null; p.dc.close(); } catch {}
