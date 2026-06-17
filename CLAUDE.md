@@ -303,7 +303,7 @@ cosign verify ghcr.io/paps-jp/passist-signaling:vX.Y.Z \
   - `SIGNALING_IMAGE_DIGEST=sha256:...` — `/api/build` に公開される digest。 viewer の Cosign 検証で expected として使われるので、 pull 後の実 digest と一致させる
   - `ACCESS_MODE=approve` (host が viewer 1 件ずつ承認)
   - `TURN_AUTH_SECRET=...` (時限 TURN 認証用 master secret。 秘匿)
-  - `SIGN_TURN_URLS=turn:turn.passist.paps.jp:3478,turns:turn.passist.paps.jp:5349` 等
+  - `SIGN_TURN_URLS=turn:passist-turn.paps.jp:3478,turns:passist-turn.paps.jp:5349` 等
   - `ACME_EMAIL=paps@paps.jp`
 - VPS 構成スクリプト: `deploy/bootstrap.sh`（UFW・Docker 導入・`.env` 雛形生成）。
 
