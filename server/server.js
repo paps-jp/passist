@@ -93,6 +93,12 @@ function buildServerIceServers() {
   if (ICE_TURN_URL && ICE_TURN_USER && ICE_TURN_PASS) {
     list.push({ urls: ICE_TURN_URL, username: ICE_TURN_USER, credential: ICE_TURN_PASS });
   }
+  // V-20: 時限 TURN (SIGN_TURN_URLS + TURN_AUTH_SECRET) をホスト側にも配布。
+  //   従来は viewer 側 (accepted 時 msg.turn) にのみ配布していたが、 ホスト PC で
+  //   stun.l.google.com が DNS で引けない環境では srflx が取れず P2P 確立できない。
+  //   ホストも TURN 経由で relay できれば DNS 問題を回避できる。
+  const dynamicTurn = turnForViewer();
+  if (dynamicTurn) list.push(dynamicTurn);
   return list;
 }
 
