@@ -70,6 +70,27 @@ function crashLog(msg) {
   console.error('[host] ' + msg);
 }
 let lastRendererRecover = 0;
+// メインプロセス自体が uncaughtException 等で停止した時の自動再起動。
+// 30 秒以内の連続クラッシュはスキップ (これより速いループは原因を直すべきなのでログだけ残す)。
+let lastMainCrashRestart = 0;
+function scheduleMainRestart(reason) {
+  if (isQuitting) return;
+  const now = Date.now();
+  if (now - lastMainCrashRestart < 30000) {
+    crashLog(`crash too frequent, skip restart (${reason})`);
+    return;
+  }
+  lastMainCrashRestart = now;
+  try {
+    isQuitting = true;
+    // 内蔵 signaling 子プロセスを先に停止 (放置するとポート占有で新プロセスが起動できない)
+    if (serverProc) { try { serverProc.kill(); } catch {} }
+    app.relaunch();
+    app.exit(1);
+  } catch (err) {
+    crashLog('relaunch failed ' + err.message);
+  }
+}
 app.on('render-process-gone', (_e, _wc, d) => {
   crashLog('render-process-gone ' + JSON.stringify(d));
   // レンダラがクラッシュしても自動復帰（クラッシュループ防止に最短5秒間隔）
@@ -87,7 +108,10 @@ app.on('render-process-gone', (_e, _wc, d) => {
   }
 });
 app.on('child-process-gone', (_e, d) => crashLog('child-process-gone ' + JSON.stringify(d)));
-process.on('uncaughtException', (e) => crashLog('uncaughtException ' + (e && e.stack ? e.stack : e)));
+process.on('uncaughtException', (e) => {
+  crashLog('uncaughtException ' + (e && e.stack ? e.stack : e));
+  scheduleMainRestart('uncaughtException');
+});
 process.on('unhandledRejection', (r) => crashLog('unhandledRejection ' + (r && r.stack ? r.stack : r)));
 
 const REMOTE_SERVER_URL = process.env.REMOTE_SERVER_URL || ''; // 例: wss://example.com/ws（外部サーバ利用時）
@@ -106,6 +130,9 @@ let mainWindow = null;
 let tray = null;
 let isQuitting = false;
 let serverProc = null;
+// signaling 子プロセスの自動再起動用カウンタ (指数バックオフ)
+let serverRestartAttempts = 0;
+let lastServerRestart = 0;
 let selectedSourceId = null;
 let selectedSourceName = null;
 
@@ -137,7 +164,7 @@ function maybeSpawnServer() {
     ? path.join(process.resourcesPath, 'server', 'server.js')
     : path.join(__dirname, '..', 'server', 'server.js');
   const s = settings.get();
-  serverProc = spawn(process.execPath, [serverEntry], {
+  const child = spawn(process.execPath, [serverEntry], {
     env: {
       ...process.env,
       ELECTRON_RUN_AS_NODE: '1',
@@ -149,9 +176,32 @@ function maybeSpawnServer() {
     },
     stdio: 'pipe',
   });
-  serverProc.stdout.on('data', (d) => process.stdout.write(`[server] ${d}`));
-  serverProc.stderr.on('data', (d) => process.stderr.write(`[server] ${d}`));
-  serverProc.on('exit', (code) => console.log(`[host] signaling server exited: ${code}`));
+  serverProc = child;
+  child.stdout.on('data', (d) => process.stdout.write(`[server] ${d}`));
+  child.stderr.on('data', (d) => process.stderr.write(`[server] ${d}`));
+  child.on('exit', (code, signal) => {
+    console.log(`[host] signaling server exited: code=${code} signal=${signal}`);
+    if (serverProc === child) serverProc = null;
+    // 自動再起動の条件: アプリ終了中でない / 外部サーバ利用でない / self モードのまま
+    if (isQuitting) return;
+    if (REMOTE_SERVER_URL) return;
+    try { if (settings.get().serverMode !== 'self') return; } catch { return; }
+    // 連続クラッシュは指数バックオフ。 30 秒以上クラッシュが無ければカウンタをリセット。
+    const now = Date.now();
+    if (now - lastServerRestart > 30000) serverRestartAttempts = 0;
+    serverRestartAttempts++;
+    lastServerRestart = now;
+    if (serverRestartAttempts > 10) {
+      crashLog(`signaling server crashed ${serverRestartAttempts} times in a row, giving up`);
+      return;
+    }
+    const delay = Math.min(30000, 1000 * Math.pow(2, serverRestartAttempts - 1));
+    console.log(`[host] signaling server restart in ${delay}ms (attempt ${serverRestartAttempts})`);
+    setTimeout(() => {
+      if (isQuitting) return;
+      try { maybeSpawnServer(); } catch (e) { crashLog('server respawn failed ' + e.message); }
+    }, delay);
+  });
 }
 
 // 安全網: getDisplayMedia が使われた場合でも、選択済みウィンドウ以外は渡さない。
