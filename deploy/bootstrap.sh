@@ -106,8 +106,10 @@ fi
 
 # 監査ログ・公開集計の永続化ディレクトリを事前に作成し、IPを含む audit/ は厳格な権限に。
 # docker compose の volumes (./data:/data) でマウントされる。
+# 所有者は ghcr.io/paps-jp/passist-signaling イメージの node user (uid 1000) に合わせる。
+# $WWW_USER (uid 1001) にしてしまうとコンテナから書けず stats / audit が EACCES で全滅する。
 mkdir -p "$DEPLOY/data/audit"
-chown -R "$WWW_USER":"$WWW_USER" "$DEPLOY/data"
+chown -R 1000:1000 "$DEPLOY/data"
 chmod 750 "$DEPLOY/data"
 chmod 700 "$DEPLOY/data/audit"
 echo "[bootstrap] data/ created (audit/ is 700, contains IP logs)"

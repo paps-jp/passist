@@ -41,8 +41,10 @@ services:
       - "8443"
     volumes:
       # 監査ログと公開集計をホスト側に永続化。containerが消えても保持される。
-      # 監査ログには接続元IP等が含まれるため、ホスト側で 0700 推奨：
-      #   sudo chown -R root:root ./data && sudo chmod 700 ./data/audit
+      # 監査ログには接続元IP等が含まれるため、ホスト側で 0700 推奨。
+      # 所有者は signaling コンテナの node user (uid 1000) に合わせること
+      # ($WWW_USER 等にすると container が書けず stats / audit が EACCES で全滅する):
+      #   sudo chown -R 1000:1000 ./data && sudo chmod 750 ./data && sudo chmod 700 ./data/audit
       - ./data:/data
     networks:
       - pn
