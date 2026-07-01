@@ -14,7 +14,9 @@ services:
       PORT: 8443
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL}
       ACCESS_MODE: ${ACCESS_MODE:-approve}
-      SESSION_TTL_MS: ${SESSION_TTL_MS:-1800000}
+      # 既定 24 時間。 リモート監視用途で頻繁に切れないことを優先。 host:end で明示終了、
+      # ホスト切断時のセッション残留は 24h 経過で自動 GC。 .env で上書き可。
+      SESSION_TTL_MS: ${SESSION_TTL_MS:-86400000}
       # image digest は build 時には未確定なので、pull 後に docker image inspect で取得した値を
       # 起動時に渡して /api/build から公開する。デプロイスクリプトで自動入力可能。
       IMAGE_DIGEST: ${SIGNALING_IMAGE_DIGEST:-}

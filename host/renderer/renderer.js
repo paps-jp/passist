@@ -576,23 +576,20 @@
     b.classList.remove('hidden');
   }
 
-  // ホスト WS 自動再接続。指数バックオフで最大5回、5回失敗したら諦めてユーザー操作待ち。
-  // host:end / expired / sessionStarted=false（picker）では shouldReconnect=false にして停止。
-  // 成功した host:create で existingToken/hostSecret を送るため、URL は再接続前と同じが維持される。
+  // ホスト WS 自動再接続。 リモート監視用途で「絶対落ちない」ため回数上限を設けず、
+  // delay 上限 (30 秒) だけで暴走を抑制する。 host:end / expired / sessionStarted=false（picker）
+  // では shouldReconnect=false にして停止。 成功した host:create で existingToken/hostSecret
+  // を送るため、URL は再接続前と同じが維持される。
   let shouldReconnect = true;
   let reconnectAttempt = 0;
   let reconnectTimer = null;
-  const MAX_RECONNECT = 5;
   function clearReconnect() { if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; } }
   function scheduleReconnect() {
     if (!shouldReconnect || reconnectTimer) return;
-    if (reconnectAttempt >= MAX_RECONNECT) {
-      setStatus(tr('host.dyn.reconnectFail', { max: MAX_RECONNECT }));
-      return;
-    }
-    const delay = Math.min(30000, 500 * Math.pow(2, reconnectAttempt));
+    // 500ms, 1s, 2s, 4s, 8s, 16s, 30s, 30s, ... (Math.min で頭打ち)
+    const delay = Math.min(30000, 500 * Math.pow(2, Math.min(reconnectAttempt, 6)));
     reconnectAttempt++;
-    setStatus(tr('host.dyn.reconnecting', { n: reconnectAttempt, max: MAX_RECONNECT }));
+    setStatus(tr('host.dyn.reconnecting', { n: reconnectAttempt, max: '∞' }));
     reconnectTimer = setTimeout(() => { reconnectTimer = null; startSignaling(); }, delay);
   }
 
@@ -1013,8 +1010,33 @@
     };
     // V-14: viewer 切断の自動復活ロジック。
     //   disconnected を 8 秒待ち、 戻らなければ ICE restart (pc.createOffer({iceRestart:true}))
-    //   で同じ peer のまま candidate を再交渉する。 2 回まで再試行、 全部失敗で closePeerFor。
-    //   iOS Safari のバックグラウンド遷移 (画面ロック) → 復帰時の再接続を救う狙い。
+    //   で同じ peer のまま candidate を再交渉する。
+    //   V-21: リモート監視用途で「絶対落ちない」ため、 回数上限を撤廃して無限リトライ。
+    //   delay は 8s → 15s → 30s → 60s と伸ばし、 60s で頭打ち。 復活まで諦めず、
+    //   iceConnectionState が 'connected'/'completed' に戻ったら disconnectTimer をクリア。
+    //   iOS Safari のバックグラウンド遷移 / 一時的ネットワーク断でも復活を続ける。
+    function scheduleIceRestart(delayMs) {
+      const cur = peers.get(viewerId);
+      if (!cur || cur.pc !== pc) return;
+      if (cur.disconnectTimer) clearTimeout(cur.disconnectTimer);
+      cur.disconnectTimer = setTimeout(async () => {
+        const c = peers.get(viewerId);
+        if (!c || c.pc !== pc) return; // 既に張り替わっていたら停止
+        if (['connected', 'completed'].includes(pc.iceConnectionState)) return; // 復活済み
+        c.iceRestartAttempts++;
+        try {
+          const offer = await pc.createOffer({ iceRestart: true });
+          await pc.setLocalDescription(offer);
+          sendWs({ type: 'signal', to: viewerId, data: { sdp: pc.localDescription } });
+          console.log(`[host] ICE restart offer sent to viewer ${viewerId} (attempt ${c.iceRestartAttempts})`);
+        } catch (err) {
+          console.warn(`[host] ICE restart failed for viewer ${viewerId}:`, err && err.message);
+        }
+        // 諦めずに次のリトライを予約 (8s, 15s, 30s, 60s cap)
+        const nextDelay = Math.min(60000, 8000 * Math.pow(2, Math.max(0, c.iceRestartAttempts - 1)));
+        scheduleIceRestart(nextDelay);
+      }, delayMs);
+    }
     pc.oniceconnectionstatechange = () => {
       const s = pc.iceConnectionState;
       const e = peers.get(viewerId);
@@ -1024,26 +1046,7 @@
         if (e.disconnectTimer) { clearTimeout(e.disconnectTimer); e.disconnectTimer = null; }
         e.iceRestartAttempts = 0; // 復活したらリセット
       } else if (s === 'disconnected') {
-        if (e.disconnectTimer) clearTimeout(e.disconnectTimer);
-        e.disconnectTimer = setTimeout(async () => {
-          const cur = peers.get(viewerId);
-          if (!cur || cur.pc !== pc) return; // 既に閉じられていたら何もしない
-          if (cur.iceRestartAttempts >= 2) {
-            console.log(`[host] viewer ${viewerId} disconnected (no recovery after ${cur.iceRestartAttempts} ICE restart attempts), closing`);
-            closePeerFor(viewerId);
-            return;
-          }
-          cur.iceRestartAttempts++;
-          try {
-            const offer = await pc.createOffer({ iceRestart: true });
-            await pc.setLocalDescription(offer);
-            sendWs({ type: 'signal', to: viewerId, data: { sdp: pc.localDescription } });
-            console.log(`[host] ICE restart offer sent to viewer ${viewerId} (attempt ${cur.iceRestartAttempts}/2)`);
-          } catch (err) {
-            console.warn(`[host] ICE restart failed for viewer ${viewerId}:`, err && err.message);
-            closePeerFor(viewerId);
-          }
-        }, 8000); // 8 秒の grace period (短時間の揺らぎは自然回復するので待つ)
+        scheduleIceRestart(8000); // 8 秒の grace period (短時間の揺らぎは自然回復するので待つ)
       } else if (s === 'failed' || s === 'closed') {
         if (e.disconnectTimer) { clearTimeout(e.disconnectTimer); e.disconnectTimer = null; }
         // failed/closed は onconnectionstatechange で closePeerFor が呼ばれる
