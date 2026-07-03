@@ -16,6 +16,20 @@ const QRCode = require('qrcode'); // 共有URLのQRコード生成（スマホ�
 const localApi = require('./local-api'); // MCP 連携用のローカル HTTP API (127.0.0.1:8444)
 const mcpReg = require('./mcp-auto-register'); // MCP クライアント設定ファイルへの自動登録
 
+// V-22: Chromium の DNS 経路の耐障害化。
+// - disable-features=AsyncDns: HTTP/WS 経路の非同期 DNS を無効化 → system resolver に fallback。
+//   EDR / AV / MDM の DNS 検査 hook と Chromium 独自 resolver が干渉して -105 で落ちるのを回避。
+// - host-resolver-rules: WebRTC の p2p resolver は上記フラグを尊重しない別ルートを通るため、
+//   STUN/TURN で使うホスト名を明示的に IP に MAP して DNS そのものを bypass する。
+//   passist-turn.paps.jp は VPS (160.16.206.193 で固定) なので hard-code してもリスク低。
+//   stun.l.google.com はデフォルトの STUN で、 IP が変わっても他の STUN で代替できる余地あり。
+// これらは app.whenReady() より前に呼ぶ必要があるので、 module load 直後に配置。
+app.commandLine.appendSwitch('disable-features', 'AsyncDns');
+app.commandLine.appendSwitch(
+  'host-resolver-rules',
+  'MAP passist-turn.paps.jp 160.16.206.193, MAP stun.l.google.com 74.125.250.129',
+);
+
 // === MCP / Local API: renderer 往復用の Promise トラッキング ===
 // main → renderer に「mcp:get-share-state」 等のリクエストを送り、 renderer が
 // 'mcp:renderer-reply' で result + reqId を返す。 ここで Promise を resolve する。
@@ -154,6 +168,44 @@ try {
 } catch (e) {
   console.warn('[host] input module unavailable → 閲覧のみ:', e.message);
   input = null;
+}
+
+// V-24: 日次自動再起動。 リモート監視での長期稼働で Chromium / Electron の累積問題 (メモリ・
+//   キャプチャエンジンのリーク・DNS キャッシュ肥大等) を予防的にリセット。 session URL は
+//   existingToken/hostSecret の再利用で保たれ、 共有窓は settings.activeShareName から
+//   maybeResume() で自動復帰するため、 viewer 側は数秒〜十数秒の断のみで復活する。
+//   有効化は env var で: PASSIST_AUTO_RESTART_HOUR=3 (0-23) → 毎日その時刻に再起動。
+//   PASSIST_AUTO_RESTART_MINUTE=15 で分も指定可 (省略時 0)。 未設定なら無効。
+//   スリープ復帰後にも動くよう setTimeout ではなく setInterval で毎分チェック。
+let autoRestartTargetMs = 0;
+function scheduleAutoRestart() {
+  const h = parseInt(process.env.PASSIST_AUTO_RESTART_HOUR || '', 10);
+  const m = parseInt(process.env.PASSIST_AUTO_RESTART_MINUTE || '0', 10);
+  if (!Number.isFinite(h) || h < 0 || h > 23) return; // 未設定 or 範囲外
+  const mm = Number.isFinite(m) && m >= 0 && m <= 59 ? m : 0;
+  const computeNext = () => {
+    const now = new Date();
+    const t = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, mm, 0, 0);
+    if (t.getTime() <= now.getTime()) t.setDate(t.getDate() + 1); // 今日の時刻を過ぎていれば翌日
+    return t.getTime();
+  };
+  autoRestartTargetMs = computeNext();
+  console.log(`[host] auto-restart scheduled: ${new Date(autoRestartTargetMs).toISOString()}`);
+  setInterval(() => {
+    if (isQuitting) return;
+    if (Date.now() < autoRestartTargetMs) return;
+    // 発火: 次回発火時刻をずらして先に決めておく (relaunch 失敗時にも再発火しないよう)
+    autoRestartTargetMs = computeNext() + 24 * 60 * 60 * 1000; // 一旦 2 日先へ (再起動が正常なら意味なし)
+    console.log('[host] auto-restart firing (relaunch + exit)');
+    try {
+      isQuitting = true;
+      if (serverProc) { try { serverProc.kill(); } catch {} } // 内蔵 signaling を先に殺してポート開放
+      app.relaunch();
+      app.exit(0);
+    } catch (err) {
+      crashLog('auto-restart failed ' + err.message);
+    }
+  }, 60000); // 毎分
 }
 
 function maybeSpawnServer() {
@@ -869,6 +921,7 @@ if (!app.requestSingleInstanceLock()) {
     settings.init(path.join(app.getPath('userData'), 'passist-settings.json'));
     serverPort = parseInt(String(settings.get().port), 10) || 8443;
     signalWs = computeSignalWs(); // 中央サーバ / 自分のPC を設定に従って決定
+    scheduleAutoRestart(); // 日次自動再起動 (env var PASSIST_AUTO_RESTART_HOUR で有効化)
     trust.init(path.join(app.getPath('userData'), 'passist-trust.json'));
     setupDisplayMedia();
     buildAppMenu();

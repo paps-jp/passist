@@ -494,19 +494,140 @@
     // Electron キャプチャエンジンや Win32 API がクラッシュの起点になる。
     const vt = stream.getVideoTracks()[0];
     if (vt) vt.onended = handleCaptureLost;
+    startFrameWatchdog(); // V-25: フレームが止まった時にも onended と同じ経路で復旧に流す
   }
 
+  // V-25: フレーム停滞監視。 WGC の getFrame 失敗 (Windows Graphics Capture のタイムアウト等) は
+  //   MediaStreamTrack を 'ended' に落とさないため、 V-23 の onended ハンドラでは検出できない。
+  //   preview の currentTime が 15 秒 (5 秒 × 3 回連続で進まない) 動かなければ frame が止まった
+  //   とみなして handleCaptureLost() に流す → V-23 の recapture 経路に載る。
+  //   V-25 は「track が live なのにフレームが来ない」 という中途半端状態を専門にケアする。
+  let frameWatchdogTimer = null;
+  let frameWatchdogLastTime = 0;
+  let frameWatchdogStallCount = 0;
+  function startFrameWatchdog() {
+    stopFrameWatchdog();
+    frameWatchdogLastTime = 0;
+    frameWatchdogStallCount = 0;
+    frameWatchdogTimer = setInterval(() => {
+      const v = $('preview');
+      if (!v || !v.srcObject) return; // 共有中でない = 監視スキップ
+      if (!v.videoWidth) return; // まだ 1 枚目が来てない (起動直後の許容期間) = スキップ
+      const now = v.currentTime;
+      if (now === frameWatchdogLastTime) {
+        frameWatchdogStallCount++;
+        if (frameWatchdogStallCount >= 3) {
+          console.warn('[host] frame stall detected (~15s no advance), triggering handleCaptureLost');
+          frameWatchdogStallCount = 0;
+          frameWatchdogLastTime = 0;
+          handleCaptureLost(); // async だが await せず fire-and-forget (次の tick で recovery が走る)
+        }
+      } else {
+        frameWatchdogStallCount = 0;
+        frameWatchdogLastTime = now;
+      }
+    }, 5000);
+  }
+  function stopFrameWatchdog() {
+    if (frameWatchdogTimer) { clearInterval(frameWatchdogTimer); frameWatchdogTimer = null; }
+    frameWatchdogLastTime = 0;
+    frameWatchdogStallCount = 0;
+  }
+
+  // V-23: 共有トラックが 'ended' に落ちた際の自動復旧。
+  //   長時間稼働の途中で MediaStreamTrack が dead になる (Chromium キャプチャエンジンの内部エラー、
+  //   ウィンドウ最小化からの復帰、 権限一時失効等) と、 新規 viewer 接続が「接続中… 映像を待って
+  //   います」 で止まる。 ユーザに毎回「画面を選び直す」 操作を強いるのは監視用途で致命的なので、
+  //   まず同じ selectedSourceId で getDisplayMedia を再取得し、 既存 peer には replaceTrack で
+  //   差し替え (再ネゴ不要) → viewer 側は無停止で映像復活。
+  //   復旧不能 (ウィンドウが本当に閉じた / 権限失効) の場合のみ従来の撤収処理へ。
+  //   短時間 (10 秒以内) に何度も onended が発火する状況 = 系統的な問題なので、 ループ回避で撤収する。
+  let lastRecaptureAt = 0;
+  async function handleCaptureLost() {
+    if (Date.now() - lastRecaptureAt < 10000) {
+      console.warn('[host] track ended again within 10s of recapture — giving up, falling to teardown');
+      return teardownCapture();
+    }
+    lastRecaptureAt = Date.now();
+    const recovered = await tryAutoRecapture();
+    if (recovered) return;
+    return teardownCapture();
+  }
+  async function tryAutoRecapture() {
+    if (!lastSharedWindow) return false; // 初回選択前は復旧しようがない
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        // V-23.1: 対象アプリが再描画で HWND を作り直すケース (Electron 系や UWP でよくある) に対応。
+        //   保存された window 名で最新の windows:list を引き直し、 一致するものがあれば
+        //   selectSource で HWND を更新してから capture する。 これが「画面を選び直す」 操作の
+        //   自動版。 見つからない (窓が本当に閉じた) 場合は従来通り古い ID で試して失敗させる。
+        try {
+          const list = await window.host.listWindows();
+          const match = list.find((w) => w.name === lastSharedWindow.name);
+          if (match && match.id !== lastSharedWindow.id) {
+            await window.host.selectSource(match.id, match.name);
+            lastSharedWindow = { id: match.id, name: match.name };
+            console.log(`[host] auto-recapture: window HWND changed, updated to ${match.id}`);
+          }
+        } catch (e) {
+          console.warn('[host] auto-recapture: listWindows failed:', e && e.message);
+        }
+        const newStream = await capture(); // 更新済み selectedSourceId で新しい窓の stream を取得
+        const newTrack = newStream.getVideoTracks()[0];
+        if (!newTrack || newTrack.readyState !== 'live') {
+          try { newStream.getTracks().forEach((t) => t.stop()); } catch {}
+          throw new Error('new track not live');
+        }
+        // V-23.2: track.readyState だけでは「live だがフレーム 0」 の擬似成功を検出できない。
+        //   WGC (Windows Graphics Capture) は共有対象が最小化・保護状態・elevated 等の場合、
+        //   getFrame を 5 秒ごとに timeout し続ける (track は live のまま)。
+        //   実 frame が届いているかを preview の videoWidth で検証する。
+        const preview = $('preview');
+        preview.srcObject = newStream;
+        await new Promise((r) => setTimeout(r, 3000)); // 最初のフレームが届く時間を待つ
+        if (!preview.videoWidth || preview.videoWidth === 0) {
+          try { newStream.getTracks().forEach((t) => t.stop()); } catch {}
+          throw new Error('no frames after 3s (WGC likely timing out)');
+        }
+        // 既存 peer の video sender を新 track に差し替え (再ネゴ無し = viewer 無停止)
+        for (const [, p] of peers.entries()) {
+          const sender = p.pc.getSenders().find((s) => s.track && s.track.kind === 'video');
+          if (sender) { try { await sender.replaceTrack(newTrack); } catch (e) { console.warn('[host] replaceTrack failed:', e.message); } }
+        }
+        // 旧 stream を止めて差し替え、 preview も更新
+        const old = stream;
+        stream = newStream;
+        try { $('preview').srcObject = stream; } catch {}
+        if (old) { try { old.getTracks().forEach((t) => t.stop()); } catch {} }
+        // 新 track が 2 秒以上生きたら onended ハンドラを掛け直す (即死しても無限ループにしない)
+        setTimeout(() => { if (newTrack.readyState === 'live') newTrack.onended = handleCaptureLost; }, 2000);
+        startFrameWatchdog(); // V-25: 新 stream に対しても frame stall 監視を再開
+        console.log(`[host] auto-recapture success on attempt ${attempt}`);
+        return true;
+      } catch (e) {
+        console.warn(`[host] auto-recapture attempt ${attempt} failed: ${e && e.message}`);
+        if (attempt < 3) await new Promise((r) => setTimeout(r, 500 * Math.pow(2, attempt - 1)));
+      }
+    }
+    return false;
+  }
   // 共有していたウィンドウが消失したときの撤収処理。
   // セッション(URL/接続/承認)は維持して、ユーザーは「← 別の画面を選ぶ」で別ウィンドウを共有し直せる。
   // ホスト側の selectedSourceId と activeShareName をクリアして、無効HWND への以後のアクセスを止める。
-  function handleCaptureLost() {
+  function teardownCapture() {
+    stopFrameWatchdog(); // V-25: 共有停止時は監視も止める (recovery 経路の無限ループ抑止)
     try { $('preview').srcObject = null; } catch {}
     if (stream) {
       try { stream.getTracks().forEach((t) => t.stop()); } catch {}
       stream = null;
     }
-    // 次回起動時に閉じた窓を自動再開しようとして再クラッシュ → を防ぐ
-    try { window.host.settingsSet({ activeShareName: '' }); } catch {}
+    // V-23.3: activeShareName は保持する。 消してしまうと V-24 の日次自動再起動後に
+    // maybeResume() が early return して picker で止まってしまうため。 窓が本当に消えた
+    // ケースでも maybeResume() → findWindowByName() が null を返し → startWatch() で
+    // 「窓の起動を待つ」 状態に落ちるだけで crash 経路にはならない (元コメントの「再クラッシュ」
+    // 懸念は現行 main.js の setDisplayMediaRequestHandler では発生しない)。
+    // 明示的な「終了」 ボタンは別途 activeShareName='' を設定するため、 ユーザ意図的な終了は
+    // このまま尊重される (line 247 参照)。
     // ホスト側の selectedSourceId をクリア → 無効HWND での setDisplayMediaRequestHandler 応答や入力注入を止める
     try { window.host.selectSource(null, null); } catch {}
     setStatus(tr('host.dyn.windowClosed'));
