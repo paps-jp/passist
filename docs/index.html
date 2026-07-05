@@ -4,24 +4,24 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#78b3f7" />
-    <title>PAssist — ブラウザだけで1ウィンドウを共有・遠隔操作</title>
-    <meta name="description" content="PAssist は、自分のPCの「1つのウィンドウだけ」を、ブラウザ・アカウント不要で相手に共有し遠隔操作してもらえる Windows ツール。デスクトップ全体は決して映りません。無料・ダウンロードはこちら。" />
+    <title>PAssist — ブラウザだけで選んだ画面を共有・遠隔操作</title>
+    <meta name="description" content="PAssist は、自分のPCから選んだウィンドウまたはデスクトップ全体を、ブラウザ・アカウント不要で相手に共有し遠隔操作してもらえる Windows ツール。選んだ範囲以外は映りません。無料・ダウンロードはこちら。" />
     <link rel="icon" href="passist_min.svg" />
     <!-- OGP / Twitter Card -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="PAssist" />
     <meta property="og:locale" content="ja_JP" />
-    <meta property="og:title" content="PAssist — ブラウザだけで1ウィンドウを共有・遠隔操作" />
-    <meta property="og:description" content="選んだ1ウィンドウだけを、ブラウザ・アカウント不要で共有＆遠隔操作。デスクトップ全体は映りません。" />
+    <meta property="og:title" content="PAssist — ブラウザだけで選んだ画面を共有・遠隔操作" />
+    <meta property="og:description" content="選んだウィンドウまたはデスクトップ全体を、ブラウザ・アカウント不要で共有＆遠隔操作。選んだ範囲以外は映りません。" />
     <meta property="og:url" content="https://paps-jp.github.io/passist/" />
     <meta property="og:image" content="https://paps-jp.github.io/passist/ogp.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:type" content="image/png" />
-    <meta property="og:image:alt" content="PAssist — ブラウザだけで1つのウィンドウを共有・遠隔操作" />
+    <meta property="og:image:alt" content="PAssist — ブラウザだけで選んだ画面を共有・遠隔操作" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="PAssist — ブラウザだけで1ウィンドウを共有・遠隔操作" />
-    <meta name="twitter:description" content="選んだ1ウィンドウだけを、ブラウザ・アカウント不要で共有＆遠隔操作。デスクトップ全体は映りません。" />
+    <meta name="twitter:title" content="PAssist — ブラウザだけで選んだ画面を共有・遠隔操作" />
+    <meta name="twitter:description" content="選んだウィンドウまたはデスクトップ全体を、ブラウザ・アカウント不要で共有＆遠隔操作。選んだ範囲以外は映りません。" />
     <meta name="twitter:image" content="https://paps-jp.github.io/passist/ogp.png" />
     <style>
       :root{
@@ -149,10 +149,10 @@
         <button class="lang-btn" data-lang-btn="ja" onclick="setLang('ja')">日本語</button>
         <button class="lang-btn" data-lang-btn="en" onclick="setLang('en')">English</button>
       </div>
-      <h1 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)" data-i18n="lp.h1">PAssist — ブラウザだけで1ウィンドウを共有・遠隔操作</h1>
+      <h1 style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)" data-i18n="lp.h1">PAssist — ブラウザだけで選んだ画面を共有・遠隔操作</h1>
       <div class="logo-chip"><img src="passist.svg" alt="PAssist ロゴ" data-i18n-attr="alt:lp.logoAlt" /></div>
-      <p class="tagline" data-i18n="lp.tagline">ブラウザだけで、1つのウィンドウを共有・遠隔操作。</p>
-      <p class="sub" data-i18n-html="lp.sub">アカウント不要。相手は<strong>QRコードを読み取るだけ</strong>（またはURLを開くだけ）で、すぐに操作を開始。デスクトップ全体は決して映りません。</p>
+      <p class="tagline" data-i18n="lp.tagline">ブラウザだけで、選んだ画面を共有・遠隔操作。</p>
+      <p class="sub" data-i18n-html="lp.sub">アカウント不要。相手は<strong>QRコードを読み取るだけ</strong>（またはURLを開くだけ）で、すぐに操作を開始。共有されるのはあなたが選んだ<strong>ウィンドウまたはデスクトップ全体</strong>のみで、それ以外は映りません。</p>
       <div class="cta">
         <a class="btn btn-primary" href="https://github.com/paps-jp/passist/releases/latest/download/PAssist.exe"><svg class="ic"><use href="#i-download"/></svg><span data-i18n="lp.cta.download">Windows版をダウンロード</span></a>
         <a class="btn btn-ghost" href="docs.html"><svg class="ic"><use href="#i-book-open"/></svg><span data-i18n="lp.cta.docs">ドキュメント</span></a>
@@ -165,15 +165,15 @@
       <div class="wrap">
         <h2 class="title" data-i18n="lp.about.title">PAssist とは</h2>
         <p class="lead" data-i18n-html="lp.about.lead">
-          PAssist は Windows 向けのリモート操作ツールです。共有するのは<strong>選んだ 1 つのウィンドウだけ</strong>。
+          PAssist は Windows 向けのリモート操作ツールです。共有するのは<strong>あなたが選んだウィンドウ、またはデスクトップ全体</strong>のいずれか。
           操作する相手は<strong>ブラウザを開くだけ</strong>（インストール・アカウント不要）で、映像と操作は WebRTC で暗号化されて流れます。
         </p>
         <div class="features">
-          <div class="feat"><div class="ico c-blue"><svg class="ic"><use href="#i-app-window"/></svg></div><h3 data-i18n="lp.feat1.title">1ウィンドウだけ共有</h3><p data-i18n="lp.feat1.desc">選んだ1つのウィンドウのみ。デスクトップや他の画面は構造的に映りません。</p></div>
+          <div class="feat"><div class="ico c-blue"><svg class="ic"><use href="#i-app-window"/></svg></div><h3 data-i18n="lp.feat1.title">選んだ範囲だけ共有</h3><p data-i18n="lp.feat1.desc">共有対象は「特定のウィンドウ」か「デスクトップ全体」のいずれかを選択。選んだ範囲以外のアプリや通知は構造的に映りません。</p></div>
           <div class="feat"><div class="ico c-teal"><svg class="ic"><use href="#i-globe"/></svg></div><h3 data-i18n="lp.feat2.title">相手はブラウザだけ</h3><p data-i18n="lp.feat2.desc">インストールもアカウントも不要。送られたURLを開くだけで操作を開始できます。</p></div>
           <a class="feat" href="verification.html" style="text-decoration:none;color:inherit;display:block"><div class="ico c-lav"><svg class="ic"><use href="#i-lock"/></svg></div><h3 data-i18n="lp.feat3.title">検証に基づく安全性 →</h3><p data-i18n="lp.feat3.desc">WebRTC で映像はP2P＆DTLS-SRTP暗号化。さらに Reproducible Build + Cosign 署名で「サーバが公開コードと同じ」を数学的に検証可能。</p></a>
           <div class="feat"><div class="ico c-mint"><svg class="ic"><use href="#i-circle-check"/></svg></div><h3 data-i18n="lp.feat4.title">ホスト承認制</h3><p data-i18n="lp.feat4.desc">あなたが許可するまで何も映りません。信頼した端末は次回から自動接続も可能。</p></div>
-          <div class="feat"><div class="ico c-pink"><svg class="ic"><use href="#i-ban"/></svg></div><h3 data-i18n="lp.feat5.title">脱出キーをブロック</h3><p data-i18n="lp.feat5.desc">Win / Alt+Tab / Alt+F4 などを遮断。操作は対象ウィンドウの中だけに限定。</p></div>
+          <div class="feat"><div class="ico c-pink"><svg class="ic"><use href="#i-ban"/></svg></div><h3 data-i18n="lp.feat5.title">脱出キーをブロック</h3><p data-i18n="lp.feat5.desc">Win / Alt+Tab / Alt+F4 などを遮断。操作は共有中の対象内に限定。</p></div>
           <div class="feat"><div class="ico c-cream"><svg class="ic"><use href="#i-timer"/></svg></div><h3 data-i18n="lp.feat6.title">一時利用</h3><p data-i18n="lp.feat6.desc">セッションは期限付き（既定30分）。期限切れで自動的に失効します。無期限にも設定できます。</p></div>
         </div>
       </div>
@@ -186,7 +186,7 @@
         <div class="steps">
           <div class="step">
             <figure class="step-shot"><img src="screenshots/pick.png" alt="共有する画面を1つ選ぶ" data-i18n-attr="alt:lp.step1.alt" loading="lazy" /></figure>
-            <div class="step-body"><div class="n">1</div><h3 data-i18n="lp.step1.title">ウィンドウを選ぶ</h3><p data-i18n="lp.step1.desc">PAssist を起動し、共有したいウィンドウを 1 つクリックして選びます。</p></div>
+            <div class="step-body"><div class="n">1</div><h3 data-i18n="lp.step1.title">画面を選ぶ</h3><p data-i18n="lp.step1.desc">PAssist を起動し、共有したいウィンドウ、またはデスクトップ全体をクリックして選びます。</p></div>
           </div>
           <div class="step">
             <figure class="step-shot"><img src="screenshots/share.png" alt="リンクとQRコードを送る" data-i18n-attr="alt:lp.step2.alt" loading="lazy" /></figure>
@@ -246,7 +246,7 @@
           <p data-i18n-html="lp.bg.p1">特定非営利活動法人ぱっぷす（PAPS）は、性的な画像や動画の拡散、セクストーション（性的脅迫）、リベンジポルノなどのデジタル性暴力被害を受けた方々への相談支援を行うNPO法人です（<a href="https://paps.jp" target="_blank" rel="noopener">https://paps.jp</a>）。</p>
           <p data-i18n="lp.bg.p2">ぱっぷすの支援活動では、相談者への遠隔サポートや、スタッフ同士の技術支援、セキュリティの確保のために、画面共有やリモート操作が必要になる場面があります。しかし、市販のツールでは、支援現場で求められる要件やセキュリティ上の要請に十分対応できないことも多く、ぱっぷすでは必要な機能を備えたツールを独自に開発してきました。</p>
           <p data-i18n="lp.bg.p3">また、ぱっぷすは、ライブチャットやSNS、動画配信サービスなどのオンラインプラットフォーム上で発生するデジタル性暴力の相談支援を数多く行っており、インターネット上での情報流通やネットワーク技術、オンラインサービスの仕組みに関する知見を蓄積してきました。こうした支援現場で培われた経験と技術的知見も、PAssistの開発に活かされています。</p>
-          <p data-i18n="lp.bg.p4">PAssistは、そのような支援活動の中から生まれたツールの一つです。Windows上の特定のウィンドウを共有し、遠隔から閲覧・操作できるようにすることで、相談支援やチーム内での協働を円滑に行うことを目的としています。</p>
+          <p data-i18n="lp.bg.p4">PAssistは、そのような支援活動の中から生まれたツールの一つです。Windows 上の指定した画面（ウィンドウ、またはデスクトップ全体）を共有し、遠隔から閲覧・操作できるようにすることで、相談支援やチーム内での協働を円滑に行うことを目的としています。</p>
           <p data-i18n="lp.bg.p5">また、ぱっぷすではオープンソースの理念を重視しています。支援活動のために開発したツールのうち、他の団体や個人、さまざまな業務・教育・支援の現場でも活用できるものについては、今後も積極的に公開していきたいと考えています。</p>
           <p data-i18n="lp.bg.p6">PAssistが、さまざまな支援活動や日々の業務を支えるツールとして活用されることを願っています。</p>
         </div>
@@ -255,7 +255,7 @@
     </section>
 
     <footer>
-      <span data-i18n="lp.footer">PAssist — 単一ウィンドウ・ブラウザ完結・アカウント不要のリモート操作</span> ／
+      <span data-i18n="lp.footer">PAssist — 選んだ画面をブラウザで共有・遠隔操作、アカウント不要</span> ／
       <a href="https://github.com/paps-jp/passist">github.com/paps-jp/passist</a> ／
       <a href="privacy.html">プライバシーポリシー</a>
     </footer>

@@ -18,7 +18,7 @@
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:type" content="image/png" />
-    <meta property="og:image:alt" content="PAssist — ブラウザだけで1つのウィンドウを共有・遠隔操作" />
+    <meta property="og:image:alt" content="PAssist — ブラウザだけで選んだ画面を共有・遠隔操作" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="PAssist ドキュメント" />
     <meta name="twitter:description" content="PAssist の詳細ドキュメント。アーキテクチャ・使い方・アクセス制御・セキュリティ・検証・環境変数・セルフホスト・ビルドまで。" />
@@ -96,7 +96,7 @@
           <a href="verification.html" data-i18n="docs.crumbs.ver">🔐 検証に基づく安全性</a>
         </div>
         <h1 data-i18n="docs.h1">PAssist ドキュメント</h1>
-        <p data-i18n="docs.lead">このPCの「1つのウィンドウだけ」を、ブラウザだけ・アカウント不要で、離れた相手に一時的にリモート操作してもらうツール。デスクトップ全体は決して映りません。</p>
+        <p data-i18n="docs.lead">このPCから「選んだウィンドウ」または「デスクトップ全体」を、ブラウザだけ・アカウント不要で、離れた相手に一時的にリモート操作してもらうツール。選んだ範囲以外は映りません。</p>
       </div>
     </header>
 
@@ -121,19 +121,19 @@
       <main>
         <section id="overview">
           <h2><span class="e">📘</span><span data-i18n="docs.s1.title">1. 概要</span></h2>
-          <p data-i18n-html="docs.s1.p">PAssist は Windows 向けのリモート操作ツールです。共有するのは<strong>選んだ 1 つのウィンドウだけ</strong>。操作する相手は<strong>ブラウザを開くだけ</strong>（インストール・アカウント不要）。映像と操作は WebRTC で暗号化されて流れ、デスクトップ全体は構造的に映りません。</p>
-          <div class="note" data-i18n="docs.s1.note">ねらい：① 開いている任意のウィンドウを1つ選ぶ → ② 共有URL／QRを発行 → ③ 相手がブラウザだけで一時操作 → ④ デスクトップ全体は絶対に見せない → ⑤ アカウント作成なしで入れる。</div>
+          <p data-i18n-html="docs.s1.p">PAssist は Windows 向けのリモート操作ツールです。共有するのは<strong>あなたが選んだウィンドウ、またはデスクトップ全体</strong>のいずれか。操作する相手は<strong>ブラウザを開くだけ</strong>（インストール・アカウント不要）。映像と操作は WebRTC で暗号化されて流れ、選んだ範囲以外は構造的に映りません。</p>
+          <div class="note" data-i18n="docs.s1.note">ねらい：① 開いているウィンドウ、またはデスクトップ全体を選ぶ → ② 共有URL／QRを発行 → ③ 相手がブラウザだけで一時操作 → ④ 選んだ範囲以外は映らない → ⑤ アカウント作成なしで入れる。</div>
         </section>
 
         <section id="features">
           <h2><span class="e">✨</span><span data-i18n="docs.s2.title">2. できること</span></h2>
           <table>
             <tr><th data-i18n="docs.s2.th.req">要件</th><th data-i18n="docs.s2.th.impl">実装</th></tr>
-            <tr><td data-i18n="docs.s2.r1.req">任意のウィンドウを1つだけ選ぶ</td><td data-i18n-html="docs.s2.r1.impl">開いているウィンドウ一覧から選択。キャプチャ元は <code>window</code> のみ列挙し <code>screen</code> は一切扱わない。</td></tr>
+            <tr><td data-i18n="docs.s2.r1.req">ウィンドウまたはデスクトップ全体を選ぶ</td><td data-i18n-html="docs.s2.r1.impl">picker で開いているウィンドウ、またはデスクトップ全体を選択。キャプチャ元は選択 ID に固定され、それ以外は渡らない。</td></tr>
             <tr><td data-i18n="docs.s2.r2.req">URL／QRを発行</td><td data-i18n-html="docs.s2.r2.impl">選択すると共有URL（<code>…/s/&lt;token&gt;</code>）を自動発行。スマホ用にQRコードも表示。</td></tr>
             <tr><td data-i18n="docs.s2.r3.req">ブラウザだけで一時操作</td><td data-i18n="docs.s2.r3.impl">WebRTC で映像、DataChannel でマウス/キー操作。相手はブラウザのみ。</td></tr>
             <tr><td data-i18n="docs.s2.r4.req">複数人で同時に</td><td data-i18n-html="docs.s2.r4.impl">同時接続を設定可能。<strong>操作できるのは常に1人</strong>（最初の接続者）、ほかは閲覧。全員「閲覧のみ」にも切替可。</td></tr>
-            <tr><td data-i18n="docs.s2.r5.req">デスクトップ全体は出さない</td><td data-i18n="docs.s2.r5.impl">選んだ1ウィンドウの映像のみ。構造的に画面全体を渡せない設計。</td></tr>
+            <tr><td data-i18n="docs.s2.r5.req">選んだ範囲以外は出さない</td><td data-i18n="docs.s2.r5.impl">ユーザが picker で選んだ対象（ウィンドウまたはデスクトップ全体）の映像のみ。選択範囲外のアプリや通知は構造的に渡らない。</td></tr>
             <tr><td data-i18n="docs.s2.r6.req">アカウント不要</td><td data-i18n="docs.s2.r6.impl">URLのトークンだけで接続。ログインなし。</td></tr>
             <tr><td data-i18n="docs.s2.r7.req">一時利用</td><td data-i18n="docs.s2.r7.impl">セッションに有効期限（既定30分、変更可・無期限も可）。期限切れで自動失効。</td></tr>
             <tr><td data-i18n="docs.s2.r8.req">検証できる</td><td data-i18n-html="docs.s2.r8.impl">サーバが「公開コードと同一」であることをブラウザが自動で暗号学的に検証（<a href="verification.html">詳細</a>）。</td></tr>
@@ -227,7 +227,7 @@
           <h2><span class="e">🛡️</span><span data-i18n="docs.s7.title">7. セキュリティ</span></h2>
           <table>
             <tr><th data-i18n="docs.s7.th.aspect">観点</th><th data-i18n="docs.s7.th.measure">対策</th></tr>
-            <tr><td data-i18n="docs.s7.r1.aspect">1ウィンドウ限定</td><td data-i18n-html="docs.s7.r1.measure">キャプチャ元に <code>screen</code> を列挙せず、選択IDに固定。デスクトップ・他ウィンドウは映らない。</td></tr>
+            <tr><td data-i18n="docs.s7.r1.aspect">選択範囲限定</td><td data-i18n-html="docs.s7.r1.measure">キャプチャ元は picker で明示選択した ID に固定。ユーザが選んだ以外のウィンドウ・アプリは映らない。</td></tr>
             <tr><td data-i18n="docs.s7.r2.aspect">一時利用</td><td data-i18n="docs.s7.r2.measure">セッションに有効期限（既定30分）。期限切れで自動失効。</td></tr>
             <tr><td data-i18n="docs.s7.r3.aspect">勝手に繋がせない</td><td data-i18n="docs.s7.r3.measure">既定でホスト承認制。許可するまで映像は流れない。PIN／招待リンクのモードも有り。</td></tr>
             <tr><td data-i18n="docs.s7.r4.aspect">事前承認（信頼端末）</td><td data-i18n="docs.s7.r4.measure">端末ごとのクレデンシャル。ホストはハッシュ（SHA-256）のみ保存。</td></tr>
