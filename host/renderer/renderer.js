@@ -421,9 +421,16 @@
         cap.appendChild(ico);
       }
       const label = document.createElement('span');
-      label.textContent = w.name;
+      // V-26: screen は「🖥️」 プレフィックスで一目で分かるように
+      label.textContent = w.isScreen ? '🖥️ ' + w.name : w.name;
       cap.appendChild(label);
-      if (w.owned) {
+      if (w.isScreen) {
+        const sub = document.createElement('span');
+        sub.className = 'subhint';
+        sub.textContent = tr('host.picker.screenSub');
+        cap.appendChild(sub);
+        card.title = tr('host.picker.screenTitle');
+      } else if (w.owned) {
         // owned 窓（アプリ本体に付随する別ウィンドウ）。どの本体のものか分かるよう注記。
         const sub = document.createElement('span');
         sub.className = 'subhint';

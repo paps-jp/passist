@@ -1,8 +1,10 @@
 'use strict';
 // Electron メインプロセス。
-// - 開いている「ウィンドウ」だけを列挙（screen は一切扱わない → デスクトップ全体は出せない）
-// - 選択ウィンドウのキャプチャ要求に応える
+// - 開いている「ウィンドウ」に加え、「デスクトップ全体 (screen)」も列挙する (V-26)
+//   ウィンドウ選択が原則、 デスクトップ全体はリモート監視等で明示的にユーザが選ぶ場合のみ
+// - 選択ウィンドウ / スクリーンのキャプチャ要求に応える
 // - レンダラから来た入力イベントをネイティブ注入モジュールへ橋渡し
+//   (screen 選択時は特定 HWND への注入ができないため、 監視用途では readonly 設定推奨)
 // - 開発時はシグナリングサーバを子プロセスとして自動起動
 
 const { app, BrowserWindow, desktopCapturer, session, ipcMain, Tray, Menu, nativeImage, shell, dialog, nativeTheme, clipboard, systemPreferences } = require('electron');
@@ -261,7 +263,7 @@ function setupDisplayMedia() {
   session.defaultSession.setDisplayMediaRequestHandler(
     (_request, callback) => {
       desktopCapturer
-        .getSources({ types: ['window'] }) // ★ 'screen' を含めない
+        .getSources({ types: ['window', 'screen'] }) // V-26: screen (デスクトップ全体) も選択肢に含める
         .then((sources) => {
           const chosen = sources.find((s) => s.id === selectedSourceId);
           if (chosen) return callback({ video: chosen });
@@ -280,8 +282,11 @@ function setupDisplayMedia() {
 }
 
 ipcMain.handle('windows:list', async () => {
+  // V-26: window だけでなく screen (デスクトップ全体) も列挙対象に。 リモート監視で
+  //   「特定のウィンドウ 1 つ」 では足りず、 モニタ全体を配信したいケースへ対応。
+  //   screen ソースは isScreen=true を付けて renderer 側で明示表示する。
   const sources = await desktopCapturer.getSources({
-    types: ['window'], // ★ ウィンドウのみ
+    types: ['window', 'screen'],
     fetchWindowIcons: true,
     thumbnailSize: { width: 320, height: 200 },
   });
@@ -291,6 +296,7 @@ ipcMain.handle('windows:list', async () => {
     name: s.name,
     thumbnail: s.thumbnail && !s.thumbnail.isEmpty() ? s.thumbnail.toDataURL() : null,
     appIcon: s.appIcon && !s.appIcon.isEmpty() ? s.appIcon.toDataURL() : null,
+    isScreen: s.id.startsWith('screen:'),
   }));
 
   // owned 窓（付随ウィンドウ）の自動掲載。
