@@ -260,6 +260,16 @@ function maybeSpawnServer() {
 
 // 安全網: getDisplayMedia が使われた場合でも、選択済みウィンドウ以外は渡さない。
 function setupDisplayMedia() {
+  // V-27: webcam (navigator.mediaDevices.getUserMedia) の許可要求を自動で通す。
+  //   PAssist の renderer は origin file:// / 内蔵の picker 経由でしか呼ばないので、
+  //   追加のユーザプロンプトは要らない (呼び手が同一プロセスで信頼できる)。
+  session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
+    if (permission === 'media') return callback(true);
+    callback(false);
+  });
+  session.defaultSession.setPermissionCheckHandler((_wc, permission) => {
+    return permission === 'media';
+  });
   session.defaultSession.setDisplayMediaRequestHandler(
     (_request, callback) => {
       desktopCapturer

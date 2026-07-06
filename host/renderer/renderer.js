@@ -400,13 +400,18 @@
   async function loadWindows() {
     const grid = $('grid');
     grid.innerHTML = '<p class="hint">' + tr('host.picker.loading') + '</p>';
-    const wins = await window.host.listWindows();
+    // V-27: window/screen と webcam を並行取得。 webcam は先頭に並べる (よく使う想定)。
+    const [wins, cams] = await Promise.all([
+      window.host.listWindows(),
+      listCameras(),
+    ]);
+    const items = [...cams, ...wins];
     grid.innerHTML = '';
-    if (!wins.length) {
+    if (!items.length) {
       grid.innerHTML = '<p class="hint">' + tr('host.picker.empty') + '</p>';
       return;
     }
-    for (const w of wins) {
+    for (const w of items) {
       const card = document.createElement('button');
       card.className = 'card';
       const thumb = document.createElement('img');
@@ -421,10 +426,18 @@
         cap.appendChild(ico);
       }
       const label = document.createElement('span');
-      // V-26: screen は「🖥️」 プレフィックスで一目で分かるように
-      label.textContent = w.isScreen ? '🖥️ ' + w.name : w.name;
+      // V-26: screen は 🖥️、 V-27: webcam は 📷 プレフィックスで一目で分かるように
+      label.textContent = w.isCamera ? '📷 ' + w.name
+        : w.isScreen ? '🖥️ ' + w.name
+        : w.name;
       cap.appendChild(label);
-      if (w.isScreen) {
+      if (w.isCamera) {
+        const sub = document.createElement('span');
+        sub.className = 'subhint';
+        sub.textContent = tr('host.picker.cameraSub');
+        cap.appendChild(sub);
+        card.title = tr('host.picker.cameraTitle');
+      } else if (w.isScreen) {
         const sub = document.createElement('span');
         sub.className = 'subhint';
         sub.textContent = tr('host.picker.screenSub');
@@ -445,9 +458,48 @@
   }
 
   async function capture() {
+    // V-27: webcam (isCamera=true) の場合は getUserMedia で直接デバイスから取得。
+    //   通常のウィンドウ / screen は getDisplayMedia (main 側 setDisplayMediaRequestHandler 経由)。
+    if (lastSharedWindow && lastSharedWindow.isCamera) {
+      const deviceId = String(lastSharedWindow.id || '').replace(/^camera:/, '');
+      return await navigator.mediaDevices.getUserMedia({
+        video: {
+          deviceId: deviceId ? { exact: deviceId } : undefined,
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30 },
+        },
+        audio: false,
+      });
+    }
     // 選択ウィンドウは main 側の setDisplayMediaRequestHandler が selectedSourceId で固定して返す。
     // （古い getUserMedia + chromeMediaSource:'desktop' は新しい Electron で不安定/クラッシュ要因のため使わない）
     return await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+  }
+
+  // V-27: 利用可能な webcam を列挙して picker に足す。 label が空の時 (permission 未取得時) は
+  //   仮の名前 (Webcam 1, Webcam 2) で表示。 実際に選択された時に getUserMedia が走って
+  //   permission ダイアログ が出る (main.js 側で setPermissionRequestHandler を許可済み)。
+  async function listCameras() {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      let idx = 0;
+      return devices
+        .filter((d) => d.kind === 'videoinput')
+        .map((d) => {
+          idx++;
+          return {
+            id: 'camera:' + d.deviceId,
+            name: d.label || tr('host.picker.cameraFallback', { n: idx }),
+            thumbnail: null,
+            appIcon: null,
+            isCamera: true,
+          };
+        });
+    } catch (e) {
+      console.warn('[host] camera enumeration failed:', e && e.message);
+      return [];
+    }
   }
 
   async function choose(w, opts) {
@@ -568,16 +620,20 @@
         //   保存された window 名で最新の windows:list を引き直し、 一致するものがあれば
         //   selectSource で HWND を更新してから capture する。 これが「画面を選び直す」 操作の
         //   自動版。 見つからない (窓が本当に閉じた) 場合は従来通り古い ID で試して失敗させる。
-        try {
-          const list = await window.host.listWindows();
-          const match = list.find((w) => w.name === lastSharedWindow.name);
-          if (match && match.id !== lastSharedWindow.id) {
-            await window.host.selectSource(match.id, match.name);
-            lastSharedWindow = { id: match.id, name: match.name };
-            console.log(`[host] auto-recapture: window HWND changed, updated to ${match.id}`);
+        //   V-27: webcam の場合は HWND という概念が無いのでこのステップはスキップ。
+        //   deviceId は不変前提 (USB 抜き差しで変わるケースは capture() で throw → 別 attempt)。
+        if (!lastSharedWindow.isCamera) {
+          try {
+            const list = await window.host.listWindows();
+            const match = list.find((w) => w.name === lastSharedWindow.name);
+            if (match && match.id !== lastSharedWindow.id) {
+              await window.host.selectSource(match.id, match.name);
+              lastSharedWindow = { id: match.id, name: match.name };
+              console.log(`[host] auto-recapture: window HWND changed, updated to ${match.id}`);
+            }
+          } catch (e) {
+            console.warn('[host] auto-recapture: listWindows failed:', e && e.message);
           }
-        } catch (e) {
-          console.warn('[host] auto-recapture: listWindows failed:', e && e.message);
         }
         const newStream = await capture(); // 更新済み selectedSourceId で新しい窓の stream を取得
         const newTrack = newStream.getVideoTracks()[0];
@@ -657,10 +713,12 @@
   }
 
   async function findWindowByName(name) {
-    const wins = await window.host.listWindows();
+    // V-27: window / screen に加え webcam も探索対象に。
+    const [wins, cams] = await Promise.all([window.host.listWindows(), listCameras()]);
+    const all = [...cams, ...wins];
     return (
-      wins.find((w) => w.name === name) ||
-      wins.find((w) => w.name && (w.name.includes(name) || name.includes(w.name))) ||
+      all.find((w) => w.name === name) ||
+      all.find((w) => w.name && (w.name.includes(name) || name.includes(w.name))) ||
       null
     );
   }
