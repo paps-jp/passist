@@ -397,15 +397,29 @@
     });
   }
 
+  // V-23.7.1: リロードのたびに grid.innerHTML を全消し + 再構築するとチカチカする。
+  //   前回の項目 signature (id + name + フラグ) を覚えておき、 中身に変化が無ければ
+  //   DOM を触らない。 「Loading…」 placeholder も初回だけ表示。
+  let lastPickerSignature = '';
   async function loadWindows() {
     const grid = $('grid');
-    grid.innerHTML = '<p class="hint">' + tr('host.picker.loading') + '</p>';
+    // 初回 (grid が空 or hint 表示のみ) のみ Loading… を表示
+    const hasCards = grid && grid.querySelector('button.card');
+    if (!hasCards) grid.innerHTML = '<p class="hint">' + tr('host.picker.loading') + '</p>';
     // V-27: window/screen と webcam を並行取得。 webcam は先頭に並べる (よく使う想定)。
     const [wins, cams] = await Promise.all([
       window.host.listWindows(),
       listCameras(),
     ]);
     const items = [...cams, ...wins];
+    // V-23.7.1: signature が変わってなければ DOM 更新をスキップ (チカチカ抑止)。
+    //   thumbnail は変わることがあっても id/name/種別が同じなら「同じ候補」 とみなす。
+    const sig = JSON.stringify(items.map((w) => ({
+      id: w.id, name: w.name,
+      isCamera: !!w.isCamera, isScreen: !!w.isScreen, owned: !!w.owned,
+    })));
+    if (sig === lastPickerSignature && hasCards) return; // 差分無し
+    lastPickerSignature = sig;
     grid.innerHTML = '';
     if (!items.length) {
       grid.innerHTML = '<p class="hint">' + tr('host.picker.empty') + '</p>';
