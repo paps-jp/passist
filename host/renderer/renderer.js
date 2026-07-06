@@ -705,6 +705,10 @@
     // ホスト側の selectedSourceId をクリア → 無効HWND での setDisplayMediaRequestHandler 応答や入力注入を止める
     try { window.host.selectSource(null, null); } catch {}
     setStatus(tr('host.dyn.windowClosed'));
+    // V-23.4: 24h 監視用途だと session 画面のまま止めてもユーザに気付かれない。 picker を
+    // 強制展開して再選択を視覚的に促す。 既存 viewer の接続 URL / 承認状態は保持されているので、
+    // 再選択したら choose() の replaceTrack で無停止で映像が復活する。
+    openPickerForReselect();
   }
 
   // --- セッション自動再開 / ウィンドウ監視 ---
@@ -723,15 +727,40 @@
     else startWatch(name);
   }
 
+  // V-23.5: 対象アプリの window title は同じ窓でも「-」 「(未保存)」 等の suffix が動的に
+  //   変わることが多い。 lastSharedWindow.name と現在の window の name が微妙に違うだけで
+  //   findWindowByName が null 返しになり teardown 経路に落ちるのを防ぐ。
+  //   末尾の「- xxx」 「(xxx)」 「[xxx]」 を剥がしたキャノニカル名で追加比較する。
+  function canonicalWindowName(name) {
+    if (!name) return '';
+    return String(name)
+      .replace(/\s*[\-—–\|]\s*[^\-—–\|]+$/, '') // 末尾 " - Something" を除去
+      .replace(/\s*\([^)]*\)\s*$/, '')            // 末尾 "(unsaved)" 等を除去
+      .replace(/\s*\[[^\]]*\]\s*$/, '')           // 末尾 "[modified]" 等を除去
+      .trim();
+  }
   async function findWindowByName(name) {
     // V-27: window / screen に加え webcam も探索対象に。
     const [wins, cams] = await Promise.all([window.host.listWindows(), listCameras()]);
     const all = [...cams, ...wins];
-    return (
-      all.find((w) => w.name === name) ||
-      all.find((w) => w.name && (w.name.includes(name) || name.includes(w.name))) ||
-      null
-    );
+    // Level 1: 完全一致
+    let hit = all.find((w) => w.name === name);
+    if (hit) return hit;
+    // Level 2: 部分一致 (双方向)
+    hit = all.find((w) => w.name && (w.name.includes(name) || name.includes(w.name)));
+    if (hit) return hit;
+    // Level 3: V-23.5 canonical name (suffix 除去) で再比較
+    const canon = canonicalWindowName(name);
+    if (canon && canon !== name) {
+      hit = all.find((w) => canonicalWindowName(w.name) === canon);
+      if (hit) return hit;
+      hit = all.find((w) => {
+        const c = canonicalWindowName(w.name);
+        return c && (c.includes(canon) || canon.includes(c));
+      });
+      if (hit) return hit;
+    }
+    return null;
   }
 
   function startWatch(name) {
@@ -1164,8 +1193,26 @@
     const box = $('inviteBox'); if (box) box.classList.toggle('hidden', !isInvite);
   }
 
+  // V-28: stream を失った状態 (auto-recapture 3 回失敗 → teardownCapture 実行済み) で
+  //   新規 viewer が来ると、 startPeerFor 内の stream.getTracks() で TypeError が投げられ、
+  //   uncaught promise rejection になって viewer が offer を受け取れず永久待機した。
+  //   picker を強制展開してユーザに再選択を促す + 状態バーで通知する。
+  function openPickerForReselect() {
+    try { $('session').classList.add('hidden'); } catch {}
+    try { $('picker').classList.remove('hidden'); } catch {}
+    try { loadWindows(); } catch (e) { console.warn('loadWindows failed:', e && e.message); }
+  }
+
   // ビューアごとに peer 接続を張る（同じキャプチャ stream を各接続へ送る＝メッシュ）
   async function startPeerFor(viewerId) {
+    // V-28: stream 無し状態での startPeerFor は早期 return。 従来は下の
+    // stream.getTracks() が null で throw して silent 死になっていた。
+    if (!stream) {
+      console.warn(`[host] startPeerFor(${viewerId}): stream is null (recapture 済み/teardown 済み)、 picker を開いて再選択促す`);
+      setStatus(tr('host.dyn.streamLostReselect'));
+      openPickerForReselect();
+      return;
+    }
     closePeerFor(viewerId); // 再接続時の取りこぼし防止
     const pc = new RTCPeerConnection({ iceServers: buildIceServers() });
     // V-14: ICE restart 自動復活用の状態。 disconnected を 8 秒待ってから再交渉、 2 回まで再試行。
