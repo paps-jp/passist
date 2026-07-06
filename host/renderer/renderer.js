@@ -480,22 +480,33 @@
   // V-27: 利用可能な webcam を列挙して picker に足す。 label が空の時 (permission 未取得時) は
   //   仮の名前 (Webcam 1, Webcam 2) で表示。 実際に選択された時に getUserMedia が走って
   //   permission ダイアログ が出る (main.js 側で setPermissionRequestHandler を許可済み)。
+  // V-27.1: 同名カメラ (同じモデルを 2 台挿してる等) を見分けられるよう、 重複したら
+  //   末尾に (1), (2)... を自動付与。 単独の label は素のまま。
   async function listCameras() {
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
-      let idx = 0;
-      return devices
-        .filter((d) => d.kind === 'videoinput')
-        .map((d) => {
-          idx++;
-          return {
-            id: 'camera:' + d.deviceId,
-            name: d.label || tr('host.picker.cameraFallback', { n: idx }),
-            thumbnail: null,
-            appIcon: null,
-            isCamera: true,
-          };
-        });
+      const cams = devices.filter((d) => d.kind === 'videoinput');
+      let fallbackIdx = 0;
+      const bases = cams.map((d) => d.label || tr('host.picker.cameraFallback', { n: ++fallbackIdx }));
+      const totals = new Map();
+      for (const b of bases) totals.set(b, (totals.get(b) || 0) + 1);
+      const seen = new Map();
+      return cams.map((d, i) => {
+        const base = bases[i];
+        let name = base;
+        if (totals.get(base) > 1) {
+          const n = (seen.get(base) || 0) + 1;
+          seen.set(base, n);
+          name = `${base} (${n})`;
+        }
+        return {
+          id: 'camera:' + d.deviceId,
+          name,
+          thumbnail: null,
+          appIcon: null,
+          isCamera: true,
+        };
+      });
     } catch (e) {
       console.warn('[host] camera enumeration failed:', e && e.message);
       return [];
