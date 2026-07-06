@@ -572,17 +572,32 @@
   //   preview の currentTime が 15 秒 (5 秒 × 3 回連続で進まない) 動かなければ frame が止まった
   //   とみなして handleCaptureLost() に流す → V-23 の recapture 経路に載る。
   //   V-25 は「track が live なのにフレームが来ない」 という中途半端状態を専門にケアする。
+  // V-25.1: 初回フレーム到達待ちの間 videoWidth=0 だが、 WGC が「一度もフレームを返せない」
+  //   ケース (対象窓が最小化・elevated・DRM 保護等) では従来 skip し続けて発火しなかった。
+  //   startFrameWatchdog 起動時刻を記録し、 20 秒経っても videoWidth=0 なら stall とみなして発火。
   let frameWatchdogTimer = null;
   let frameWatchdogLastTime = 0;
   let frameWatchdogStallCount = 0;
+  let frameWatchdogFirstFrameAwaitStart = 0;
   function startFrameWatchdog() {
     stopFrameWatchdog();
     frameWatchdogLastTime = 0;
     frameWatchdogStallCount = 0;
+    frameWatchdogFirstFrameAwaitStart = Date.now();
     frameWatchdogTimer = setInterval(() => {
       const v = $('preview');
       if (!v || !v.srcObject) return; // 共有中でない = 監視スキップ
-      if (!v.videoWidth) return; // まだ 1 枚目が来てない (起動直後の許容期間) = スキップ
+      if (!v.videoWidth) {
+        // V-25.1: 20 秒経っても 1 枚目が来ない = WGC が完全に詰まってる → 発火
+        if (frameWatchdogFirstFrameAwaitStart && Date.now() - frameWatchdogFirstFrameAwaitStart > 20000) {
+          console.warn('[host] no first frame within 20s → triggering handleCaptureLost');
+          frameWatchdogFirstFrameAwaitStart = 0;
+          handleCaptureLost();
+        }
+        return;
+      }
+      // 1 枚目が到達したので await タイマは無効化、 定常の stall 監視に切り替え
+      frameWatchdogFirstFrameAwaitStart = 0;
       const now = v.currentTime;
       if (now === frameWatchdogLastTime) {
         frameWatchdogStallCount++;
@@ -602,6 +617,7 @@
     if (frameWatchdogTimer) { clearInterval(frameWatchdogTimer); frameWatchdogTimer = null; }
     frameWatchdogLastTime = 0;
     frameWatchdogStallCount = 0;
+    frameWatchdogFirstFrameAwaitStart = 0;
   }
 
   // V-23: 共有トラックが 'ended' に落ちた際の自動復旧。
@@ -709,6 +725,15 @@
     // 強制展開して再選択を視覚的に促す。 既存 viewer の接続 URL / 承認状態は保持されているので、
     // 再選択したら choose() の replaceTrack で無停止で映像が復活する。
     openPickerForReselect();
+    // V-23.6: 対象アプリが「再起動」 系のケースでは、 一時的に窓が消えて数秒〜数十秒後に
+    //   同名で戻ってくる。 startWatch (4 秒毎の polling) を起動しておけば、 復活した瞬間に
+    //   findWindowByName が拾って choose(src, {auto:true}) で自動再共有される。
+    //   ユーザがその場に居なくても勝手に復旧するので 24h 監視で有効。
+    try {
+      const s = cfg && cfg.settings;
+      const name = s && s.activeShareName;
+      if (name) startWatch(name);
+    } catch (e) { console.warn('[host] startWatch after teardown failed:', e && e.message); }
   }
 
   // --- セッション自動再開 / ウィンドウ監視 ---
@@ -768,7 +793,13 @@
     showWatch('対象ウィンドウ「' + name + '」の起動を待っています…（見つかり次第、自動で共有を再開します）');
     watchTimer = setInterval(async () => {
       const src = await findWindowByName(name);
-      if (src) choose(src, { auto: true }); // choose 内で stopWatch される
+      if (src) { choose(src, { auto: true }); return; } // choose 内で stopWatch される
+      // V-23.7: 一致無しでも picker が見えているならリストを最新化。
+      //   ユーザが手動で「更新」 ボタンを押さなくても、 対象窓が復活したらすぐ表示に現れる。
+      const picker = $('picker');
+      if (picker && !picker.classList.contains('hidden')) {
+        try { await loadWindows(); } catch {}
+      }
     }, 4000);
   }
   function stopWatch() {
