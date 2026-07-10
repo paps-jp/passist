@@ -527,23 +527,53 @@
     }
   }
 
+  // V-29: 手動 picker 選択時の capture 一過性失敗を自動リトライ。
+  //   Qwatch Monitor 系の DirectShow/D3D 描画アプリは起動直後・映像デコーダ初期化中に
+  //   WGC が一時的に attach できない瞬間がある。 1.5s → 3s バックオフで最大 3 回試行、
+  //   ユーザに「もう一度手動でクリック」 を強いない。
+  //   auto フロー (maybeResume / startWatch / tryAutoRecapture) は既に上位で
+  //   リトライしているので二重リトライを避けるため 1 回のみ。
+  async function captureWithRetry(opts) {
+    const maxAttempts = opts && opts.auto ? 1 : 3;
+    let lastErr;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      if (attempt > 1) {
+        const delay = attempt === 2 ? 1500 : 3000;
+        await new Promise((r) => setTimeout(r, delay));
+      }
+      try {
+        return await capture();
+      } catch (e) {
+        lastErr = e;
+        console.warn(`[host] capture attempt ${attempt}/${maxAttempts} failed:`, e && e.message);
+      }
+    }
+    throw lastErr;
+  }
+
+  // choose 実行中の多重クリック抑止 (picker で同じ or 別のカードを連打された時に
+  // 内部状態が壊れるのを防ぐ)
+  let chooseInProgress = false;
   async function choose(w, opts) {
-    opts = opts || {};
-    lastSharedWindow = w; // 終了後の「▶ もう一度共有」用に記録
-    stopWatch();
-    await window.host.selectSource(w.id, w.name);
-    window.host.settingsSet({ activeShareName: w.name }); // 共有対象を保存（終了ボタンまで保持＝再起動で自動再開）
-    let newStream;
+    if (chooseInProgress) return;
+    chooseInProgress = true;
     try {
-      newStream = await capture();
-    } catch (e) {
-      if (opts.auto) {
-        showResume(w); // 自動再開でキャプチャ不可（ユーザー操作要求等）→ 再開ボタンを提示
+      opts = opts || {};
+      lastSharedWindow = w; // 終了後の「▶ もう一度共有」用に記録
+      stopWatch();
+      await window.host.selectSource(w.id, w.name);
+      window.host.settingsSet({ activeShareName: w.name }); // 共有対象を保存（終了ボタンまで保持＝再起動で自動再開）
+      let newStream;
+      try {
+        newStream = await captureWithRetry(opts);
+      } catch (e) {
+        if (opts.auto) {
+          showResume(w); // 自動再開でキャプチャ不可（ユーザー操作要求等）→ 再開ボタンを提示
+          return;
+        }
+        alert(tr('host.dyn.captureFail', { error: e.message }));
         return;
       }
-      alert(tr('host.dyn.captureFail', { error: e.message }));
-      return;
-    }
     hideWatch();
     if (sessionStarted) {
       // 既存セッションを維持: 全ピアの映像トラックを差し替え（URL・接続・承認はそのまま継続）
@@ -573,12 +603,15 @@
       startSignaling();
       sessionStarted = true;
     }
-    // 共有対象ウィンドウが閉じられた（リモート操作で×が押された等）ことを検出。
-    // ハンドラ未設定だと renderer は「共有中」状態のまま無効HWNDへ入力注入を続けてしまい、
-    // Electron キャプチャエンジンや Win32 API がクラッシュの起点になる。
-    const vt = stream.getVideoTracks()[0];
-    if (vt) vt.onended = handleCaptureLost;
-    startFrameWatchdog(); // V-25: フレームが止まった時にも onended と同じ経路で復旧に流す
+      // 共有対象ウィンドウが閉じられた（リモート操作で×が押された等）ことを検出。
+      // ハンドラ未設定だと renderer は「共有中」状態のまま無効HWNDへ入力注入を続けてしまい、
+      // Electron キャプチャエンジンや Win32 API がクラッシュの起点になる。
+      const vt = stream.getVideoTracks()[0];
+      if (vt) vt.onended = handleCaptureLost;
+      startFrameWatchdog(); // V-25: フレームが止まった時にも onended と同じ経路で復旧に流す
+    } finally {
+      chooseInProgress = false;
+    }
   }
 
   // V-25: フレーム停滞監視。 WGC の getFrame 失敗 (Windows Graphics Capture のタイムアウト等) は
